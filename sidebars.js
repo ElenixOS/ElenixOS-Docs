@@ -96,7 +96,7 @@ const sidebars = {
           type: 'category',
           label: '脚本引擎',
           items: [
-            'architecture/script_engine/index',
+            'architecture/script_engine_overview',
             'architecture/script_engine/elenix_os',
             'architecture/script_engine/lvgl',
             'architecture/script_engine/special',

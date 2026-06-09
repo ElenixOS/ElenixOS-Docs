@@ -216,6 +216,89 @@ Must reset `error` when transitioning from `EXCEPTION` to `IDLE`
 `EXCEPTION` indicates "execution failure", with the specific reason distinguished by `error_type`.
 :::
 
+### Engine Crash and Recovery
+
+#### Background
+
+When JerryScript encounters an unrecoverable internal error (e.g., OOM, assertion failure), it calls `jerry_port_fatal()` to terminate the process. On embedded devices, termination means a system crash. ElenixOS overrides this function to implement engine crash recovery: **reset the engine to a clean state and continue running**.
+
+Recoverable fatal errors:
+
+| Code | JerryScript Definition | Description |
+|------|----------------------|-------------|
+| 10 | `JERRY_FATAL_OUT_OF_MEMORY` | Out of memory |
+| 12 | `JERRY_FATAL_REF_COUNT_LIMIT` | Reference count limit |
+| 13 | `JERRY_FATAL_DISABLED_BYTE_CODE` | Disabled instruction executed |
+| 14 | `JERRY_FATAL_UNTERMINATED_GC_LOOPS` | GC loop limit reached |
+| 120 | `JERRY_FATAL_FAILED_ASSERTION` | Assertion failed |
+
+#### Recovery Mechanism
+
+Recovery is based on C `setjmp`/`longjmp`:
+
+```mermaid
+sequenceDiagram
+    participant JS as JavaScript
+    participant SE as ScriptEngine
+    participant Jerry as JerryScript
+
+    SE->>Jerry: script_engine_run()<br/>setjmp(recovery_point)
+    Jerry->>JS: Execute bytecode
+    JS-->>Jerry: OOM / Assertion
+    Jerry->>Jerry: jerry_port_fatal(code)
+    Jerry->>SE: longjmp(recovery_point, code)
+    Note over SE: CRITICAL ORDERING
+    SE->>SE: 1. Clean module queue & tracked modules
+    SE->>SE: 2. Destroy all SPM programs<br/>(calls cleanup_view for LVGL widgets)
+    SE->>Jerry: 3. jerry_init() — wipe & reinit heap
+    SE->>SE: 4. Increment engine_gen<br/>(invalidates stale SNI handles)
+    Note over SE: RECOVERY COMPLETE
+    SE-->>SE: return -SE_ERR_JERRY_EXCEPTION
+```
+
+**Key design points:**
+
+- **`jerry_port_fatal` is located in `ElenixOS/src/script_engine/jerry_port.c`**: A strong symbol that overrides JerryScript's weak default, performing a `longjmp` back to the setjmp recovery point in `script_engine_run()`
+- **Strict cleanup ordering**: All JS handles on the old heap must be freed **before** `jerry_init()` wipes the heap, otherwise dangling pointers occur
+- **Engine generation (`engine_gen`)**: Incremented after each recovery. SNI control blocks record the generation at creation time; `sni_node_from_native()` and `sni_obj_deleted_cb()` compare generations to detect and reject handles from stale sessions, preventing use-after-free
+
+#### LVGL Widget Cleanup
+
+When an SPM program is destroyed during engine recovery, its associated LVGL widgets are automatically cleaned up via the `cleanup_view` callback registered by the upper layer (e.g., watchface):
+
+```c
+typedef struct script_program {
+    // ...
+    void (*cleanup_view)(void *user_data);   // LVGL view cleanup callback
+    void *cleanup_user_data;                 // Callback argument (lv_obj_t *view)
+} script_program_t;
+```
+
+Triggered in:
+- `spm_terminate_program()` — normal termination
+- `spm_handle_engine_reset()` — emergency cleanup during engine crash
+
+#### Error Reporting
+
+Crash information flows to the user through:
+
+1. `_set_error_info()` in the recovery path records a string containing the crash code and description (e.g., `"Engine crash (code=10, Out of memory)"`)
+2. `spm_start_program()` saves the error to the persistent copy `s_last_error`
+3. The fault panel retrieves and displays it via `spm_get_last_error()`
+
+Fault panel example:
+```
+Code: -200
+ID: cn.sab1e.lv_example
+ErrorType: Engine crash
+Error: Engine crash (code=10, Out of memory)
+```
+
+#### Safety Guards
+
+- **Stale frame guard**: If `jerry_port_fatal` is called after the setjmp frame is gone, `abort()` is called directly to avoid longjmp to an invalid stack frame
+- **Recursion guard**: If a fatal error occurs during recovery (`fatal_recovering == true`), `abort()` is called to prevent infinite setjmp/longjmp loops
+
 #### Realm Manager
 
 The Realm Manager is a sub-module of the engine kernel, not separated into a separate file, but still holds the necessary Realm switching API. It encapsulates JerryScript's Realm operations to avoid confusion caused by multiple controls. Realm Core is a lightweight execution layer interface, only responsible for the creation, destruction, and switching of JavaScript runtime Realm, without any lifecycle semantics.

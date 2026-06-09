@@ -216,6 +216,89 @@ typedef struct
 `EXCEPTION` 表示"执行过程失败"，具体原因由 `error_type` 区分。
 :::
 
+### 引擎崩溃与恢复
+
+#### 问题背景
+
+JerryScript 在遇到不可恢复的内部错误（如 OOM、断言失败）时会调用 `jerry_port_fatal()` 终止进程。在嵌入式设备上直接终止意味着系统崩溃，因此 ElenixOS 接管了此函数，实现引擎崩溃恢复：**重置引擎到干净状态，使系统继续运行**。
+
+可恢复的致命错误包括：
+
+| 错误码 | JerryScript 定义 | 描述 |
+|--------|-----------------|------|
+| 10 | `JERRY_FATAL_OUT_OF_MEMORY` | 内存不足 |
+| 12 | `JERRY_FATAL_REF_COUNT_LIMIT` | 引用计数上限 |
+| 13 | `JERRY_FATAL_DISABLED_BYTE_CODE` | 执行被禁用的指令 |
+| 14 | `JERRY_FATAL_UNTERMINATED_GC_LOOPS` | GC 循环上限 |
+| 120 | `JERRY_FATAL_FAILED_ASSERTION` | 断言失败 |
+
+#### 恢复原理
+
+恢复机制基于 `setjmp`/`longjmp`：
+
+```mermaid
+sequenceDiagram
+    participant JS as JavaScript
+    participant SE as ScriptEngine
+    participant Jerry as JerryScript
+
+    SE->>Jerry: script_engine_run()<br/>setjmp(recovery_point)
+    Jerry->>JS: Execute bytecode
+    JS-->>Jerry: OOM / Assertion
+    Jerry->>Jerry: jerry_port_fatal(code)
+    Jerry->>SE: longjmp(recovery_point, code)
+    Note over SE: CRITICAL ORDERING
+    SE->>SE: 1. Clean module queue & tracked modules
+    SE->>SE: 2. Destroy all SPM programs<br/>(calls cleanup_view for LVGL widgets)
+    SE->>Jerry: 3. jerry_init() — wipe & reinit heap
+    SE->>SE: 4. Increment engine_gen<br/>(invalidates stale SNI handles)
+    Note over SE: RECOVERY COMPLETE
+    SE-->>SE: return -SE_ERR_JERRY_EXCEPTION
+```
+
+**关键设计：**
+
+- **`jerry_port_fatal` 位于 `ElenixOS/src/script_engine/jerry_port.c`**：作为强符号覆盖 JerryScript 的弱符号默认实现，执行 `longjmp` 跳回 `script_engine_run()` 的 setjmp 恢复点
+- **严格清理顺序**：必须在 `jerry_init()` 重置堆之前释放旧堆上的所有 JS 句柄，否则产生 dangling pointer
+- **引擎代数（`engine_gen`）**：每次恢复后自增。SNI 控制块在创建时记录当前代数，`sni_node_from_native()` 和 `sni_obj_deleted_cb()` 通过代数比较识别并拒绝来自旧会话的句柄，防止 use-after-free
+
+#### LVGL 控件清理
+
+引擎崩溃后，SPM 程序被销毁，其关联的 LVGL 控件通过 `cleanup_view` 回调自动清理。回调在程序创建时由上层（如表盘）注册：
+
+```c
+typedef struct script_program {
+    // ...
+    void (*cleanup_view)(void *user_data);   // LVGL 视图清理回调
+    void *cleanup_user_data;                 // 回调参数（lv_obj_t *view）
+} script_program_t;
+```
+
+触发路径：
+- `spm_terminate_program()` — 正常终止
+- `spm_handle_engine_reset()` — 引擎崩溃时的紧急清理
+
+#### 错误报告
+
+崩溃信息通过以下路径传递给用户：
+
+1. 恢复路径中 `_set_error_info()` 记录包含崩溃代码和描述的字符串（如 `"Engine crash (code=10, Out of memory)"`）
+2. `spm_start_program()` 将错误信息保存到持久化副本 `s_last_error` 中
+3. 故障面板通过 `spm_get_last_error()` 获取并显示
+
+故障面板示例：
+```
+Code: -200
+ID: cn.sab1e.lv_example
+ErrorType: Engine crash
+Error: Engine crash (code=10, Out of memory)
+```
+
+#### 安全防护
+
+- **空栈帧保护**：若 `jerry_port_fatal` 在 setjmp 帧失效后被调用，直接 `abort()`，避免 longjmp 到无效栈帧
+- **递归保护**：若恢复过程中再次发生致命错误（`fatal_recovering == true`），直接 `abort()`，防止 setjmp/longjmp 死循环
+
 #### Realm 管理器
 
 Realm 管理器是引擎内核的一个子模块，没有被分离为单独文件，但仍然持有必须的 Realm 切换 API，封装 JerryScript 的 Realm 操作，避免多处控制导致混乱。Realm Core 是轻量执行层接口，仅负责 JavaScript 运行时 Realm 的创建、销毁与切换，不包含任何生命周期语义。
