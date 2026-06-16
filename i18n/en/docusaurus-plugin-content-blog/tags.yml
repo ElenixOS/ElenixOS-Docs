@@ -1,0 +1,16 @@
+demo:
+  label: Demo
+  permalink: /demo
+  description: ElenixOS demo
+lvgl:
+  label: LVGL
+  permalink: /lvgl
+  description: LVGL related articles
+tutorial:
+  label: Tutorial
+  permalink: /tutorial
+  description: ElenixOS tutorial
+layout:
+  label: Layout
+  permalink: /layout
+  description: Layout related articles

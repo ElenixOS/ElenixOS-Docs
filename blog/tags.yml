@@ -1,4 +1,16 @@
 demo:
   label: Demo
   permalink: /demo
-  description: ElenixOS demo
+  description: ElenixOS 示例
+lvgl:
+  label: LVGL
+  permalink: /lvgl
+  description: LVGL 相关文章
+tutorial:
+  label: 教程
+  permalink: /tutorial
+  description: ElenixOS 开发教程
+layout:
+  label: 布局
+  permalink: /layout
+  description: 布局相关文章

@@ -1,0 +1,23 @@
+---
+slug: /lvgl-bubble-tutorial
+title: ElenixOS 气泡应用布局实现教程已发布至 LVGL Blog
+authors: [Sab1e-dev]
+tags: [tutorial, lvgl, layout]
+---
+
+ElenixOS 中 WatchOS 风格气泡应用布局的实现教程现已发布至 LVGL 官方博客。
+
+文章完整梳理了从零复刻 watchOS 气泡网格界面的技术路径，包括：
+
+- **交错蜂巢布局算法**：索引到行列的映射、动态垂直居中
+- **距离场驱动缩放**：中心区保持最大尺寸，边缘平滑过渡
+- **边缘压缩与位移补偿**：解决边缘气泡过于稀疏的问题
+- **输入状态机**：区分轻触和拖拽，避免误触
+- **物理引擎**：阻尼弹簧回中、惯性滚动、步进吸附
+- **按压动画**：局部变形而非全局变换
+
+文中配有完整的代码片段和算法流程图，适合希望深入了解 LVGL 自定义组件开发的嵌入式 UI 开发者阅读。
+
+前往原文：
+
+https://lvgl.io/blog/tutorial-recreating-apple-watch-bubble-component

@@ -1,0 +1,23 @@
+---
+slug: /lvgl-bubble-tutorial
+title: ElenixOS Bubble App Layout Tutorial Published on LVGL Blog
+authors: [Sab1e-dev]
+tags: [tutorial, lvgl, layout]
+---
+
+A step-by-step tutorial on recreating the WatchOS-style bubble app layout from ElenixOS has been published on the LVGL official blog.
+
+The article covers the complete technical path to replicating the watchOS bubble grid interface from scratch, including:
+
+- **Staggered honeycomb layout algorithm**: index-to-row/column mapping, dynamic vertical centering
+- **Distance-field-driven scaling**: full size in the center zone, smooth transition toward edges
+- **Edge compaction and translation compensation**: preventing sparse appearance at screen boundaries
+- **Input state machine**: distinguishing taps from drags to avoid false triggers
+- **Physics engine**: damped spring recentering, inertial scrolling, step snapping
+- **Press animation**: local deformation rather than full-frame transforms
+
+The post includes code snippets and algorithm flowcharts, making it suitable for embedded UI developers who want to dive deep into custom LVGL component development.
+
+Read the full article:
+
+https://lvgl.io/blog/tutorial-recreating-apple-watch-bubble-component
