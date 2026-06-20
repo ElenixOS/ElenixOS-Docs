@@ -36,13 +36,9 @@ Therefore, LV_FS_DEFAULT_DRIVE_LETTER must point to the ElenixOS driver, otherwi
 
 ## Path Handling
 
-### Path Sanitization
+### Path Resolution
 
-The `_storage_sanitize_path` function ensures all paths have the EOS_SYS_ROOT_DIR prefix:
-
-- If the path already contains the system root directory prefix, it remains unchanged
-- If the path starts with "/" (absolute path), the system root directory prefix is added
-- If the path is a relative path, the system root directory prefix is added
+All path resolution is handled at the `eos_fs_port` layer, no longer by the storage service. On the simulator, call `eos_fs_set_root()` once at startup to set the sandbox root; `eos_fs_open_read()` / `eos_fs_open_write()` and friends internally call `eos_fs_realpath()` to transparently map virtual paths to real filesystem paths. On production hardware the root defaults to `"/"`, so paths pass through unchanged.
 
 ## JSON Storage API
 

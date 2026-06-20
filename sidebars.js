@@ -80,6 +80,7 @@ const sidebars = {
             'architecture/services/sensor/sensor',
             'architecture/services/state/state',
             'architecture/services/time/time',
+            'architecture/services/audio/audio',
           ],
         },
         {
