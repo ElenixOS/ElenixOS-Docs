@@ -54,6 +54,7 @@ function HomepageHeader() {
   const [commandId, setCommandId] = useState(1);
   const [demoCode, setDemoCode] = useState('');
   const [canWrite, setCanWrite] = useState(false);
+  const [listenerReady, setListenerReady] = useState(false);
   const iframeRef = useRef(null);
   const codeHighlighterRef = useRef(null);
   const {colorMode} = useColorMode();
@@ -91,6 +92,7 @@ button.addEventCb((e) => {
   useEffect(() => {
     _ensureGlobalListener();
     _stateBinding.current = {setIsReady, setDemoCode, setCanWrite, defaultCode};
+    setListenerReady(true);
     return () => { _stateBinding.current = null; };
   }, []);
 
@@ -250,7 +252,7 @@ button.addEventCb((e) => {
               </div>
             </div>
             <div className={styles.demoPreview}>
-              <iframe ref={iframeRef} src={SIMULATOR_URL} className={styles.previewFrame} title="ElenixOS WASM Simulator" />
+              <iframe ref={iframeRef} src={listenerReady ? SIMULATOR_URL : 'about:blank'} className={styles.previewFrame} title="ElenixOS WASM Simulator" />
             </div>
           </div>
         </div>
