@@ -444,5 +444,13 @@
   "theme.tags.tagsPageTitle": {
     "message": "标签",
     "description": "The title of the tag list page"
+  },
+  "todo.title": {
+    "message": "待完善",
+    "description": "Todo admonition title"
+  },
+  "todo.defaultContent": {
+    "message": "该部分内容正在构建中，请稍后查看。",
+    "description": "Todo admonition default content"
   }
 }

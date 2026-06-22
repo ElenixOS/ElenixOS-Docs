@@ -12,7 +12,7 @@ const LAYERS = [
       translate({id: 'homepage.arch.app.system', message: '系统应用'}),
       translate({id: 'homepage.arch.app.third', message: '第三方应用'}),
     ],
-    url: '/docs/architecture/framework/app/app',
+    url: '/docs/architecture/framework/app',
   },
   {
     label: translate({id: 'homepage.arch.layer5', message: '内核层'}),
@@ -29,7 +29,7 @@ const LAYERS = [
       translate({id: 'homepage.arch.service.sensor', message: '传感器 · 显示 · 电池 · 存储 · 电源'}),
       translate({id: 'homepage.arch.service.count', message: '10+ 标准系统服务'}),
     ],
-    url: '/docs/architecture/services/sensor/sensor',
+    url: '/docs/architecture/services/sensor',
   },
   {
     label: translate({id: 'homepage.arch.layer3', message: '设备管理器'}),
@@ -45,7 +45,7 @@ const LAYERS = [
       translate({id: 'homepage.arch.driver.sensor', message: '传感器驱动 · 显示驱动'}),
       translate({id: 'homepage.arch.driver.fs', message: '电池驱动 · 文件系统驱动'}),
     ],
-    url: '/docs/architecture/arch',
+    url: '/docs/architecture/driver',
   },
   {
     label: translate({id: 'homepage.arch.layer1', message: '硬件层'}),
@@ -53,9 +53,9 @@ const LAYERS = [
       translate({id: 'homepage.arch.hw.mcu', message: 'MCU / SoC · 蓝牙'}),
       translate({id: 'homepage.arch.hw.storage', message: '传感器 · 存储器 · 显示屏'}),
     ],
-    url: '/docs/architecture/arch',
-  },
-];
+    url: '/docs/architecture/hardware',
+    },
+  ];
 
 const SCRIPT_FLOW = [
   {label: translate({id: 'homepage.arch.flow.js', message: 'JS 应用 / 表盘'}), accent: false},

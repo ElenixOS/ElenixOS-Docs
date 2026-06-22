@@ -50,6 +50,8 @@ const sidebars = {
         'architecture/arch',
         'architecture/runtime',
         'architecture/device_architecture_design',
+        'architecture/hardware',
+        'architecture/driver',
         {
           type: 'category',
           label: '框架层',

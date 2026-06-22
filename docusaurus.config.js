@@ -178,7 +178,7 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright \u00A9 ${new Date().getFullYear()} ElenixOS`,
+        copyright: `Copyright \u00A9 ${new Date().getFullYear()} ElenixOS. Built with <a href="https://docusaurus.io" target="_blank" rel="noopener noreferrer">Docusaurus</a>.`,
       },
       prism: {
         theme: prismThemes.github,

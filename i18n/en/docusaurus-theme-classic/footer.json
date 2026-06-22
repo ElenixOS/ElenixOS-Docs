@@ -80,7 +80,7 @@
     "description": "The label of footer link with label=腾讯频道 linking to https://pd.qq.com/s/2arlf3js7"
   },
   "copyright": {
-    "message": "Copyright © 2026 ElenixOS Contributors. Built with Docusaurus.",
+    "message": "Copyright © 2025-2026 ElenixOS Contributors. Built with <a href=\"https://docusaurus.io\" target=\"_blank\" rel=\"noopener noreferrer\">Docusaurus</a>.",
     "description": "The footer copyright"
   }
 }

@@ -664,5 +664,13 @@
   },
   "homepage.bottomCTA.github": {
     "message": "Follow Us on GitHub"
+  },
+  "todo.title": {
+    "message": "TODO",
+    "description": "Todo admonition title"
+  },
+  "todo.defaultContent": {
+    "message": "This section is under construction. Please check back later.",
+    "description": "Todo admonition default content"
   }
 }
