@@ -8,6 +8,7 @@
   text-align: center;
   max-width: 740px;
   margin: 0 auto;
+  padding: 0 1.5rem;
   animation: fadeUp 0.7s ease both;
 }
 
@@ -351,9 +352,60 @@
 /* ── Responsive ── */
 @media screen and (max-width: 996px) {
   .heroBanner { padding: 3.5rem 0 2.5rem; }
+  .heroContent { padding: 0 1.5rem; max-width: 100%; }
   .heroTitle { font-size: clamp(2rem, 8vw, 3rem); }
-  .heroStats { flex-wrap: wrap; gap: 1rem 2rem; max-width: 320px; margin: 2rem auto 0; }
+  .heroSubtitle { font-size: 1rem; max-width: 100%; }
+  .heroBadge { font-size: 0.8rem; }
+  .buttons { gap: 0.75rem; margin-top: 1.5rem; }
+  .primaryButton,
+  .secondaryButton { padding: 0.65rem 1.5rem; font-size: 0.9rem; }
+  .quickLinks { margin-top: 1rem; }
+  .quickLink { font-size: 0.85rem; }
+  .quickLinkDivider { font-size: 0.85rem; margin: 0 0.3rem; }
+  .heroStats { flex-wrap: wrap; gap: 1rem 1.8rem; justify-content: center; margin: 2rem auto 0; }
+  .statItem strong { font-size: 0.64rem; }
+  .statItem span { font-size: 1rem; }
+  .demoCard { margin-top: 2rem; border-radius: 18px; }
   .demoBody { grid-template-columns: 1fr; min-height: auto; }
-  .demoEditor { border-right: none; border-bottom: 1px solid #e8e8ed; min-height: 300px; }
-  .demoPreview { min-height: 360px; }
+  .demoEditor { border-right: none; border-bottom: 1px solid #e8e8ed; min-height: 240px; height: 240px; }
+  .demoPreview { min-height: 300px; height: 300px; }
+  .editorWrapper { min-height: 0; }
+}
+
+@media screen and (max-width: 480px) {
+  .heroBanner { padding: 2.5rem 0 2rem; }
+  .heroContent { padding: 0 1rem; }
+  .heroTitle { font-size: clamp(1.7rem, 9vw, 2.6rem); margin-bottom: 0.75rem; }
+  .heroSubtitle { font-size: 0.88rem; }
+  .heroBadge { font-size: 0.74rem; margin-bottom: 0.6rem; }
+  .buttons { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+  .primaryButton,
+  .secondaryButton { text-align: center; padding: 0.6rem 1.2rem; font-size: 0.85rem; }
+  .quickLinks { margin-top: 0.8rem; flex-wrap: wrap; justify-content: center; }
+  .quickLink { font-size: 0.8rem; padding: 0.15rem 0; }
+  .quickLinkDivider { font-size: 0.8rem; margin: 0 0.2rem; }
+  .heroStats { gap: 0.6rem 1.2rem; margin-top: 1.4rem; }
+  .statItem strong { font-size: 0.6rem; }
+  .statItem span { font-size: 0.9rem; }
+  .demoCard { margin-top: 1.5rem; border-radius: 14px; }
+  .demoHeader { padding: 0 0.7rem; min-height: 36px; gap: 0.35rem; }
+  .demoDot { width: 8px; height: 8px; }
+  .demoTitle { font-size: 0.68rem; }
+  .demoStatus { gap: 0.25rem; }
+  .demoStatusText { font-size: 0.62rem; }
+  .statusDot { width: 6px; height: 6px; }
+  .demoBody { grid-template-columns: 1fr; }
+  .demoEditor { min-height: 180px; height: 180px; border-bottom: 1px solid #e8e8ed; }
+  .demoPreview { min-height: 220px; height: 220px; }
+  .editorToolbar { padding: 0.3rem 0.6rem; }
+  .editorLabel { font-size: 0.62rem; }
+  .runButton { padding: 0.22rem 0.6rem; font-size: 0.68rem; }
+  .runButton svg { width: 12px; height: 12px; }
+  .codeHighlighter,
+  .codeEditor { font-size: 0.68rem; padding: 0.5rem; }
+}
+
+@media screen and (max-width: 996px) {
+  :global([data-theme='dark']) .demoEditor { border-bottom-color: #333336; }
+  :global([data-theme='dark']) .editorToolbar { border-bottom-color: #333336; }
 }

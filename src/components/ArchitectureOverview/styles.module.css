@@ -184,6 +184,36 @@
 
 @media screen and (max-width: 996px) {
   .section { padding: 4rem 0; }
-  .archWrap { grid-template-columns: 1fr; }
-  .flowSidebar { max-width: 500px; margin: 0 auto; }
+  .sectionTitle { font-size: clamp(1.6rem, 5vw, 2.4rem); }
+  .sectionSubtitle { font-size: 0.95rem; max-width: 100%; }
+  .headerBlock { margin-bottom: 2.5rem; }
+  .archWrap { grid-template-columns: 1fr; gap: 2.5rem; }
+  .layerStack { max-width: 100%; }
+  .layerRow { padding: 0.9rem 0; margin-left: 0 !important; }
+  .layerRow:hover { padding-left: 0; }
+  .layerLabel { font-size: 0.98rem; }
+  .layerItem { font-size: 0.8rem; }
+  .layerContent { min-width: 0; }
+  .layerItems { flex-wrap: wrap; }
+  .flowSidebar { max-width: 100%; margin: 0; padding: 1.5rem; }
+}
+
+@media screen and (max-width: 480px) {
+  .section { padding: 3rem 0; }
+  .sectionTitle { font-size: clamp(1.4rem, 6vw, 2rem); }
+  .sectionSubtitle { font-size: 0.88rem; }
+  .headerBlock { margin-bottom: 2rem; }
+  .archWrap { gap: 2rem; }
+  .layerRow { padding: 0.75rem 0; margin-left: 0 !important; }
+  .layerAccent { width: 3px; height: 16px; margin-right: 0.8rem; }
+  .layerLabel { font-size: 0.88rem; }
+  .layerItem { font-size: 0.74rem; }
+  .layerItem + .layerItem::before { margin-right: 0.6rem; }
+  .layerArrow { width: 14px; height: 14px; }
+  .flowSidebar { padding: 1.2rem; border-radius: 14px; }
+  .flowContainer { gap: 1.2rem; padding-left: 0.3rem; }
+  .flowLabel { font-size: 0.85rem; }
+  .flowDesc { font-size: 0.74rem; }
+  .flowNote { font-size: 0.74rem; padding-top: 1rem; }
+  .flowTitle { font-size: 0.84rem; }
 }

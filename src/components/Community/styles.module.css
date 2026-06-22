@@ -78,8 +78,23 @@
 :global([data-theme='dark']) .license { color: #86868b; }
 :global([data-theme='dark']) .licenseIcon { color: #2997ff; }
 
-@media screen and (max-width: 996px) { .section { padding: 4rem 0; } }
+@media screen and (max-width: 996px) {
+  .section { padding: 4rem 0; }
+  .sectionTitle { font-size: clamp(1.6rem, 5vw, 2.4rem); }
+  .sectionSubtitle { font-size: 0.95rem; max-width: 100%; }
+  .headerBlock { margin-bottom: 2rem; }
+  .grid { gap: 0.8rem; justify-content: center; }
+  .card { padding: 1.4rem 1.4rem; min-width: 0; flex: 1 1 140px; max-width: 200px; }
+}
 
 @media screen and (max-width: 480px) {
-  .card { min-width: 120px; padding: 1.4rem 1.2rem; }
+  .section { padding: 3rem 0; }
+  .sectionTitle { font-size: clamp(1.4rem, 6vw, 2rem); }
+  .sectionSubtitle { font-size: 0.85rem; }
+  .headerBlock { margin-bottom: 1.5rem; }
+  .grid { gap: 0.6rem; margin-bottom: 1.5rem; }
+  .card { padding: 1.1rem 0.8rem; min-width: calc(50% - 0.6rem); max-width: none; flex: 1 1 calc(50% - 0.6rem); border-radius: 12px; }
+  .cardLabel { font-size: 0.85rem; }
+  .cardDesc { font-size: 0.7rem; }
+  .license { font-size: 0.74rem; flex-wrap: wrap; }
 }

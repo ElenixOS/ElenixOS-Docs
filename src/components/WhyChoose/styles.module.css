@@ -67,4 +67,21 @@
 
 @media screen and (max-width: 996px) {
   .section { padding: 4rem 0; }
+  .sectionTitle { font-size: clamp(1.6rem, 5vw, 2.4rem); }
+  .sectionSubtitle { font-size: 0.95rem; margin-bottom: 2rem; max-width: 100%; }
+  .row { gap: 1.2rem; padding: 1.4rem 0; }
+  .rowTitle { font-size: 1.1rem; }
+  .rowDesc { font-size: 0.9rem; }
+  .rowIcon svg { width: 28px; height: 28px; }
+}
+
+@media screen and (max-width: 480px) {
+  .section { padding: 3rem 0; }
+  .sectionTitle { font-size: clamp(1.4rem, 6vw, 2rem); }
+  .sectionSubtitle { font-size: 0.85rem; margin-bottom: 1.5rem; max-width: 100%; }
+  .row { flex-direction: column; gap: 0.6rem; padding: 1.2rem 0; }
+  .rowIcon { margin-top: 0; }
+  .rowIcon svg { width: 24px; height: 24px; }
+  .rowTitle { font-size: 1.05rem; }
+  .rowDesc { font-size: 0.85rem; }
 }

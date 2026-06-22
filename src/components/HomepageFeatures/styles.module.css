@@ -47,9 +47,24 @@
 
 @media screen and (max-width: 996px) {
   .features { padding: 3rem 0 3.5rem; }
+  .label { margin-bottom: 2rem; }
   .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.8rem 1rem; }
+  .itemLabel { font-size: 0.76rem; }
+}
+
+@media screen and (max-width: 640px) {
+  .features { padding: 2.5rem 0 3rem; }
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.4rem 0.8rem; }
+  .item { gap: 0.6rem; }
+  .itemLabel { font-size: 0.7rem; }
+  .icon svg { width: 28px; height: 28px; }
 }
 
 @media screen and (max-width: 480px) {
+  .features { padding: 2.5rem 0 3rem; }
+  .label { font-size: 0.74rem; margin-bottom: 1.6rem; }
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem 1rem; }
+  .item { gap: 0.5rem; }
+  .itemLabel { font-size: 0.68rem; }
+  .icon svg { width: 26px; height: 26px; }
 }

@@ -80,4 +80,16 @@
 
 @media screen and (max-width: 996px) {
   .section { padding: 4.5rem 0 5.5rem; }
+  .title { font-size: clamp(1.6rem, 5vw, 2.5rem); }
+  .subtitle { font-size: 0.95rem; max-width: 100%; }
+  .content { max-width: 100%; padding: 0 0.5rem; }
+}
+
+@media screen and (max-width: 480px) {
+  .section { padding: 3.5rem 0 4rem; }
+  .title { font-size: clamp(1.4rem, 7vw, 2rem); }
+  .subtitle { font-size: 0.85rem; margin-bottom: 1.5rem; }
+  .buttons { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+  .primaryBtn,
+  .secondaryBtn { justify-content: center; padding: 0.7rem 1.4rem; font-size: 0.88rem; }
 }
