@@ -43,6 +43,42 @@
     "message": "Contact Us",
     "description": "The label of footer link with label=联系我们 linking to mailto:contact@elenixos.com"
   },
+  "link.title.浏览文档": {
+    "message": "Browse Docs",
+    "description": "The title of the footer links column with title=浏览文档 in the footer"
+  },
+  "link.title.项目资源": {
+    "message": "Project Resources",
+    "description": "The title of the footer links column with title=项目资源 in the footer"
+  },
+  "link.title.开发者社区": {
+    "message": "Developer Community",
+    "description": "The title of the footer links column with title=开发者社区 in the footer"
+  },
+  "link.item.label.系统架构": {
+    "message": "System Architecture",
+    "description": "The label of footer link with label=系统架构 linking to /docs/architecture/arch"
+  },
+  "link.item.label.更新日志": {
+    "message": "Changelog",
+    "description": "The label of footer link with label=更新日志 linking to /docs/CHANGELOG"
+  },
+  "link.item.label.JavaScript API": {
+    "message": "JavaScript API",
+    "description": "The label of footer link with label=JavaScript API linking to /docs/architecture/script_engine/elenix_os"
+  },
+  "link.item.label.在线模拟器": {
+    "message": "Online Simulator",
+    "description": "The label of footer link with label=在线模拟器 linking to https://simulator.elenixos.com/wasm/latest/main.html"
+  },
+  "link.item.label.GitHub Discussions": {
+    "message": "GitHub Discussions",
+    "description": "The label of footer link with label=GitHub Discussions linking to https://github.com/ElenixOS/ElenixOS/discussions"
+  },
+  "link.item.label.腾讯频道": {
+    "message": "Tencent Channel",
+    "description": "The label of footer link with label=腾讯频道 linking to https://pd.qq.com/s/2arlf3js7"
+  },
   "copyright": {
     "message": "Copyright © 2026 ElenixOS Contributors. Built with Docusaurus.",
     "description": "The footer copyright"

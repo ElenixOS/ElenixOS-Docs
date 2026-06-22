@@ -117,74 +117,68 @@ const config = {
             position: 'left',
             label: '文档',
           },
+          {to: '/blog', label: '博客', position: 'left'},
+          {
+            href: 'https://simulator.elenixos.com/wasm/latest/main.html',
+            label: '在线模拟器',
+            position: 'left',
+          },
           {
             type: 'search',
             position: 'right',
           },
-          {to: '/blog', label: '博客', position: 'left'},
           {
             type: 'localeDropdown',
             position: 'right',
           },
           {
-            href: 'https://github.com/ElenixOS/ElenixOS',
-            label: 'GitHub 仓库',
+            type: 'html',
             position: 'right',
+            value: `
+              <a href="https://github.com/ElenixOS/ElenixOS"
+                 class="navbar__link navbar-github-link"
+                 target="_blank" rel="noopener noreferrer"
+                 aria-label="GitHub">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                </svg>
+              </a>
+            `,
           },
         ],
       },
       footer: {
-        style: 'dark',
         links: [
           {
-            title: '文档',
+            title: '浏览文档',
             items: [
-              {
-                label: '项目介绍',
-                to: '/docs/intro',
-              },
-              {
-                label: '构建与使用',
-                href: '/docs/getting_started/build',
-              },
+              {label: '项目介绍', to: '/docs/intro'},
+              {label: '快速开始', to: '/docs/getting_started/quick_start'},
+              {label: '构建与使用', to: '/docs/getting_started/build'},
+              {label: '系统架构', to: '/docs/architecture/arch'},
+              {label: '更新日志', to: '/docs/CHANGELOG'},
             ],
           },
           {
-            title: '项目',
+            title: '项目资源',
             items: [
-              {
-                label: '快速开始',
-                href: '/docs/getting_started/quick_start',
-              },
-              {
-                label: '脚本引擎指南',
-                href: '/docs/architecture/script_engine',
-              },
-              {
-                label: '开发工具',
-                href: '/docs/development/dev_tools',
-              },
+              {label: '脚本引擎指南', to: '/docs/architecture/script_engine'},
+              {label: 'JavaScript API', to: '/docs/architecture/script_engine/elenix_os'},
+              {label: '开发工具', to: '/docs/development/dev_tools'},
+              {label: '在线模拟器', href: 'https://simulator.elenixos.com/wasm/latest/main.html'},
             ],
           },
           {
-            title: '更多',
+            title: '开发者社区',
             items: [
-              {
-                label: '博客',
-                to: '/blog',
-              },
-              {
-                label: 'GitHub 仓库',
-                href: 'https://github.com/ElenixOS/ElenixOS',
-              },
-              {
-                label: '联系我们',
-                href: 'mailto:contact@elenixos.com',
-              },
+              {label: 'GitHub Discussions', href: 'https://github.com/ElenixOS/ElenixOS/discussions'},
+              {label: '腾讯频道', href: 'https://pd.qq.com/s/2arlf3js7'},
+              {label: '博客', to: '/blog'},
+              {label: '联系我们', href: 'mailto:contact@elenixos.com'},
             ],
           },
         ],
-        copyright: `版权所有 © ${new Date().getFullYear()} ElenixOS 贡献者。基于 Docusaurus 构建。`,
+        copyright: `Copyright \u00A9 ${new Date().getFullYear()} ElenixOS`,
       },
       prism: {
         theme: prismThemes.github,

@@ -18,5 +18,9 @@
   "item.label.GitHub 仓库": {
     "message": "GitHub Repository",
     "description": "Navbar item with label GitHub 仓库"
+  },
+  "item.label.在线模拟器": {
+    "message": "Online Simulator",
+    "description": "Navbar item with label 在线模拟器"
   }
 }

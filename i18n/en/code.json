@@ -412,5 +412,257 @@
   "theme.tags.tagsPageTitle": {
     "message": "Tags",
     "description": "The title of the tag list page"
+  },
+  "homepage.stats.simulator": {
+    "message": "Online Experience"
+  },
+  "homepage.stats.simulator.value": {
+    "message": "Simulator"
+  },
+  "homepage.run": {
+    "message": "Run"
+  },
+  "homepage.features.scriptDriven": {
+    "message": "Script-Driven Architecture"
+  },
+  "homepage.features.runtime": {
+    "message": "LVGL + JerryScript"
+  },
+  "homepage.features.portable": {
+    "message": "Portable & Extensible"
+  },
+  "homepage.features.ux": {
+    "message": "Wearable Interaction UX"
+  },
+  "homepage.features.simulator": {
+    "message": "Online Simulator"
+  },
+  "homepage.features.toolchain": {
+    "message": "Developer Toolchain"
+  },
+  "homepage.arch.layer6": {
+    "message": "Application Layer"
+  },
+  "homepage.arch.app.watchface": {
+    "message": "Watchface System"
+  },
+  "homepage.arch.app.system": {
+    "message": "System Apps"
+  },
+  "homepage.arch.app.third": {
+    "message": "Third-Party Apps"
+  },
+  "homepage.arch.layer5": {
+    "message": "Kernel Layer"
+  },
+  "homepage.arch.kernel.script": {
+    "message": "Script Engine (SPM / SNI)"
+  },
+  "homepage.arch.kernel.event": {
+    "message": "Event System"
+  },
+  "homepage.arch.kernel.ui": {
+    "message": "Built-in UI Widgets"
+  },
+  "homepage.arch.layer4": {
+    "message": "Service Layer"
+  },
+  "homepage.arch.service.sensor": {
+    "message": "Sensor · Display · Battery · Storage · Power"
+  },
+  "homepage.arch.service.count": {
+    "message": "10+ Standard System Services"
+  },
+  "homepage.arch.layer3": {
+    "message": "Device Manager"
+  },
+  "homepage.arch.device.unified": {
+    "message": "Unified Device Registration & Discovery"
+  },
+  "homepage.arch.device.state": {
+    "message": "State Machine · Status Reporting"
+  },
+  "homepage.arch.layer2": {
+    "message": "Driver Layer"
+  },
+  "homepage.arch.driver.sensor": {
+    "message": "Sensor Driver · Display Driver"
+  },
+  "homepage.arch.driver.fs": {
+    "message": "Battery Driver · Filesystem Driver"
+  },
+  "homepage.arch.layer1": {
+    "message": "Hardware Layer"
+  },
+  "homepage.arch.hw.mcu": {
+    "message": "MCU / SoC · Bluetooth"
+  },
+  "homepage.arch.hw.storage": {
+    "message": "Sensor · Storage · Display"
+  },
+  "homepage.arch.flow.js": {
+    "message": "JS Apps / Watchfaces"
+  },
+  "homepage.arch.flow.spm": {
+    "message": "Lifecycle Management"
+  },
+  "homepage.arch.flow.sni": {
+    "message": "API Bridge Layer"
+  },
+  "homepage.arch.flow.native": {
+    "message": "Native Services"
+  },
+  "homepage.arch.heading": {
+    "message": "Six-layer architecture, cleanly decoupled from hardware to application"
+  },
+  "homepage.arch.subtitle": {
+    "message": "Each layer has clear responsibilities, providing a unified API upward and adapting to different hardware platforms downward."
+  },
+  "homepage.arch.flowTitle": {
+    "message": "Script Runtime Model"
+  },
+  "homepage.arch.flowNote": {
+    "message": "Each app has its own isolated Realm environment. SPM manages the lifecycle, and SNI provides a unified API bridge."
+  },
+  "homepage.why.heading": {
+    "message": "Why Choose ElenixOS"
+  },
+  "homepage.why.subtitle": {
+    "message": "An open system purpose-built for wearables, balancing extreme performance with development efficiency."
+  },
+  "homepage.why.script.title": {
+    "message": "Script-Based Development, Rapid Iteration"
+  },
+  "homepage.why.script.desc": {
+    "message": "Write UI and interaction logic in JavaScript, with hot updates without recompiling firmware. Watchfaces and apps share the same script runtime and API system, reducing learning costs and increasing consistency."
+  },
+  "homepage.why.resource.title": {
+    "message": "Resource-Friendly, Deeply Optimized"
+  },
+  "homepage.why.resource.desc": {
+    "message": "JerryScript is designed for low-memory devices, and LVGL renders efficiently. The system is deeply optimized to run smoothly on typical smartwatch MCUs with extremely low RAM usage."
+  },
+  "homepage.why.portable.title": {
+    "message": "Highly Portable, Write Once & Reuse Across Platforms"
+  },
+  "homepage.why.portable.desc": {
+    "message": "Six-layer abstraction and unified device interfaces — porting to a new MCU only requires driver layer adaptation, with zero changes to upper-layer application code, drastically reducing cross-platform migration costs."
+  },
+  "homepage.why.ux.title": {
+    "message": "Apple Watch-Level Interaction Experience"
+  },
+  "homepage.why.ux.desc": {
+    "message": "UI and interaction style deeply reference Apple Watch, emphasizing animation continuity, gesture fluidity, and interface hierarchy. Combined with the LVGL animation system and event mechanism, it delivers a near-native smartwatch experience on embedded platforms."
+  },
+  "homepage.tech.heading": {
+    "message": "Technology Stack"
+  },
+  "homepage.tech.lvgl.desc": {
+    "message": "Lightweight embedded graphics library with rich UI controls and animation capabilities, powering all interface rendering."
+  },
+  "homepage.tech.jerry.desc": {
+    "message": "A JavaScript engine designed for IoT and embedded devices, providing a complete ES5.1 execution environment with minimal memory footprint."
+  },
+  "homepage.tech.runtimeTitle": {
+    "message": "ElenixOS Custom Runtime"
+  },
+  "homepage.tech.spm": {
+    "message": "Lifecycle Management"
+  },
+  "homepage.tech.sni": {
+    "message": "API Bridge Layer"
+  },
+  "homepage.tech.native": {
+    "message": "Native Services"
+  },
+  "homepage.tech.nativeCount": {
+    "message": "10+ System Services"
+  },
+  "homepage.quick.heading": {
+    "message": "Get Started in 3 Steps"
+  },
+  "homepage.quick.step1.title": {
+    "message": "Try Online"
+  },
+  "homepage.quick.step1.a": {
+    "message": "Open the simulator directly in your browser"
+  },
+  "homepage.quick.step1.b": {
+    "message": "No installation needed, get started instantly"
+  },
+  "homepage.quick.step1.c": {
+    "message": "Experience full system functionality"
+  },
+  "homepage.quick.step1.cta": {
+    "message": "Open Simulator"
+  },
+  "homepage.quick.step2.title": {
+    "message": "Set Up Environment"
+  },
+  "homepage.quick.step2.a": {
+    "message": "Clone the repository"
+  },
+  "homepage.quick.step2.b": {
+    "message": "Install build dependencies"
+  },
+  "homepage.quick.step2.c": {
+    "message": "Build and run the PC simulator"
+  },
+  "homepage.quick.step2.cta": {
+    "message": "View Build Guide"
+  },
+  "homepage.quick.step3.title": {
+    "message": "Develop Apps"
+  },
+  "homepage.quick.step3.a": {
+    "message": "Read the JS API documentation"
+  },
+  "homepage.quick.step3.b": {
+    "message": "Write UI and interaction logic"
+  },
+  "homepage.quick.step3.c": {
+    "message": "Package and deploy to device"
+  },
+  "homepage.quick.step3.cta": {
+    "message": "View JS API"
+  },
+  "homepage.community.heading": {
+    "message": "Join the Community, Build Together"
+  },
+  "homepage.community.subtitle": {
+    "message": "ElenixOS is an open, community-driven project. We welcome every developer's participation and contribution."
+  },
+  "homepage.community.license": {
+    "message": "Apache License 2.0 — Free to use, modify, and distribute, including for commercial purposes."
+  },
+  "homepage.community.qq.label": {
+    "message": "Tencent Channel"
+  },
+  "homepage.community.simulator.label": {
+    "message": "Online Simulator"
+  },
+  "homepage.community.github.desc": {
+    "message": "Source Code & Issues"
+  },
+  "homepage.community.discussions.desc": {
+    "message": "Tech Discussion & Q&A"
+  },
+  "homepage.community.qq.desc": {
+    "message": "China Developer Community"
+  },
+  "homepage.community.simulator.desc": {
+    "message": "Instant browser experience"
+  },
+  "homepage.bottomCTA.title": {
+    "message": "Ready to build the next generation of smart wearable experiences?"
+  },
+  "homepage.bottomCTA.subtitle": {
+    "message": "From docs to code, from simulator to device — it all starts here."
+  },
+  "homepage.bottomCTA.docs": {
+    "message": "Start Reading Docs"
+  },
+  "homepage.bottomCTA.github": {
+    "message": "Follow Us on GitHub"
   }
 }

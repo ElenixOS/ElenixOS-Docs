@@ -1,0 +1,79 @@
+.section {
+  padding: 6rem 0;
+  background: #fff;
+}
+
+.headerBlock {
+  margin-bottom: 3rem;
+  max-width: 680px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: clamp(2rem, 3.2vw, 2.8rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #1d1d1f;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.stepCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 2rem;
+  border-radius: 20px;
+  background: #f5f5f7;
+}
+
+.stepNumber {
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #d2d2d7;
+  letter-spacing: -0.04em;
+}
+
+.stepTitle {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1d1d1f;
+  letter-spacing: -0.02em;
+}
+
+.stepList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.stepItem { font-size: 0.92rem; color: #6e6e73; line-height: 1.5; }
+
+.stepCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.6rem;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: #0071e3 !important;
+  text-decoration: none !important;
+  transition: gap 0.2s;
+  align-self: flex-start;
+}
+
+.stepCta:hover { gap: 0.55rem; }
+
+@media screen and (max-width: 996px) {
+  .section { padding: 4rem 0; }
+  .grid { grid-template-columns: 1fr; max-width: 420px; }
+}
