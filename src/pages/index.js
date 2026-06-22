@@ -19,6 +19,35 @@ import styles from './index.module.css';
 
 const SIMULATOR_URL = 'https://simulator.elenixos.com/wasm/latest/main.html';
 const DEMO_APP_ID = 'com.elenixos.demo';
+const SEND_TIMEOUT_MS = 3000;
+const SEND_MAX_RETRIES = 3;
+const SEND_RETRY_DELAY_MS = 500;
+
+// Module-level message listener: survives Docusaurus SPA component remounts
+// (e.g. language switching) so messages from the iframe are never lost.
+let _globalListenerActive = false;
+const _stateBinding = {current: null};
+
+function _ensureGlobalListener() {
+  if (_globalListenerActive) return;
+  _globalListenerActive = true;
+  window.addEventListener('message', (event) => {
+    const message = event.data;
+    const bound = _stateBinding.current;
+    if (!bound || !message || message.namespace !== 'ElenixOS') return;
+    if (message.type === 'ready') {
+      bound.setIsReady(true);
+    } else if (message.type === 'response') {
+      if (message.action === 'readAppMainJs' && message.ok) {
+        bound.setDemoCode(message.result || bound.defaultCode);
+        bound.setCanWrite(true);
+      } else if (message.action === 'readAppMainJs' && !message.ok) {
+        bound.setDemoCode(bound.defaultCode);
+        bound.setCanWrite(false);
+      }
+    }
+  });
+}
 
 function HomepageHeader() {
   const [isReady, setIsReady] = useState(false);
@@ -60,49 +89,49 @@ button.addEventCb((e) => {
   });
 
   useEffect(() => {
-    const handleMessage = (event) => {
-      const message = event.data;
-      if (message && message.namespace === 'ElenixOS') {
-        if (message.type === 'ready') {
-          setIsReady(true);
-        } else if (message.type === 'response') {
-          if (message.action === 'readAppMainJs' && message.ok) {
-            setDemoCode(message.result || defaultCode);
-            setCanWrite(true);
-          } else if (message.action === 'readAppMainJs' && !message.ok) {
-            setDemoCode(defaultCode);
-            setCanWrite(false);
-          }
-        }
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    _ensureGlobalListener();
+    _stateBinding.current = {setIsReady, setDemoCode, setCanWrite, defaultCode};
+    return () => { _stateBinding.current = null; };
   }, []);
 
   useEffect(() => {
     if (isReady) readDemoCode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady]);
 
   const sendCommand = (action, payload = {}, callback = null) => {
-    if (!iframeRef.current || !isReady) return;
-    const id = commandId;
-    setCommandId(id + 1);
-    const message = {
-      namespace: 'ElenixOS', type: 'command',
-      id: id.toString(), action, payload,
-    };
-    const handleResponse = (event) => {
-      const response = event.data;
-      if (response && response.namespace === 'ElenixOS' && response.type === 'response') {
-        if (response.id === id.toString() || (response.id === '' && response.action === action)) {
-          if (callback) callback(response);
-          window.removeEventListener('message', handleResponse);
+    const attempt = (retriesLeft) => {
+      if (!iframeRef.current || !isReady) {
+        if (retriesLeft > 0) {
+          setTimeout(() => attempt(retriesLeft - 1), SEND_RETRY_DELAY_MS);
         }
+        return;
       }
+      const id = commandId;
+      setCommandId(id + 1);
+      const message = {
+        namespace: 'ElenixOS', type: 'command',
+        id: id.toString(), action, payload,
+      };
+      let timeoutId;
+      const handleResponse = (event) => {
+        const response = event.data;
+        if (response && response.namespace === 'ElenixOS' && response.type === 'response') {
+          if (response.id === id.toString() || (response.id === '' && response.action === action)) {
+            clearTimeout(timeoutId);
+            if (callback) callback(response);
+            window.removeEventListener('message', handleResponse);
+          }
+        }
+      };
+      timeoutId = setTimeout(() => {
+        window.removeEventListener('message', handleResponse);
+        if (retriesLeft > 0) attempt(retriesLeft - 1);
+      }, SEND_TIMEOUT_MS);
+      window.addEventListener('message', handleResponse);
+      iframeRef.current.contentWindow.postMessage(message, '*');
     };
-    window.addEventListener('message', handleResponse);
-    iframeRef.current.contentWindow.postMessage(message, '*');
+    attempt(SEND_MAX_RETRIES);
   };
 
   const readDemoCode = () => {
