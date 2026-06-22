@@ -105,10 +105,10 @@ const config = {
         theme: {light: 'neutral', dark: 'forest'},
       },
       navbar: {
-        title: 'ElenixOS',
         logo: {
           alt: 'ElenixOS Logo',
           src: 'img/logo.png',
+          srcDark: 'img/logo_dark.png',
         },
         items: [
           {

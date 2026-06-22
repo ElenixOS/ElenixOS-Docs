@@ -109,6 +109,18 @@
   flex-shrink: 0;
 }
 
+/* ── Dark mode ── */
+:global([data-theme='dark']) .section { background: #161616; }
+:global([data-theme='dark']) .sectionTitle { color: #f5f5f7; }
+:global([data-theme='dark']) .coreName { color: #f5f5f7; }
+:global([data-theme='dark']) .coreDesc { color: #a1a1a6; }
+:global([data-theme='dark']) .coreSeparator { background: #333336; }
+:global([data-theme='dark']) .divider::before,
+:global([data-theme='dark']) .divider::after { background: #333336; }
+:global([data-theme='dark']) .dividerText { color: #86868b; }
+:global([data-theme='dark']) .flowLabel { color: #f5f5f7; }
+:global([data-theme='dark']) .flowDesc { color: #86868b; }
+
 @media screen and (max-width: 996px) {
   .section { padding: 4rem 0; }
   .coreRow { flex-direction: column; gap: 1.2rem; }

@@ -24,6 +24,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ── Navbar ── */
+.navbar__title {
+  display: none;
+}
+
+.navbar__logo {
+  transform: translateY(-2px);
+}
+
 .navbar {
   backdrop-filter: saturate(180%) blur(20px);
   background: rgba(255, 255, 255, 0.8);

@@ -160,6 +160,28 @@
   border-top: 1px solid #e8e8ed;
 }
 
+/* ── Dark mode ── */
+:global([data-theme='dark']) .section { background: #000000; }
+:global([data-theme='dark']) .sectionTitle { color: #f5f5f7; }
+:global([data-theme='dark']) .sectionSubtitle { color: #a1a1a6; }
+:global([data-theme='dark']) .layerRow { border-bottom-color: #333336; }
+:global([data-theme='dark']) .layerAccent { background: #424245; }
+:global([data-theme='dark']) .layerLabel { color: #f5f5f7; }
+:global([data-theme='dark']) .layerItem { color: #a1a1a6; }
+:global([data-theme='dark']) .layerArrow { color: #424245; }
+:global([data-theme='dark']) .layerRow:hover .layerAccent { background: #2997ff; }
+:global([data-theme='dark']) .layerRow:hover .layerLabel { color: #2997ff; }
+:global([data-theme='dark']) .layerRow:hover .layerArrow { color: #2997ff; }
+:global([data-theme='dark']) .flowSidebar { background: #161616; }
+:global([data-theme='dark']) .flowTitle { color: #f5f5f7; }
+:global([data-theme='dark']) .flowContainer::before { background: #333336; }
+:global([data-theme='dark']) .flowDot { background: #424245; }
+:global([data-theme='dark']) .flowDotAccent { background: #2997ff; }
+:global([data-theme='dark']) .flowLabel { color: #f5f5f7; }
+:global([data-theme='dark']) .flowLabelAccent { color: #2997ff; }
+:global([data-theme='dark']) .flowDesc { color: #a1a1a6; }
+:global([data-theme='dark']) .flowNote { color: #a1a1a6; border-top-color: #333336; }
+
 @media screen and (max-width: 996px) {
   .section { padding: 4rem 0; }
   .archWrap { grid-template-columns: 1fr; }
