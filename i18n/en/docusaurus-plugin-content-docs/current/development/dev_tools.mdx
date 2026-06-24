@@ -24,6 +24,37 @@ source venv/bin/activate
 pip install -r scripts/requirements.txt
 ```
 
+## Kernel Configuration Tool (Kconfig)
+
+Kconfig is ElenixOS's kernel build configuration system. Originating from the Linux kernel, it manages build options in a structured way, enabling the same kernel codebase to adapt to different hardware platforms and product requirements.
+
+### Core Concepts
+
+Configuration merges through three layers:
+- **Kernel definitions** (`Kconfig`): Declares all configurable items, their types, constraints, and defaults
+- **Project defaults** (`defaults.conf`): Version-controlled baseline configuration for this project
+- **Local overrides** (`.config`): Per-build-directory overrides, excluded from version control
+
+Refer to [Kernel Configuration System](./kconfig).
+
+### Install Dependency
+
+```bash
+pip install kconfiglib
+```
+
+### Usage
+
+```bash
+make menuconfig              # Edit build/.config
+```
+
+Rebuild after changes:
+
+```bash
+make build
+```
+
 ## Application Packaging Tool
 
 The application packaging tool (`eos_pkg_builder.py`) is used to package applications into .eapk or .ewpk files, containing all resources required by the application, such as icons, scripts, resource files, etc.

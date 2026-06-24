@@ -28,6 +28,14 @@ This page will introduce how to compile and run the ElenixOS simulator in a loca
 
 [Visual Studio Code](https://code.visualstudio.com/).
 
+## Install Python Dependency
+
+```bash
+pip install -r requirements.txt
+```
+
+Installs `kconfiglib`, required for the build system to auto-generate kernel configuration headers. If not installed, the build proceeds using kernel defaults instead of Kconfig settings.
+
 ## Obtain Code
 
 ```bash
@@ -121,42 +129,26 @@ If you are using Homebrew LLVM on macOS:
 
 ### Basic Build Steps
 
-1. **Create build directory**
+The project root `Makefile` provides shortcut commands:
 
 ```bash
-mkdir -p build
-cd build
+make          # Configure and build
+make run      # Build and run
 ```
 
-2. **Run CMake configuration**
-
-```bash
-cmake ..
-```
-
-3. **Build the project**
-
-```bash
-cmake --build .
-```
-
-4. **Run the executable**
-
-```bash
-../bin/main
-```
+Underlying equivalent: `cmake -B build && cmake --build build`.
 
 ### Enable FreeRTOS Mode
 
-If you want to enable FreeRTOS mode in command line build, you can add the `-DUSE_FREERTOS=ON` option when configuring CMake:
+To enable FreeRTOS mode, pass `-DUSE_FREERTOS=ON` during CMake configuration:
 
 ```bash
-cmake .. -DUSE_FREERTOS=ON
+cmake -B build -DUSE_FREERTOS=ON
 ```
 
 ### Custom Build Options
 
-The project supports the following CMake options:
+The project provides the following CMake options:
 
 - `-DUSE_FREERTOS=ON/OFF`: Enable/disable FreeRTOS
 - `-DLV_USE_DRAW_SDL=ON/OFF`: Enable/disable SDL drawing unit
@@ -178,7 +170,7 @@ The project supports the following CMake options:
 - If using Homebrew LLVM, you can specify the compiler during CMake configuration:
 
 ```bash
-cmake .. -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++
+cmake -B build -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++
 ```
 
 #### Windows (MSYS2)
@@ -187,16 +179,15 @@ cmake .. -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILE
 - Ensure mingw-w64-x86_64-toolchain, mingw-w64-x86_64-cmake, and mingw-w64-x86_64-SDL2 are installed
 - Build commands are the same as the basic steps
 
-### Clean Build
+### Kconfig Configuration
 
-To clean build files, you can execute the following command:
+Kernel build options (memory allocation strategy, filesystem type, font source, etc.) are configurable via the Kconfig system. Refer to [Kernel Configuration System](../development/kconfig).
 
 ```bash
-cd build
-rm -rf *
+make menuconfig             # Edit build/.config
 ```
 
-Or delete the entire build directory:
+### Clean Build
 
 ```bash
 rm -rf build

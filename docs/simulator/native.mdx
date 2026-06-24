@@ -25,6 +25,7 @@ title: 本地运行（Native Simulator）
   - SDL2
   - CMake (3.13+)
   - Python 3.7+
+  - kconfiglib（用于 Kconfig 内核配置）
 
 [Visual Studio Code](https://code.visualstudio.com/)。
 
@@ -119,39 +120,31 @@ pacman -S mingw-w64-x86_64-SDL2
 
 ## 使用命令行构建
 
+### 安装 Python 依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+安装 `kconfiglib`，用于构建系统自动生成内核配置头文件。未安装时构建不会中断，但回退至内核默认值。
+
 ### 基本构建步骤
 
-1. **创建构建目录**
+项目根目录的 `Makefile` 提供快捷命令：
 
 ```bash
-mkdir -p build
-cd build
+make          # 配置并构建
+make run      # 构建并运行
 ```
 
-2. **运行 CMake 配置**
-
-```bash
-cmake ..
-```
-
-3. **构建项目**
-
-```bash
-cmake --build .
-```
-
-4. **运行可执行文件**
-
-```bash
-../bin/main
-```
+底层等价于 `cmake -B build && cmake --build build`。
 
 ### 启用 FreeRTOS 模式
 
 如果希望在命令行构建中启用 FreeRTOS 模式，可以在 CMake 配置时添加 `-DUSE_FREERTOS=ON` 选项：
 
 ```bash
-cmake .. -DUSE_FREERTOS=ON
+cmake -B build -DUSE_FREERTOS=ON
 ```
 
 ### 自定义构建选项
@@ -178,7 +171,7 @@ cmake .. -DUSE_FREERTOS=ON
 - 如使用 Homebrew LLVM，可在 CMake 配置时指定编译器：
 
 ```bash
-cmake .. -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++
+cmake -B build -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++
 ```
 
 #### Windows (MSYS2)
@@ -187,16 +180,15 @@ cmake .. -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILE
 - 确保已安装 mingw-w64-x86_64-toolchain、mingw-w64-x86_64-cmake 和 mingw-w64-x86_64-SDL2
 - 构建命令与基本步骤相同
 
-### 清理构建
+### 调整内核配置
 
-如需清理构建文件，可执行以下命令：
+内核编译选项（内存分配策略、文件系统类型、字体源等）通过 Kconfig 系统配置。详见 [内核配置系统](../development/kconfig)。
 
 ```bash
-cd build
-rm -rf *
+make menuconfig             # 编辑 build/.config
 ```
 
-或删除整个 build 目录：
+### 清理构建
 
 ```bash
 rm -rf build

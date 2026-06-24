@@ -126,6 +126,7 @@ const sidebars = {
       type: 'category',
       label: '开发指南',
       items: [
+        'development/kconfig',
         'development/dev_tools',
         'development/package_builder',
       ],
