@@ -14,3 +14,7 @@ layout:
   label: 布局
   permalink: /layout
   description: 布局相关文章
+architecture:
+  label: 架构
+  permalink: /architecture
+  description: 架构相关文章
