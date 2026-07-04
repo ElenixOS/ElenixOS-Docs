@@ -1,0 +1,53 @@
+---
+sidebar_position: 10
+title: Testing Overview
+---
+
+# Testing Overview
+
+ElenixOS's layered architecture means that a regression at any layer can propagate upward indirectly, and as an embedded GUI operating system with deep runtime dependence on LVGL, test code cannot execute without the graphics runtime. The testing framework must simultaneously address two fundamentally different needs: deterministic regression verification of logic-intensive subsystems, and visual verification of UI interaction behavior.
+
+## Two-Layer Model
+
+The testing framework consists of a framework layer and a GUI layer, each with a clearly defined design purpose.
+
+The framework layer handles test registration, scheduling, execution, and result recording. It models each test as a named function that returns a boolean value expressing pass/fail. The framework layer is unconcerned with the specific logic of tests—it only manages the test lifecycle and result aggregation: registering and deduplicating by name, scheduling execution by registration order or group prefix, centrally recording and outputting results through the logging system, and maintaining pass/fail counts and progress status. The framework layer also provides a set of assertion macros that encapsulate condition checking and result recording calls within the macro, keeping test functions concise.
+
+The GUI layer builds a checkbox checklist page on top of LVGL, presenting the framework layer's test suite as a selectable list with group-level collapse/expand, single or select-all/deselect, an execution progress bar with real-time display of the currently running test, and a pass/fail summary with status icons. The GUI layer is an optional frontend—the framework layer can register and execute without GUI. The boundary between the two is the framework layer's batch execution and result recording interfaces.
+
+## Naming Convention and Automatic Grouping
+
+Test names use a colon-delimited prefix system: the prefix identifies the subsystem or subcategory the test belongs to, and the text after the colon describes the specific test scenario. When building the GUI checklist, the framework scans all registered test names, aggregates tests with the same prefix into a group, and generates a group header with a group-level checkbox and collapse/expand control for each group.
+
+This design avoids maintaining additional grouping metadata—group information is entirely derived from the naming convention. New tests are automatically placed in the correct group as long as they follow the naming convention.
+
+## Aggregation Pattern
+
+Each subsystem module provides its own registration function, internally registering tests in the module's local order. These registration functions are called in sequence by a unified runner module, which is also responsible for launching the GUI page.
+
+Aggregation occurs at two stages: during registration, the runner calls all subsystem registration functions and collects all tests into the framework layer's static table; during execution, the framework iterates through the table, skips unselected entries, and executes selected tests in order. Subsystems only need to expose a single registration function and do not need to be aware of the framework layer's internal table structure or the existence of other subsystems.
+
+## Compile-Time Gating
+
+All test modules are conditionally compiled via the `EOS_ENABLE_TEST_APP` macro, which is controlled by a Kconfig option. When disabled, all test-related source files, header files, and framework API calls are removed by the preprocessor, having no impact on the production firmware. The isolation occurs at the preprocessor stage rather than the linker stage—even if test modules reference symbols that only exist in the test context, no compilation error will occur when tests are disabled.
+
+## Activity Lifecycle Integration
+
+Both the framework layer's GUI page and individual interactive test pages are built on the Activity model. Each test page is an Activity instance, managing UI object creation and cleanup through `on_enter`/`on_destroy`, and handling state preservation and restoration during page transitions through `on_pause`/`on_resume`. The framework layer nullifies static pointers to UI objects within the page in the destroy callback to avoid dangling references; individual interactive test pages follow the same pattern, each managing their own UI state.
+
+## Current Limitations
+
+The framework layer has several inherent limitations in its execution model and runtime environment:
+
+- **No headless mode**. Current test execution depends on LVGL runtime initialization and cannot run directly on pure console environments or headless CI pipeline nodes. The framework layer interfaces can logically operate without GUI, but there is no standalone command-line entry point.
+- **Synchronous execution model**. The framework layer calls test functions sequentially in registration order, and each function must complete all its judgments and return a result within its call stack. Asynchronous scenarios that require multiple LVGL ticks to complete (such as verifying after waiting for a service state change) are not directly supported.
+- **Capacity limits**. The framework layer uses fixed-size static arrays to store test entries and group information; both entry count and group capacity are determined at compile time.
+
+## TODO
+
+<Todo />
+
+- **Headless execution mode**: Provide an entry point that does not depend on GUI startup, outputting results via logs or serial port, enabling automated CI testing
+- **Asynchronous test support**: For test scenarios requiring cross-frame or multi-round event loops, provide a standardized execution framework using state machine or callback patterns
+- **Inter-test dependency declaration**: Allow declaring execution prerequisites for tests, automatically skipping dependent tests when prerequisites fail
+- **Test coverage measurement**: Integrate code coverage tools to quantify test coverage across subsystems

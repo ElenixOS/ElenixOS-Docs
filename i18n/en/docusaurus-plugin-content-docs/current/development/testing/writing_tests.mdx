@@ -1,0 +1,62 @@
+---
+sidebar_position: 11
+title: Writing Tests
+---
+
+# Writing Tests
+
+When adding new tests to ElenixOS, the first decision is whether the verification requirements should go through the framework layer pipeline or build a standalone GUI page. These two paths serve different verification goals and differ in execution model, result determination, and integration approach. Understanding the applicable scenarios for each and the framework layer's internal workflow is a prerequisite for ensuring test consistency and maintainability.
+
+## Choosing an Execution Path
+
+Going through the framework layer pipeline is suitable for: logical correctness verification of subsystem APIs, scenarios requiring batch execution and unified statistics, regression cases that may be run repeatedly, and parameterized verification of boundary conditions and error paths. Its advantages are automated execution and unified pass/fail aggregation; the trade-off is that test functions must be synchronous in form with clear return value semantics.
+
+Building a standalone GUI page is suitable for: verification requiring human observation of UI rendering, scenarios depending on continuous interaction (swiping, button presses, dragging), real-time sensor data visualization, and functional verification relying on hardware feedback such as audio playback/recording. Its advantages are support for interactive operation and visual feedback; the trade-off is the inability to automatically determine pass/fail, making it unsuitable for batch regression.
+
+The two paths converge at the code level through a unified entry point: the main test menu lists both the framework layer's unit test entry and individual page entries with a consistent navigation structure.
+
+## Framework Layer Tests
+
+### Execution Contract
+
+The framework layer follows an implicit contract when calling test functions: test functions are called synchronously on the LVGL main loop thread and must complete all verification logic and record results before returning. A return value of `true` generally indicates test passage, but the framework layer determines pass/fail status based on explicit result recording calls—the return value primarily affects the caller's quick judgment. Therefore, test functions must not perform blocking waits, must not rely on cross-frame state changes, and must not assume the execution order of other tests.
+
+### Naming Convention
+
+Test names use the `prefix: description` format. The prefix should be the subsystem or submodule name, and the description should use concise natural language. When building the GUI checklist, the framework layer automatically groups by prefix—tests sharing the same prefix are placed in the same group with a group-level UI. This means new tests only need to use the same prefix as existing tests in the same group to be automatically placed in the correct group, with no additional configuration required.
+
+Note the granularity of prefixes: too fine leads to too many groups, affecting GUI checklist usability; too coarse mixes unrelated tests, reducing selection precision.
+
+### Assertion Macros
+
+The assertion macros provided by the framework layer perform both condition checking and result recording in a single call, reducing boilerplate code inside test functions. Macros use the condition expression value in the parameter as the pass/fail basis and record a human-readable description as a detail string, allowing a single assertion line to express the complete verification intent.
+
+Assertion macros look up the corresponding entry in the framework layer by test name and update its status. This means assertion macros strictly depend on the test being already registered in the framework layer—unregistered test names only generate a log warning when calling assertion macros and are not counted in pass/fail statistics.
+
+### Handling Asynchronous Scenarios
+
+For asynchronous test scenarios requiring multiple LVGL ticks or waiting for service state changes, the current approach uses a timer-driven state machine pattern: the test function registers as passed on its first call (indicating the test has started), starts an LVGL timer to drive subsequent stages, and updates the test result via the result recording function in the final stage.
+
+This approach embeds a deferred settlement point within the synchronous call-return model, leveraging the framework layer's ability to allow subsequent result record overwrites. Note that overwrite behavior is limited to tests that have not yet been executed—once the executor marks a test as executed, subsequent result recording calls will not update its status, to avoid double counting.
+
+## Writing Notes
+
+- **Test names must be unique**. The framework layer silently discards duplicate entries during registration; different subsystems should ensure naming uniqueness through prefixes.
+- **Registration must complete before page startup**. The framework layer GUI page iterates through registered tests and builds the UI in its entry function; registrations after page startup will not be reflected in the already-created checklist.
+- **Standalone GUI pages do not interoperate with the framework layer**. Pass/fail statistics manually recorded in standalone pages are not included in the framework layer's aggregated results.
+- **Capacity limits**. There is a compile-time upper limit on the number of registered tests and groups; consider merging when approaching the limit.
+
+## Integration Process
+
+To add framework layer tests for an existing subsystem: define test functions in the subsystem's test module following the naming convention, register tests in the subsystem's registration function, and after recompilation, the new tests will automatically appear in the corresponding group of the GUI checklist.
+
+To add an interactive verification page for a UI component or hardware interaction: create a new page based on the Activity model, manage UI creation and cleanup in lifecycle callbacks, and add an entry button in the main test menu bound to the page launch callback.
+
+To create a complete test module for a newly developed subsystem: create an independent test file for the subsystem containing a registration function; insert a call to the new registration function in the runner module's aggregation function; all test files are protected by `EOS_ENABLE_TEST_APP` conditional compilation.
+
+## TODO
+
+<Todo />
+
+- **Standardization of async tests**: Abstract the timer-driven async pattern into a built-in capability of the framework layer, making async test definitions as concise as synchronous tests
+- **Test data separation**: Allow test input data to be provided as external files, separated from test logic

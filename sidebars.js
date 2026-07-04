@@ -129,6 +129,14 @@ const sidebars = {
         'development/kconfig',
         'development/dev_tools',
         'development/package_builder',
+        {
+          type: 'category',
+          label: '测试',
+          items: [
+            'development/testing/overview',
+            'development/testing/writing_tests',
+          ],
+        },
       ],
     },
     'contributing',

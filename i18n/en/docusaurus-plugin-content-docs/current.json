@@ -46,5 +46,9 @@
   "sidebar.tutorialSidebar.category.开发指南": {
     "message": "Development Guide",
     "description": "The label for category '开发指南' in sidebar 'tutorialSidebar'"
+  },
+  "sidebar.tutorialSidebar.category.测试": {
+    "message": "Testing",
+    "description": "The label for category '测试' in sidebar 'tutorialSidebar'"
   }
 }
