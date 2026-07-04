@@ -2,7 +2,7 @@
 slug: /sni-architecture-evolution
 title: "Script Native Interface (SNI): Architectural Evolution and Reflections"
 authors: [Sab1e-dev]
-tags: [sni, jerryscript, lvgl, architecture, semantics]
+tags: [sni, jerryscript, lvgl, architecture]
 ---
 
 ## Background
@@ -46,11 +46,22 @@ The same logic applies to compile-time solutions: compile HTML/XML or JSX on the
 
 At this point we began to realize the direction might have been wrong from the start. Not because any particular solution was inadequate, but because the premise itself needed reexamination.
 
-The code generation tool was built on an implicit assumption: after extracting type definitions from LVGL headers, all APIs returning struct pointers can be modeled as JS Handle Objects using a unified pattern. The generator decides its export strategy based on C type (Syntax): see `lv_xxx_t *`, apply the control block or managed resource template.
+The code generation tool itself deserves recognition. It is not a fully-automatic "syntax scanner" — it is a config-driven code generator. Its workflow is straightforward: a human writes an API table (`api_table`) defining which classes exist and which method patterns to export; a human maintains a type classification table (`lv_types.json`) annotating each LVGL type as `handle_object`, `value_object`, or `primitive`; the generator reads these two configs and automatically produces the corresponding C binding code. For complex interfaces that cannot be auto-generated, it also supports specifying hand-written wrapper functions directly in the config.
 
-The problem with this assumption: it treats the C type system as an object semantic system.
+This design works flawlessly for the LVGL widget layer. Types like `lv_obj_t` and `lv_button_t` are annotated as `handle_object` in `lv_types.json` — the generator produces control block binding code. Types like `lv_style_t` and `lv_color_t` are annotated as `value_object` — the generator produces value-copy code. Everything is deterministic and predictable.
 
-LVGL is a remarkably clever design. At the UI widget level, it implements a complete object-oriented style in C: `lv_obj_t` as the base class, `lv_button_t` and `lv_label_t` implementing inheritance through type casting. Each widget has construction, destruction, property access, and event callbacks. These objects have stable identity, clear lifecycle boundaries, and observable destruction events—they can perfectly establish cross-domain identity mapping. The code generation tool handles these APIs effortlessly, not because the tool is well-written, but because LVGL's design here is inherently object-oriented: C type equals object semantics, and the generator follows syntax which happens to follow semantics.
+The problem lies elsewhere: **no one ever defined what qualifies for inclusion in this API table, and what doesn't.**
+
+The API table is human-maintained, and so is the type classification table. When a person fills in these configs, there is no explicit rule telling them: is the pointer returned by this function safe for the JS side? Should this type be annotated as handle or value, or should it never appear in the config at all?
+
+In other words, the config system is complete, but the config specification is missing. No document declares "SNI only exports APIs satisfying the following criteria." No process performs a safety review when new entries are added. Each developer adds things to the table based on their own understanding. Someone added `lv_animimg_get_anim` to a method matching pattern. Someone annotated `lv_anim_t` as `handle_object` — from the generator's perspective, these are perfectly valid config inputs, and it faithfully executes them. But no one ever asked whether this path is safe on the JS side.
+
+So the real problem isn't that the generator "exports by syntax." It's that:
+1. We never defined SNI's export boundary rules.
+2. The config tables swelled without constraints, and internal pointers leaked into the export list.
+3. The generator is merely a faithful executor of config — it doesn't, and shouldn't, judge whether the config is reasonable.
+
+LVGL is a remarkably clever design. At the UI widget level, it implements a complete object-oriented style in C: `lv_obj_t` as the base class, `lv_button_t` and `lv_label_t` implementing inheritance through type casting. Each widget has construction, destruction, property access, and event callbacks. These objects have stable identity, clear lifecycle boundaries, and observable destruction events—they can perfectly establish cross-domain identity mapping. Annotate them as `handle_object` in `lv_types.json`, and the generator automatically produces control block binding code. The JS side receives a safe handle.
 
 But not all of LVGL's APIs are object-oriented. Another portion of the API is fundamentally procedural resource management interfaces. Their parameters and return values are also struct pointers, but with entirely different semantics.
 
@@ -62,22 +73,22 @@ Another typical example is `lv_draw_task_t`. It is not "an independently existin
 
 These are not design flaws in LVGL. Quite the contrary, they demonstrate the LVGL developers' masterful use of C: object-oriented where appropriate, procedural C idioms where appropriate. UI widgets need object semantics, so LVGL gives them object semantics. Internal resources and execution contexts don't, so LVGL handles them in the lightest way possible: struct allocation, pass-by-reference, internal reclamation. This hybrid style is a key reason LVGL runs efficiently on MCUs.
 
-But the code generation tool doesn't understand this distinction. In the generator's eyes, `lv_obj_create` returns `lv_obj_t *`, and `lv_animimg_get_anim` returns `lv_anim_t *`—both are "functions returning struct pointers" and should be handled the same way. This is where the problem lies: the generator judges by C type (Syntax) rather than object semantics (Semantic).
+But when a function like `lv_animimg_get_anim` gets added to the API table's export rules, the config system doesn't reject it. `lv_anim_t *` either lacks a classification in `lv_types.json`, or was casually annotated as `handle_object` — perfectly legal from a config perspective. The generator faithfully produces control block binding code for it, and the JS side receives a handle. The problem isn't in the generator's logic, but at the source of the config: **no rule prevents this function from entering the API table, and no check issues a warning after it enters.**
 
 ```mermaid
-flowchart BT
+flowchart TB
     UAF["UAF, Dangling Pointers"]
     Identity["Cross-domain object identity<br/>cannot be guaranteed"]
     NoSemantic["JS holds Native structs<br/>with no object semantics"]
-    SyntaxGen["The code generator exports<br/>by C type, not by semantics"]
+    ConfigLeak["SNI export rules are absent;<br/>unsafe APIs leak into config tables"]
     UAF --> Identity
     Identity --> NoSemantic
-    NoSemantic --> SyntaxGen
+    NoSemantic --> ConfigLeak
 ```
 
-In other words: it's not that "these objects shouldn't enter JS," but that "these structs shouldn't enter JS in their raw form." The code generation tool works perfectly on UI widgets because LVGL designed the widget layer with object-oriented principles. But when it encounters LVGL's procedural APIs, it still applies the widget-layer template, and naturally this goes wrong.
+In other words: it's not that "these objects shouldn't enter JS," but that "no one asks whether this API's return value is safe for JS when adding it to the config table." UI widgets work perfectly not because the generator is smart, but because their types are correctly classified in `lv_types.json` and their APIs are reasonably included in `api_table`. Internal animation pointers fail because the same config table has no access control.
 
-Thus, the real question is not "why should these objects become JS objects," but "which structs possess object semantics, qualifying them for automatic mapping by the generator; and which do not, requiring manual encapsulation and semantic transformation before entering the JS world."
+Thus, the real question is not "what should the generator do," but "what should SNI export" — a boundary that has never been formally defined. No document declares SNI's export admission rules. No process performs safety review on config changes. The generator is a faithful executor — it doesn't, and shouldn't, judge whether the config is reasonable. The responsibility for judgment lies with us, and we hadn't shouldered it before.
 
 But this still doesn't answer a more fundamental question: why does the declarative UI approach—"don't let JS hold any native objects at all"—feel intuitively like the most thorough solution?
 
@@ -87,36 +98,38 @@ Pushing further, the conclusion becomes clearer: as long as LVGL runs on the C s
 
 There is, of course, a way to bypass the problem entirely: abandon LVGL and implement a complete UI engine on the JS side—object tree, layout, rendering, event system all within JerryScript. This path genuinely eliminates the cross-language pointer problem, because there are no cross-language pointers. But the cost is clear: running a pure-JS UI engine on an MCU means object tree construction and traversal, recursive layout calculation, per-frame dirty region diffing—all interpreted rather than native. The workload and performance don't need detailed calculation; the single item "build a functionally equivalent LVGL" is enough to disqualify this option.
 
-So "the object boundary was drawn wrong" isn't about whether any native object should enter JS at all. Tree nodes and managed resources work perfectly in the JS world because their C type happens to equal object semantics—the generator maps by syntax and happens to map by semantics. The problematic ones (internal animation pointers, event descriptors, draw tasks) have C types that are struct pointers, but object semantics are missing. The generator maps them as objects by syntax, but what JS receives is not an object.
+So "the object boundary was drawn wrong" isn't about whether any native object should enter JS at all. Tree nodes and managed resources work perfectly in the JS world because their type classification and API inclusion are reasonable. The problematic ones (internal animation pointers, event descriptors, draw tasks) fail because the config table lacks an access gate to block them.
 
-A different perspective: wild pointers are not a failure of lifecycle management, but the consequence of **the generator mapping by Syntax rather than by Semantic**.
+A different perspective: wild pointers are not a failure of lifecycle management, nor a design flaw in the generator, but **the consequence of absent SNI export boundary rules**. If clear rules had defined what can and cannot enter the config table, these problems would have been stopped the moment they were written into the config.
 
 ## The Answer
 
-Since the problem is that the generator maps by syntax rather than semantics, the answer is clear: shift the code generation tool from exporting by C type to exporting by object semantics.
+Since the problem is the absence of SNI export boundary rules, the answer is clear: **formally define SNI's export boundaries, and encode them into documentation and process.**
 
 Specifically, two rules.
 
-First, only structs possessing complete object semantics qualify for automatic mapping by the code generator into JS Handle Objects. The criteria are three: stable identity, clear lifecycle boundaries, and observable destruction events. All LVGL widget-layer objects naturally satisfy these three conditions and can continue being handled automatically by the generator.
+First, only types with stable identity, clear lifecycle boundaries, and observable destruction events qualify for inclusion in the API table and classification as `handle_object` in `lv_types.json`. All LVGL widget-layer objects naturally satisfy these three conditions — keep as-is.
 
-Second, structs lacking object semantics—configuration structures, runtime state, internal execution contexts—do not enter the automatic generation pipeline. For those that genuinely need to expose functionality to JS, go through manual encapsulation. The wrapper function performs semantic transformation on the C side: converting procedural struct operations into value objects or pure function calls that JS can safely consume. Raw struct pointers never cross the C layer; what the JS side receives is not a thin wrapper around `lv_anim_t *`, but a specifically optimized interface for the JS UI Runtime.
+Second, structs that fail these criteria — configuration structures, runtime state, internal execution contexts — are not allowed to be directly included. For those that genuinely need to expose functionality to JS, go through manual encapsulation: write hand-crafted wrapper functions that perform semantic transformation on the C side before exposing to JS. Raw struct pointers never cross the C layer.
 
-Take animation as an example. `lv.anim` is created via `new`, fully managed by SNI through the managed resource path—it possesses object semantics, no problem. But `lv_animimg_get_anim` returns `lv_anim_t *`, which lacks object semantics: it's merely a combination of configuration and state held internally by LVGL, and you can't query its aliveness because "checking if the animation is alive" is not part of its semantics. The fix is not to manage this pointer, but to stop exporting this getter. In its place, a value query function reads out the animation's current value, duration, and playback state in one shot on the C side, packaging them as a pure data object for JS. What JS receives is not a mapping of a raw LVGL object, but a semantically transformed UI Runtime interface.
+The generator's core logic doesn't need modification. It is already a mature config-driven tool. What needs to change is what sits upstream of it: the API table and type classification table need a layer of admission review. Every new config entry must pass the check: "is the pointer returned by this API safe for the JS side?"
+
+Take animation as an example. `lv.anim` is created via `new`, fully managed by SNI through the managed resource path—it is correctly configured, no problem. But `lv_animimg_get_anim` should never have been admitted into the API table's export rules. Once removed and routed through a manual wrapper — a value query function that reads out the animation's current value, duration, and playback state on the C side, packaging them as a pure data object — the JS side never touches a raw `lv_anim_t *`.
 
 ## Future Directions
 
-The managed resource model handles resources like timers that possess object semantics reliably. For internal structs lacking object semantics, such as animation internals, the current answer is to keep them out of the automatic generation pipeline and perform semantic transformation at the boundary through manual encapsulation.
+The managed resource model handles resources like timers that are fully owned by SNI — already reliable. For internal structs like animation internals, the current answer is to keep them out of the API table, routing them through manual wrappers when needed.
 
-If these scenarios become more common, we could systematize the object-semantic type classification into a fixed tagging scheme—where each C type is manually annotated as object or struct, and the generator decides its processing strategy based on the tag. But at the current scale, manual review is sufficient.
+If these scenarios become more common, we could systematize the admission review process: every new API table entry must be accompanied by a lifecycle attribution and JS-side safety assessment. But at the current scale, manual review is sufficient.
 
 ## Summary
 
 The final conclusion of this derivation is not a choice of technical solutions, but a correction of an architectural premise:
 
-> The code generation tool should generate by object **Semantic**, not by C type **Syntax**.
+> SNI needs an explicit export boundary specification — the API table and type classification table cannot be allowed to swell without constraints.
 
-LVGL implements a complete object-oriented design in C at the widget layer, where C type equals object semantics, so the generator following syntax happens to follow semantics—perfect execution. But LVGL's other APIs are procedural resource management interfaces, where struct pointers do not equal object semantics. The generator following syntax goes wrong here.
+LVGL's design is excellent: object-oriented at the widget layer, procedural C idioms in the resource interfaces — precisely what makes it efficient on MCUs. The generator's design is also excellent: config-driven, type-classified, with manual wrapper alternatives — it faithfully executes human intent. The problem lies in the gap between them: we never wrote a document declaring which APIs qualify for the config table, and which don't.
 
-The problem is on our side: we should not expect all of LVGL's APIs to conform to object semantics. Instead, we should bear the responsibility for semantic transformation at SNI's boundary.
+With clear rules in place, audit the existing `api_table` and `lv_types.json`, remove unsafe entries, and what remains is a reliable config. The generator continues doing what it does best: read config, generate code. It doesn't need to become smarter — we need to become clearer.
 
-If we need to lower the development barrier and provide a more web-like experience in the future, we can build declarative wrappers on top of the existing SNI. That would be the icing on the cake, not a patch for a leak. Because before that, defining which are objects and which are merely structs—letting the generator work efficiently in its domain while leaving what it can't handle to human judgment—matters more than anything else.
+If we need to lower the development barrier and provide a more web-like experience in the future, we can build declarative wrappers on top of the existing SNI. That would be the icing on the cake, not a patch for a leak. Because before that, writing down SNI's export boundaries matters more than adding any new system mechanism.
