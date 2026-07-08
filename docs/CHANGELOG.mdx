@@ -5,6 +5,15 @@ title: Changelog
 
 # Changelog
 
+## [v0.5.1-alpha]
+
+### Fixed
+
+- **SNI 生命周期导出边界**：豁免 `SPECIAL_METHOD_WRAPPERS` 的生命周期导出边界检查，避免特殊方法包装器被错误拦截。
+- **SNI GC 安全**：在 JS 引用释放前清除原生指针，防止 GC 扫描阶段出现 use-after-free。
+- **SNI 空指针防护**：确保事件描述符在释放后被清零，防止潜在的野指针解引用。
+- **脚本引擎诊断增强**：始终启用错误消息和回溯信息，新增诊断输出，提升问题排查效率。
+
 ## [v0.5.0-alpha]
 
 ### Added
@@ -234,6 +243,7 @@ title: Changelog
 - 提供脚本与系统核心之间的隔离机制，提升系统稳定性与安全性。
 - 提供基础调试与开发支持能力，提升桌面端开发与调试效率。
 
+[v0.5.1-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.1-alpha
 [v0.5.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.0-alpha
 [v0.4.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.4.0-alpha
 [v0.3.0-alpha.1]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.3.0-alpha.1

@@ -4,6 +4,15 @@ title: Changelog
 
 # Changelog
 
+## [v0.5.1-alpha]
+
+### Fixed
+
+- **SNI Lifecycle Export Boundary**: Exempted `SPECIAL_METHOD_WRAPPERS` from lifecycle export boundary checks to prevent special method wrappers from being incorrectly rejected.
+- **SNI GC Safety**: Clear native pointers before JS reference release during GC sweep phase to prevent use-after-free.
+- **SNI Null Pointer Protection**: Ensure event descriptors are zeroed out after deallocation to prevent potential wild pointer dereference.
+- **Script Engine Diagnostics**: Always enable error messages and backtrace, added diagnostic output for improved troubleshooting.
+
 ## [v0.5.0-alpha]
 
 ### Added
@@ -233,6 +242,7 @@ title: Changelog
 - Provides isolation mechanism between scripts and system core, improving system stability and security.
 - Provides basic debugging and development support capabilities, improving desktop-side development and debugging efficiency.
 
+[v0.5.1-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.1-alpha
 [v0.5.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.0-alpha
 [v0.4.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.4.0-alpha
 [v0.3.0-alpha.1]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.3.0-alpha.1
