@@ -4,6 +4,55 @@ title: Changelog
 
 # Changelog
 
+## [v0.5.0-alpha]
+
+### Added
+
+- **Audio Subsystem**: Added complete audio subsystem with speaker/microphone support, audio effects, and decoder pipeline for playback and recording.
+- **LVGL Image Cache Module**: Introduced generic LVGL image cache module with PSRAM support for optimized image loading performance.
+- **Bubble Grid Enhancement**: Added `eos_bubble_set_icon_color` API and support for color-only bubbles without image source.
+- **Kconfig Configuration System**: Introduced Kconfig-based system configuration framework, replacing choice booleans with companion integer configs for more flexible configuration management.
+- **TTF Font Mode**: Switched to TTF font mode with subsetted Chinese font support.
+- **Sensor Service Enhancement**: Added operating modes, per-mode sampling policy, and typed subscriber callback system.
+- **Lock Screen System**: Added lock screen functionality, settings app, SHA256 encryption library, and scroll-focus fixes.
+- **Permission System**: Added permission system and 4-layer UI overlay architecture for enhanced app isolation and security.
+- **Script Engine Recovery**: Added support for engine restart after fatal JerryScript errors, improving fault tolerance.
+- **Watchface List Auto-Positioning**: Auto-scroll to the current watchface in list view.
+- **SDK Versioning**: Introduced `minApiLevel`/`targetApiLevel` SDK versioning system for app compatibility management.
+- **Code Quality Framework**: Added unified code quality check framework with formatting rules and CI validation workflow.
+- **Build System Enhancement**: Enabled `JERRY_ERROR_MESSAGES` for detailed JS error information.
+- **Snapshot Performance Benchmark**: Added snapshot performance and animation benchmark test suite.
+
+### Changed
+
+- **LVGL Version Upgrade**: Replaced all LVGL v8 API usages with v9 equivalents, completing the full LVGL upgrade.
+- **Error Code Unification**: Unified error codes across kernel, script engine, and file system port layers.
+- **Cache Module Rename**: Renamed `eos_cache` to `eos_service_cache`, cleaned up configuration and naming conventions.
+- **Audio System Refactoring**: Removed VAR audio effects, fixed TTF font system, consolidated audio path prefixes, and replaced audio-specific test framework with generic test framework.
+- **Test Framework Unification**: Replaced audio-specific test framework with generic test framework, unifying test infrastructure.
+- **Code Comment Translation**: Translated Chinese comments to English for improved international maintainability.
+- **Code Formatting Standardization**: Adopted unified code formatting rules, formatted all sources per `.clang-format`, and migrated to `eos_malloc`/`eos_free` unified memory interface.
+- **CI Workflow Simplified**: Simplified code quality workflow to a single Linux job.
+- **Memory Optimization**: Replaced unnecessary heap-allocated paths with stack buffers to reduce memory fragmentation.
+- **App Icon Sizes Updated**.
+
+### Fixed
+
+- Fixed boot logo not displaying due to file system driver not being registered.
+- **App List Transition Optimization**: Used RGB565 snapshot format with image-based snapshot scaling instead of widget transform scaling, reducing animation duration to 350ms for significantly improved transition performance.
+- Fixed app header title animation not syncing with activity transition.
+- Allocated large draw/canvas buffers via dedicated cache allocator.
+- Swapped include order so platform override configurations take priority.
+- MinGW platform compatibility fixes: `__GNUC__` branch matching and `EOS_WEAK` weak symbol linking failures.
+- Fixed overlay z-order, touch visibility, and side-button close logic.
+- Side button and digital crown no longer incorrectly dismiss permission dialogs.
+- Lock screen dismissal now respects activity header visibility.
+- Reordered SNI unregister sequence to prevent use-after-free during GC.
+- Moved title change animation out of snapshot window to prevent animation conflicts.
+- Permission callbacks now run in the correct program context via `spm_call`.
+- Fixed V-001 security vulnerability (memcpy bounds check error).
+- Enforced lifecycle-based SNI export boundary rules, fixed integer width mismatches, and added sub-resource cascade destroy support.
+
 ## [v0.4.0-alpha]
 
 ### Breaking Changes
@@ -184,6 +233,7 @@ title: Changelog
 - Provides isolation mechanism between scripts and system core, improving system stability and security.
 - Provides basic debugging and development support capabilities, improving desktop-side development and debugging efficiency.
 
+[v0.5.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.0-alpha
 [v0.4.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.4.0-alpha
 [v0.3.0-alpha.1]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.3.0-alpha.1
 [v0.2.0-alpha.1]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.2.0-alpha.1
