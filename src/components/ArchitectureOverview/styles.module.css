@@ -100,6 +100,8 @@
   padding: 1.8rem 2rem;
   border-radius: 18px;
   background: #f5f5f7;
+  border: 1px solid #e8e8ed;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.05);
 }
 
 .flowTitle {
@@ -124,8 +126,9 @@
   left: 2px;
   top: 4px;
   bottom: 4px;
-  width: 1px;
-  background: #d2d2d7;
+  width: 2px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, #d2d2d7 0%, #d2d2d7 20%, #86868b 50%, #0071e3 100%);
 }
 
 .flowNode {
@@ -143,21 +146,48 @@
   flex-shrink: 0;
   margin-top: 0.45rem;
   z-index: 1;
+  transition: background 0.3s, box-shadow 0.3s;
+  box-shadow: 0 0 0 3px rgba(210, 210, 215, 0.18);
 }
 
-.flowDotAccent { background: #0071e3; }
+.flowDotAccent {
+  background: #0071e3;
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.12);
+}
+
 .flowContent { display: flex; flex-direction: column; gap: 0.1rem; }
-.flowLabel { font-size: 0.92rem; font-weight: 600; color: #1d1d1f; letter-spacing: -0.01em; }
+.flowLabel {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #1d1d1f;
+  letter-spacing: -0.01em;
+  transition: color 0.3s;
+}
 .flowLabelAccent { color: #0071e3; }
 .flowDesc { font-size: 0.8rem; color: #6e6e73; }
+
+.flowNode:hover .flowDot {
+  box-shadow: 0 0 0 5px rgba(0, 113, 227, 0.15);
+}
+
+.flowNode:hover .flowDotAccent {
+  box-shadow: 0 0 0 6px rgba(0, 113, 227, 0.15);
+}
+
+.flowNode:hover .flowLabel {
+  color: #0071e3;
+}
+
+.flowNode:hover .flowLabelAccent {
+  color: #005ab3;
+}
 
 .flowNote {
   margin: 0;
   font-size: 0.8rem;
-  color: #6e6e73;
+  color: #86868b;
   line-height: 1.6;
   padding-top: 1.2rem;
-  border-top: 1px solid #e8e8ed;
 }
 
 /* ── Dark mode ── */
@@ -172,15 +202,39 @@
 :global([data-theme='dark']) .layerRow:hover .layerAccent { background: #2997ff; }
 :global([data-theme='dark']) .layerRow:hover .layerLabel { color: #2997ff; }
 :global([data-theme='dark']) .layerRow:hover .layerArrow { color: #2997ff; }
-:global([data-theme='dark']) .flowSidebar { background: #161616; }
+:global([data-theme='dark']) .flowSidebar {
+  background: #161616;
+  border-color: #333336;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.25);
+}
 :global([data-theme='dark']) .flowTitle { color: #f5f5f7; }
-:global([data-theme='dark']) .flowContainer::before { background: #333336; }
-:global([data-theme='dark']) .flowDot { background: #424245; }
-:global([data-theme='dark']) .flowDotAccent { background: #2997ff; }
+:global([data-theme='dark']) .flowContainer::before {
+  background: linear-gradient(180deg, #333336 0%, #333336 20%, #636366 50%, #2997ff 100%);
+}
+:global([data-theme='dark']) .flowDot {
+  background: #424245;
+  box-shadow: 0 0 0 3px rgba(66, 66, 69, 0.18);
+}
+:global([data-theme='dark']) .flowDotAccent {
+  background: #2997ff;
+  box-shadow: 0 0 0 4px rgba(41, 151, 255, 0.12);
+}
 :global([data-theme='dark']) .flowLabel { color: #f5f5f7; }
 :global([data-theme='dark']) .flowLabelAccent { color: #2997ff; }
 :global([data-theme='dark']) .flowDesc { color: #a1a1a6; }
-:global([data-theme='dark']) .flowNote { color: #a1a1a6; border-top-color: #333336; }
+:global([data-theme='dark']) .flowNote { color: #86868b; }
+:global([data-theme='dark']) .flowNode:hover .flowDot {
+  box-shadow: 0 0 0 5px rgba(41, 151, 255, 0.15);
+}
+:global([data-theme='dark']) .flowNode:hover .flowDotAccent {
+  box-shadow: 0 0 0 6px rgba(41, 151, 255, 0.15);
+}
+:global([data-theme='dark']) .flowNode:hover .flowLabel {
+  color: #2997ff;
+}
+:global([data-theme='dark']) .flowNode:hover .flowLabelAccent {
+  color: #67b5ff;
+}
 
 @media screen and (max-width: 996px) {
   .section { padding: 4rem 0; }
