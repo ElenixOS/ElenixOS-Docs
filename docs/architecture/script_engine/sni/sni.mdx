@@ -436,7 +436,7 @@ Phase 6: 删除LVGL对象树
   - LVGL自动回收树依赖资源的原生对象
 
 :::danger
-Phase 4 的三个子阶段顺序不可重排。4a（Tree-Dependent）必须在4b（Hybrid）之前，否则Hybrid Activity销毁时的`lv_obj_delete`会遍历Tree-Dependent的已释放节点。4c（Pure）必须在4b之后，因为某些Pure资源可能仍被Hybrid Activity内部引用。
+Phase 4 的三个子阶段顺序不可重排。Tree-Dependent 必须在 Hybrid 之前，否则 Hybrid Activity 销毁时的 `lv_obj_delete` 会遍历 Tree-Dependent 的已释放节点。Pure 必须在 Hybrid 之后，因为某些 Pure 资源可能仍被 Hybrid Activity 内部引用。
 :::
 
 ## API 导出层（SNI API Export Layer）
