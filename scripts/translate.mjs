@@ -88,24 +88,25 @@ function git(args, opts = {}) {
  * Returns array of { status: 'A'|'M'|'D'|'R', path: string }.
  */
 function getChangedFiles(baseRef) {
-  // Use -z (NUL-delimited) for safe parsing of filenames with spaces
+  // -z outputs NUL-delimited fields: status<NUL>path<NUL> (or R<score><NUL>old<NUL>new<NUL>)
   const out = git(`diff --name-status -z --diff-filter=ADMR ${baseRef} HEAD -- docs/ blog/`);
   if (!out) return [];
+  // filter(Boolean) removes the trailing empty string from the final NUL
   const entries = out.split('\0').filter(Boolean);
   const files = [];
   for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i];
-    // Format: "M\0path" or "R100\0old\0new"
-    const status = entry[0];
-    const rest = entry.slice(1).trim();
+    const statusField = entries[i];
+    const status = statusField[0]; // 'A', 'M', 'D', or 'R'
     if (status === 'R') {
-      // Next entry is the new path
-      files.push({ status: 'D', path: rest });
-      if (i + 1 < entries.length) {
-        files.push({ status: 'A', path: entries[++i] });
-      }
+      // Rename: entries[i]='R100', entries[i+1]=oldPath, entries[i+2]=newPath
+      const oldPath = entries[++i];
+      const newPath = entries[++i];
+      files.push({ status: 'D', path: oldPath });
+      files.push({ status: 'A', path: newPath });
     } else {
-      files.push({ status, path: rest });
+      // Normal add/modify/delete: entries[i]='A', entries[i+1]=path
+      const filePath = entries[++i];
+      files.push({ status, path: filePath });
     }
   }
   return files;
