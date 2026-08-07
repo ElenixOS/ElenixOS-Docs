@@ -1,0 +1,53 @@
+---
+sidebar_position: 7
+title: 显示服务
+---
+
+显示服务负责管理屏幕亮度、电源开关等显示相关功能。
+
+## 亮度设置
+
+设置屏幕亮度：
+
+```c
+void eos_display_set_brightness(uint8_t brightness, eos_display_duration_t duration_ms, bool is_temporary);
+```
+
+参数说明：
+
+* `brightness`：亮度值 (0-100)
+* `duration_ms`：动画持续时间（毫秒），使用 `eos_display_duration_t` 预设或 `EOS_DISPLAY_DURATION_OFF` 表示立即改变
+* `is_temporary`：如果为 true，则保存当前亮度并临时设置新亮度，调用 `eos_display_restore()` 可恢复保存的亮度
+
+### 动画时长预设
+
+```c
+typedef enum {
+    EOS_DISPLAY_DURATION_OFF = 0,      // 立即改变
+    EOS_DISPLAY_DURATION_FAST = 100,   // 快速（100ms）
+    EOS_DISPLAY_DURATION_MEDIUM = 300, // 中速（300ms）
+    EOS_DISPLAY_DURATION_SLOW = 500,   // 慢速（500ms）
+} eos_display_duration_t;
+```
+
+## 屏幕电源控制
+
+### 打开屏幕
+
+```c
+void eos_display_power_on(void);
+```
+
+### 关闭屏幕
+
+```c
+void eos_display_power_off(void);
+```
+
+## 恢复亮度
+
+恢复为调用 `eos_display_set_brightness()` 时保存的亮度值：
+
+```c
+void eos_display_restore(eos_display_duration_t duration_ms);
+```
