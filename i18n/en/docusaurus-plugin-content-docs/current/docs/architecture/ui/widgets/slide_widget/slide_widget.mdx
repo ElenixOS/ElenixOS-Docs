@@ -1,0 +1,187 @@
+---
+sidebar_position: 5
+title: Slide Widget
+---
+
+# Slide Widget
+
+## 简述
+
+此组件为最基本的滑动组件，用于将目标对象从 base 滑动到 target。当触摸长度（垂直方向或水平方向）/(target-base) 超过阈值时，触发滑动动画，自动滑至 target，否则自动滑至 base。
+
+Slide Widget 提供了一种直观的交互方式，适用于需要通过手势控制对象位置的场景，如抽屉菜单、滑动面板等。
+
+## 核心特性
+
+* **方向支持**：支持水平和垂直两个方向的滑动
+* **阈值判定**：基于触摸距离和目标距离的比例判定是否触发滑动动画
+* **双向滑动**：可选支持双向滑动，实现更灵活的交互
+* **状态管理**：提供完整的状态机，包括空闲、拖动、阈值、回弹、动画和打开状态
+* **事件机制**：提供丰富的事件回调，方便应用程序响应各种滑动状态
+* **动画效果**：内置平滑的滑动动画，提升用户体验
+
+## 提示
+
+可以通过设置 `threshold` 为 `EOS_THRESHOLD_INFINITE` 以实现禁用目标对象移动但仍然可跟随触摸滑动的效果。这种模式适用于需要实时反馈但不触发状态变化的场景。
+
+## 注意
+
+所有事件都是发送给目标对象，即 `target_obj`。在监听事件时，请确保在目标对象上注册回调函数。
+
+示例：
+
+```c
+lv_obj_add_event_cb(sw->target_obj, my_callback, EOS_EVENT_SLIDE_WIDGET_DONE, NULL);
+```
+
+请勿对目标对象使用 `lv_obj_center`，否则会导致坐标移动混乱。
+
+## 示例
+
+```c
+// 创建滑动组件
+eos_slide_widget_t *sw = eos_slide_widget_create(
+    parent, 
+    target_obj, 
+    EOS_SLIDE_DIR_HOR, 
+    100, 
+    EOS_THRESHOLD_50
+);
+
+// 监听滑动完成事件
+lv_obj_add_event_cb(sw->target_obj, my_callback, EOS_EVENT_SLIDE_WIDGET_DONE, NULL);
+```
+
+## API 参考
+
+### 方向定义
+
+```c
+typedef enum
+{
+    EOS_SLIDE_DIR_VER,    // 垂直方向
+    EOS_SLIDE_DIR_HOR     // 水平方向
+} eos_slide_widget_dir_t;
+```
+
+### 状态定义
+
+```c
+typedef enum
+{
+    EOS_SLIDE_WIDGET_STATE_IDLE = 0,      // 空闲，未滑动
+    EOS_SLIDE_WIDGET_STATE_DRAGGING,      // 正在滑动中（手势拖动）
+    EOS_SLIDE_WIDGET_STATE_THRESHOLD,     // 超过阈值，滑动确认（执行展开/触发操作）
+    EOS_SLIDE_WIDGET_STATE_REVERTING,     // 正在回弹（未超过阈值自动返回）
+    EOS_SLIDE_WIDGET_STATE_ANIMATING,      // 手动触发动画
+    EOS_SLIDE_WIDGET_STATE_OPEN,           // 面板已完全打开
+} eos_slide_widget_state_t;
+```
+
+### 阈值定义
+
+```c
+enum{
+    EOS_THRESHOLD_0      = 0,
+    EOS_THRESHOLD_10     = 25,
+    EOS_THRESHOLD_20     = 51,
+    EOS_THRESHOLD_30     = 76,
+    EOS_THRESHOLD_40     = 102,
+    EOS_THRESHOLD_50     = 127,
+    EOS_THRESHOLD_60     = 153,
+    EOS_THRESHOLD_70     = 178,
+    EOS_THRESHOLD_80     = 204,
+    EOS_THRESHOLD_100    = 255,
+    EOS_THRESHOLD_INFINITE = INT_MAX,     // 无限阈值，禁用自动滑动
+};
+```
+
+### 结构体
+
+* **`eos_slide_widget_t`**：滑动组件结构体，包含组件的所有状态和配置信息
+
+### 函数
+
+* **`eos_slide_widget_create(lv_obj_t *parent, lv_obj_t *target_obj, eos_slide_widget_dir_t dir, lv_coord_t target, eos_threshold_t threshold)`**：创建滑动组件
+  * 参数：
+    * `parent`：触摸对象的父级对象
+    * `target_obj`：目标对象（会跟随触摸区域滑动）
+    * `dir`：滑动方向（只支持垂直方向 `EOS_SLIDE_DIR_VER` 和水平方向 `EOS_SLIDE_DIR_HOR`）
+    * `target`：目标坐标点（`dir` 为垂直时，target 指的是 y 轴坐标；为水平时，指的是 x 轴坐标）
+    * `threshold`：阈值（0～255）参见 `EOS_THRESHOLD_XXX`
+  * 返回值：创建成功返回滑动面板对象，否则为 NULL
+
+* **`eos_slide_widget_create_with_touch(lv_obj_t *touch_obj, lv_obj_t *target_obj, eos_slide_widget_dir_t dir, lv_coord_t target, eos_threshold_t threshold)`**：创建滑动组件（内部不创建触摸对象）
+  * 参数：
+    * `touch_obj`：触摸对象
+    * `target_obj`：目标对象
+    * `dir`：滑动方向
+    * `target`：目标坐标点
+    * `threshold`：阈值
+  * 返回值：创建成功返回滑动面板对象，否则为 NULL
+
+* **`eos_slide_widget_move(eos_slide_widget_t *sw, lv_coord_t start, lv_coord_t end, uint32_t duration)`**：从开始位置移动到结束位置
+  * 参数：
+    * `sw`：目标滑动组件
+    * `start`：开始坐标
+    * `end`：结束坐标
+    * `duration`：持续时间，设置为 0 则没有动画
+
+* **`eos_slide_widget_reverse(eos_slide_widget_t *sw)`**：翻转目标对象的 `target` 和 `base` 位置
+  * 参数：
+    * `sw`：目标滑动组件
+
+* **`eos_slide_widget_set_bidirectional(eos_slide_widget_t *sw, bool enable)`**：设置是否支持双向滑动
+  * 参数：
+    * `sw`：目标滑动组件
+    * `enable`：true 启用双向滑动，false 禁用双向滑动
+
+* **`eos_slide_widget_set_move_foreground_on_pressed(eos_slide_widget_t *sw, bool enable)`**：设置按下时是否移动到前景
+  * 参数：
+    * `sw`：目标滑动组件
+    * `enable`：true 启用前景移动，false 禁用前景移动
+
+* **`eos_slide_widget_set_anim_transition(eos_slide_widget_t *sw, eos_slide_widget_state_t transit_state, eos_slide_widget_state_t settle_state)`**：设置动画转换状态
+  * 参数：
+    * `sw`：目标滑动组件
+    * `transit_state`：转换状态
+    * `settle_state`：收敛状态
+
+* **`eos_slide_widget_delete(eos_slide_widget_t *sw)`**：删除滑动组件
+  * 参数：
+    * `sw`：目标滑动组件
+
+## 事件
+
+* **`EOS_EVENT_SLIDE_WIDGET_MOVING`**：滑动过程中持续触发
+* **`EOS_EVENT_SLIDE_WIDGET_DONE`**：滑动动画完成时触发
+* **`EOS_EVENT_SLIDE_WIDGET_REACHED_THRESHOLD`**：达到阈值时触发
+* **`EOS_EVENT_SLIDE_WIDGET_REVERTED`**：回弹完成时触发
+* **`EOS_EVENT_SLIDE_WIDGET_OPENED`**：面板完全打开时触发（广播事件）
+* **`EOS_EVENT_SLIDE_WIDGET_CLOSED`**：面板完全关闭时触发（广播事件）
+
+## 工作原理
+
+1. **触摸检测**：监听触摸对象的按下、拖动和释放事件
+2. **位置计算**：根据触摸移动距离计算目标对象的新位置
+3. **阈值判定**：在释放时计算触摸距离与目标距离的比例，判定是否超过阈值
+4. **动画执行**：根据判定结果执行相应的滑动动画
+5. **状态更新**：在动画过程中更新组件状态，触发相应事件
+
+## 使用方法
+
+1. **创建组件**：使用 `eos_slide_widget_create` 或 `eos_slide_widget_create_with_touch` 创建滑动组件
+2. **配置参数**：设置滑动方向、目标位置和阈值等参数
+3. **监听事件**：在目标对象上注册事件回调，响应各种滑动状态
+4. **控制行为**：根据需要启用双向滑动、前景移动等功能
+5. **手动控制**：使用 `eos_slide_widget_move` 手动触发滑动动画
+6. **清理资源**：不再需要时使用 `eos_slide_widget_delete` 删除组件
+
+## 注意事项
+
+* **坐标管理**：请勿对目标对象使用 `lv_obj_center`，否则会导致坐标移动混乱
+* **事件监听**：所有事件都是发送给目标对象，请在目标对象上注册回调函数
+* **内存管理**：创建的组件会占用内存，不再需要时应及时删除
+* **父级对象**：当父级对象为 `lv_list_class` 时，会自动禁用前景移动功能
+* **阈值选择**：根据实际需求选择合适的阈值，过大可能导致难以触发，过小可能误触发
+* **双向滑动**：启用双向滑动时，需要确保有足够的空间支持两个方向的滑动
