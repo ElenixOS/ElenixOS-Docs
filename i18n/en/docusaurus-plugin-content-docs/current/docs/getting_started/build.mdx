@@ -1,0 +1,255 @@
+---
+sidebar_position: 3
+title: 构建与使用
+---
+
+# 构建与使用
+
+本文档提供 ElenixOS 模拟器的完整构建流程，包括构建命令说明、配置选项和常见问题解决方案。
+
+## 构建概览
+
+ElenixOS 模拟器使用 CMake 作为构建系统，支持 **Native**（本地桌面）和 **WASM**（WebAssembly）两种平台。默认构建目标为 Native 平台。
+
+## 构建配置
+
+### 构建类型
+
+| 构建类型       | CMake 选项                        | 说明             |
+| ---------- | ------------------------------- | -------------- |
+| Debug      | `-DCMAKE_BUILD_TYPE=Debug`      | 调试模式，启用调试符号和断言 |
+| Release    | `-DCMAKE_BUILD_TYPE=Release`    | 发布模式，启用优化      |
+| MinSizeRel | `-DCMAKE_BUILD_TYPE=MinSizeRel` | 最小体积发布模式       |
+
+### 平台配置
+
+| 平台     | CMake 选项                | 说明             |
+| ------ | ----------------------- | -------------- |
+| Native | `-DEOS_PLATFORM=Native` | 本地桌面应用（默认）     |
+| WASM   | `-DEOS_PLATFORM=WASM`   | WebAssembly 平台 |
+
+### 功能选项
+
+| 选项                     | 默认值   | 说明                       |
+| ---------------------- | ----- | ------------------------ |
+| `USE_FREERTOS`         | `OFF` | 启用 FreeRTOS 实时内核         |
+| `LV_USE_DRAW_SDL`      | `OFF` | 启用 SDL 渲染加速              |
+| `LV_USE_LIBPNG`        | `OFF` | 启用 libpng PNG 解码         |
+| `LV_USE_LIBJPEG_TURBO` | `OFF` | 启用 libjpeg-turbo JPEG 解码 |
+| `LV_USE_FFMPEG`        | `OFF` | 启用 FFmpeg 视频播放           |
+| `LV_USE_FREETYPE`      | `OFF` | 启用 freetype 字体渲染         |
+
+## 构建步骤
+
+### Native 平台构建
+
+```bash
+# 进入项目根目录
+cd ElenixOS-Simulator
+
+# 创建构建目录
+mkdir build && cd build
+
+# 配置 CMake（Debug 模式）
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+
+# 编译
+cmake --build . -j$(nproc)
+
+# 运行模拟器
+./bin/main
+```
+
+### Release 模式构建
+
+```bash
+mkdir -p build-release && cd build-release
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build . -j$(nproc)
+```
+
+### WASM 平台构建
+
+WASM 构建需要 Emscripten 工具链。确保已安装并激活 Emscripten SDK：
+
+```bash
+# 安装 Emscripten SDK（如尚未安装）
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+./emsdk install latest
+./emsdk activate latest
+source ./emsdk_env.sh
+
+# 返回项目目录，创建 WASM 构建目录
+cd ElenixOS-Simulator
+mkdir -p build-wasm && cd build-wasm
+
+# 配置 CMake（WASM 平台）
+cmake .. -DEOS_PLATFORM=WASM -DCMAKE_BUILD_TYPE=Release
+
+# 编译
+cmake --build . -j$(nproc)
+
+# 构建产物位于 build-wasm/bin/ 目录
+# 使用 HTTP 服务器打开 bin/main.html 即可运行
+```
+
+### 启用 FreeRTOS
+
+```bash
+mkdir -p build-freertos && cd build-freertos
+cmake .. -DUSE_FREERTOS=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build . -j$(nproc)
+```
+
+## 完整的构建流程
+
+下图展示了 ElenixOS 模拟器的完整构建流程：
+
+```
+源代码 (C/C++/JS)
+    │
+    ├── ElenixOS/          ──┐
+    ├── lvgl/              ──┤── CMake 编译 ──► elenixos_lib (静态库)
+    ├── FreeRTOS/          ──┘
+    │
+    └── main/              ──┬── 链接 ──► main (可执行文件)
+        ├── main.c          │
+        ├── eos_port.c      │
+        ├── jerry_port.c    │
+        └── mac_api.c       │
+                            │
+                    运行时目录结构：
+                    bin/
+                    ├── main (或 main.html)
+                    └── fs/
+                        ├── .sys/
+                        │   ├── config/
+                        │   └── res/
+                        └── .simulator/
+```
+
+## 构建产物
+
+Native 平台构建完成后，产物位于 `build/bin/` 目录：
+
+| 文件     | 说明                    |
+| ------ | --------------------- |
+| `main` | 模拟器可执行文件              |
+| `fs/`  | 运行时文件系统目录（CMake 自动复制） |
+
+WASM 平台构建完成后，产物位于 `build-wasm/bin/` 目录：
+
+| 文件          | 说明                |
+| ----------- | ----------------- |
+| `main.html` | 模拟器 Web 页面        |
+| `main.js`   | WASM 胶水代码         |
+| `main.wasm` | WebAssembly 二进制文件 |
+| `static/`   | 静态资源目录            |
+
+## ElenixOS-Tools 开发工具
+
+项目提供了 `ElenixOS-Tools.py` 工具脚本，辅助开发流程：
+
+```bash
+# 运行工具
+python3.10 ElenixOS-Tools.py
+```
+
+该脚本提供以下功能：
+
+1. **生成 lvgl.json**：从 LVGL 源码生成 JSON API 描述文件
+2. **生成 sni_lv_types.c**：基于 lvgl.json 生成 LVGL JavaScript 绑定的类型定义文件
+
+工具会自动创建 Python 虚拟环境并安装依赖。
+
+## 运行模拟器
+
+### Native 平台
+
+直接执行构建产物：
+
+```bash
+./bin/main
+```
+
+模拟器窗口包含：
+
+* **中央显示区域**：模拟手表屏幕（390x450 像素）
+* **右侧 Crown（表冠）**：点击模拟表冠按压
+* **右侧 Side Button（侧边按钮）**：点击模拟侧边按钮按压
+
+### WASM 平台
+
+使用 HTTP 服务器提供构建产物：
+
+```bash
+# 使用 Python 内置 HTTP 服务器
+cd build-wasm/bin
+python3 -m http.server 8000
+
+# 在浏览器中打开 http://localhost:8000/build-wasm/bin/main.html
+```
+
+## 常见构建问题
+
+### CMake 配置失败
+
+**错误信息**：`Could NOT find SDL2`
+
+**解决方案**：安装 SDL2 开发库，详见[环境设置文档](/docs/getting_started/environment.mdx)。
+
+### 编译错误：未找到头文件
+
+```text
+fatal error: 'lvgl/lvgl.h' file not found
+```
+
+**解决方案**：确保子模块已正确初始化：
+
+```bash
+git submodule update --init --recursive
+```
+
+### 链接错误：未定义符号
+
+```text
+undefined reference to 'eos_xxx'
+```
+
+**解决方案**：清理构建缓存后重新编译：
+
+```bash
+rm -rf build
+mkdir build && cd build
+cmake ..
+cmake --build .
+```
+
+### WASM 构建：Emscripten 未找到
+
+```text
+CMake Error: Could not find CMAKE_ROOT
+```
+
+**解决方案**：确保 Emscripten 环境已正确激活：
+
+```bash
+source /path/to/emsdk/emsdk_env.sh
+```
+
+### FreeRTOS 构建失败
+
+启用 FreeRTOS 时，确保编译器支持 POSIX 线程（pthreads）。Linux 和 macOS 通常自带支持，Windows 下建议使用 WSL2。
+
+### WASM 平台不支持 FreeRTOS
+
+WASM 构建时 `USE_FREERTOS` 会被自动禁用，因为 Emscripten 环境不支持 FreeRTOS 的 POSIX 移植层。
+
+## 下一步
+
+构建成功后，建议按以下顺序继续探索：
+
+1. 阅读[系统架构](/docs/architecture/arch.mdx)了解 ElenixOS 的设计
+2. 阅读[快速开始](/docs/getting_started/quick_start.mdx)了解基本使用
+3. 查阅 [JS API](../architecture/script_engine/elenix_os) 开始开发应用
