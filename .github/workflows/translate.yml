@@ -77,14 +77,14 @@ jobs:
 
           echo "=== Committing i18n ==="
           git diff --cached --name-only
-          git commit -m "chore(i18n): AI translate docs/blog changes [skip ci]"
+          git commit -m "chore(i18n): AI translate docs/blog changes "
           I18N_SHA=$(git rev-parse HEAD)
 
           echo "=== Applying to main ==="
           git fetch origin main
           git checkout -B ci-i18n origin/main
           git checkout "$I18N_SHA" -- i18n/
-          git commit -m "chore(i18n): AI translate docs/blog changes [skip ci]"
+          git commit -m "chore(i18n): AI translate docs/blog changes "
 
           echo "=== Pushing to main ==="
           git push origin HEAD:main

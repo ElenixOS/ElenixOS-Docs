@@ -254,10 +254,9 @@ function translateFrontmatter(frontmatter) {
 // ─── DeepSeek API client ─────────────────────────────────────────────────────
 
 /**
- * Call DeepSeek chat completions API.
- * Returns the model's response text.
+ * Raw DeepSeek API call — returns the parsed JSON object from the response.
  */
-async function callDeepSeek(systemPrompt, userContent, retries = 3) {
+async function callDeepSeekAPI(systemPrompt, userContent, retries = 3) {
   const body = {
     model: DEEPSEEK_MODEL,
     messages: [
@@ -300,30 +299,33 @@ async function callDeepSeek(systemPrompt, userContent, retries = 3) {
       }
 
       if (data.choices?.[0]?.finish_reason === 'length') {
-        // Truncated — retry
         console.warn('  Response truncated (length), retrying...');
         body.max_tokens = Math.min(body.max_tokens * 2, 16384);
         continue;
       }
 
       // Parse JSON from response (strip possible markdown fences)
-      let parsed;
       const cleaned = content.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch {
-        // If it's not valid JSON, return the raw text
-        return content;
-      }
-
-      return parsed.translation || parsed.content || content;
+      return JSON.parse(cleaned);
     } catch (err) {
+      if (err instanceof SyntaxError) {
+        // JSON parse error — not retryable, return raw as string
+        return { _raw: err.message };
+      }
       if (attempt === retries) throw err;
       const delay = Math.min(1000 * Math.pow(2, attempt) + Math.random() * 1000, 30000);
       console.warn(`  API call failed: ${err.message.slice(0, 100)}. Retrying in ${Math.round(delay / 1000)}s...`);
       await sleep(delay);
     }
   }
+}
+
+/**
+ * Convenience wrapper — extracts the 'translation' field for the main translation flow.
+ */
+async function callDeepSeek(systemPrompt, userContent, retries = 3) {
+  const data = await callDeepSeekAPI(systemPrompt, userContent, retries);
+  return data?.translation || data?.content || JSON.stringify(data);
 }
 
 function sleep(ms) {
@@ -345,6 +347,11 @@ CRITICAL RULES — follow exactly:
 7. Use natural, idiomatic English appropriate for technical documentation.
 8. Output ONLY a JSON object: {"translation": "your translated text here"}`;
 
+const COMMENT_PROMPT = `Translate these code comments from Simplified Chinese to English.
+Keep them concise — code comments should be short and clear.
+Preserve any code symbols, variable names, or technical terms as-is.
+Return ONLY a JSON object: {"translations": ["comment 1", "comment 2", ...]}`;
+
 const DIFF_UPDATE_PROMPT = `You are a professional technical translator. Below is:
 1. The EXISTING English translation of a documentation file
 2. A git diff showing what CHANGED in the Chinese source
@@ -362,6 +369,82 @@ Output ONLY a JSON object: {"translation": "the complete updated English file"}
 === CHINESE DIFF ===
 {diff}`;
 
+// ─── Code comment extraction & translation ────────────────────────────────────
+
+/**
+ * Extract Chinese comments from code blocks, replacing comment text with markers.
+ * Returns the modified content and a map for later restoration.
+ */
+function extractComments(content) {
+  const commentMap = []; // { marker, original, prefix, indent }
+  let counter = 0;
+
+  const modified = content.replace(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g, (block) => {
+    const lines = block.split('\n');
+    let hasComments = false;
+    const newLines = lines.map((line, i) => {
+      if (i === 0 || i === lines.length - 1) return line; // fence lines
+
+      const trimmed = line.trimStart();
+      const indent = line.slice(0, line.length - trimmed.length);
+
+      // Single-line comment: // or #
+      const cmt = trimmed.match(/^(\/\/|#)\s*(.+)$/);
+      if (cmt && /[一-鿿]/.test(cmt[2])) {
+        const marker = `__CMT${counter}__`;
+        commentMap.push({ marker, original: cmt[2], prefix: cmt[1], indent });
+        counter++;
+        hasComments = true;
+        return `${indent}${cmt[1]} ${marker}`;
+      }
+
+      return line;
+    });
+    return hasComments ? newLines.join('\n') : block;
+  });
+
+  return { modified, commentMap };
+}
+
+/**
+ * Batch-translate code comments via DeepSeek API.
+ */
+async function translateCommentBatch(commentMap) {
+  if (commentMap.length === 0) return [];
+
+  const lines = commentMap.map((c, i) => `[${i}] ${c.original}`).join('\n');
+
+  if (DRY_RUN) {
+    console.log(`    → would translate ${commentMap.length} code comment(s)`);
+    return commentMap.map(c => c.original); // return originals
+  }
+
+  try {
+    const result = await callDeepSeekAPI(COMMENT_PROMPT, lines);
+    const translations = result.translations || [];
+    console.log(`    → translated ${translations.length}/${commentMap.length} code comment(s)`);
+    return translations;
+  } catch (err) {
+    console.warn(`    → comment translation failed: ${err.message}, keeping originals`);
+    return commentMap.map(c => c.original);
+  }
+}
+
+/**
+ * Replace comment markers with translated text in the final output.
+ */
+function restoreComments(content, commentMap, translations) {
+  let result = content;
+  for (let i = 0; i < commentMap.length; i++) {
+    const { marker, prefix, indent } = commentMap[i];
+    const translated = translations[i] || commentMap[i].original;
+    // Restore the full comment line: indent + prefix + translated text
+    const fullComment = `${indent}${prefix} ${translated}`;
+    result = result.replaceAll(marker, translated);
+  }
+  return result;
+}
+
 /**
  * Full translation of a new file.
  */
@@ -373,7 +456,11 @@ async function translateFull(sourcePath) {
     return { action: 'skip', reason: 'no Chinese characters detected' };
   }
 
-  const { frontmatter, body } = extractFrontmatter(source);
+  // Step 1: Extract code comments for later translation
+  const { modified: sourceWithMarkers, commentMap } = extractComments(source);
+
+  // Step 2: Protect code blocks, inline code, JSX, etc.
+  const { frontmatter, body } = extractFrontmatter(sourceWithMarkers);
   const { text: protectedBody, placeholders } = protectContent(body);
 
   const userContent = frontmatter
@@ -384,10 +471,18 @@ async function translateFull(sourcePath) {
     return { action: 'full', targetPath: mapSourceToTarget(sourcePath), dryRun: true };
   }
 
+  // Step 3: Translate the main document body
   const translated = await callDeepSeek(SYSTEM_PROMPT, userContent);
 
-  // Restore placeholders
-  const restored = restoreContent(translated, placeholders);
+  // Step 4: Restore code blocks, inline code, etc.
+  let restored = restoreContent(translated, placeholders);
+
+  // Step 5: Translate code comments and restore them
+  if (commentMap.length > 0) {
+    const commentTranslations = await translateCommentBatch(commentMap);
+    restored = restoreComments(restored, commentMap, commentTranslations);
+  }
+
   return { action: 'full', targetPath: mapSourceToTarget(sourcePath), content: restored };
 }
 
