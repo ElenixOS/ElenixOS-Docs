@@ -1,0 +1,228 @@
+---
+sidebar_position: 4
+title: 开发环境准备
+---
+
+# 开发环境准备
+
+本文档将指导你完成 ElenixOS 开发环境的搭建，包括必要的工具安装、系统要求以及环境验证方法。
+
+## 系统要求
+
+### 支持的操作系统
+
+| 操作系统                          | 支持状态 | 备注                 |
+| ----------------------------- | ---- | ------------------ |
+| macOS (Intel / Apple Silicon) | 完全支持 | 推荐使用 Homebrew 安装依赖 |
+| Ubuntu 20.04+ / Debian 11+    | 完全支持 | 推荐使用 apt 安装依赖      |
+| Windows 10+ (x86_64)          | 完全支持 | 推荐使用 MSYS2 或 WSL2  |
+| 其他 Linux 发行版                  | 基本支持 | 需自行安装对应依赖包         |
+
+### 硬件要求
+
+* **CPU**: 双核及以上，支持 `march=native` 编译优化
+* **内存**: 至少 4GB RAM（推荐 8GB 及以上）
+* **磁盘空间**: 至少 2GB 可用空间（含依赖和构建产物）
+* **显示器**: 支持 OpenGL 2.0 及以上（模拟器 GUI 显示）
+
+## 必需工具
+
+### 编译器工具链
+
+| 工具                | 最低版本       | 用途     |
+| ----------------- | ---------- | ------ |
+| CMake             | 3.10       | 构建系统配置 |
+| C 编译器 (GCC/Clang) | C99 标准支持   | C 代码编译 |
+| C++ 编译器           | C++17 标准支持 | 部分组件编译 |
+| Make / Ninja      | *          | 构建执行   |
+
+### SDL2
+
+模拟器使用 SDL2 实现窗口显示和输入处理，是模拟器运行的必需依赖。
+
+### Python 3.10
+
+ElenixOS 使用 Python 脚本辅助开发流程，包括 API 绑定生成等任务。
+
+## 环境搭建步骤
+
+### macOS
+
+使用 Homebrew 安装所需依赖：
+
+```bash
+# 安装 CMake
+brew install cmake
+
+# 安装 SDL2
+brew install sdl2
+
+# 安装 Python 3.10（如尚未安装）
+brew install python@3.10
+
+# 验证安装
+cmake --version
+sdl2-config --version
+python3.10 --version
+```
+
+### Ubuntu / Debian
+
+使用 apt 安装所需依赖：
+
+```bash
+# 更新包索引
+sudo apt update
+
+# 安装 CMake
+sudo apt install cmake
+
+# 安装 SDL2 开发库
+sudo apt install libsdl2-dev
+
+# 安装 Python 3.10
+sudo apt install python3.10 python3.10-venv
+
+# 安装构建工具
+sudo apt install build-essential
+
+# 验证安装
+cmake --version
+sdl2-config --version
+python3.10 --version
+```
+
+### Windows (MSYS2)
+
+使用 MSYS2 安装所需依赖：
+
+```bash
+# 更新包数据库
+pacman -Sy
+
+# 安装 CMake
+pacman -S mingw-w64-x86_64-cmake
+
+# 安装 SDL2
+pacman -S mingw-w64-x86_64-SDL2
+
+# 安装 GCC 工具链
+pacman -S mingw-w64-x86_64-toolchain
+
+# 安装 Python 3.10
+pacman -S mingw-w64-x86_64-python3.10
+
+# 安装 Make
+pacman -S make
+```
+
+### Windows (WSL2)
+
+在 WSL2 的 Ubuntu 环境中，按照上述 Ubuntu 的步骤安装即可。如需使用原生 Windows GUI，需额外配置：
+
+```bash
+# 安装 WSL2 必要的图形库
+sudo apt install libx11-dev libxext-dev libxrender-dev libxrandr-dev libxcursor-dev
+
+# 安装 freetype 开发库（可选，用于字体渲染）
+sudo apt install libfreetype6-dev
+```
+
+## 验证环境
+
+### 检查 CMake
+
+```bash
+cmake --version
+```
+
+输出应包含版本信息，如 `cmake version 3.10.0` 或更高版本。
+
+### 检查 SDL2
+
+```bash
+sdl2-config --version
+```
+
+输出应为 SDL2 的版本号，如 `2.0.20`。
+
+### 检查编译器
+
+```bash
+gcc --version
+# 或
+clang --version
+```
+
+确保编译器支持 C99 标准。
+
+### 检查 Python
+
+```bash
+python3.10 --version
+```
+
+输出应为 `Python 3.10.x`。
+
+## 获取代码
+
+```bash
+# 克隆模拟器仓库（含子模块）
+git clone --recursive https://github.com/ElenixOS/ElenixOS-Simulator.git
+cd ElenixOS-Simulator
+
+# 如果已克隆但未拉取子模块
+git submodule update --init --recursive
+```
+
+仓库包含以下主要组件：
+
+| 目录            | 说明                |
+| ------------- | ----------------- |
+| `ElenixOS/`   | ElenixOS 核心源码     |
+| `lvgl/`       | LVGL 图形库          |
+| `FreeRTOS/`   | FreeRTOS 实时内核（可选） |
+| `lv_drivers/` | LVGL 显示和输入驱动      |
+| `main/`       | 模拟器主程序            |
+| `config/`     | FreeRTOS 配置       |
+| `fs/`         | 文件系统模拟目录          |
+
+## 可选依赖
+
+### FreeRTOS
+
+如需在模拟器中启用 FreeRTOS 支持，无需额外安装依赖，项目已包含 FreeRTOS 源码。
+
+### LVGL 扩展功能
+
+某些 LVGL 高级功能需要额外的库支持：
+
+| 功能       | 依赖库           | CMake 选项                  |
+| -------- | ------------- | ------------------------- |
+| SDL 渲染加速 | SDL2          | `LV_USE_DRAW_SDL=ON`      |
+| PNG 解码   | libpng        | `LV_USE_LIBPNG=ON`        |
+| JPEG 解码  | libjpeg-turbo | `LV_USE_LIBJPEG_TURBO=ON` |
+| 视频播放     | FFmpeg        | `LV_USE_FFMPEG=ON`        |
+| 字体渲染     | freetype      | `LV_USE_FREETYPE=ON`      |
+
+## 常见问题
+
+### CMake 找不到 SDL2
+
+确保 SDL2 开发库已正确安装，且 `sdl2-config` 在 PATH 中。如仍无法找到，可手动指定 SDL2 路径：
+
+```bash
+cmake -DSDL2_DIR=/path/to/sdl2 ..
+```
+
+### 编译时出现 `march=native` 错误
+
+如果编译器不支持 `march=native` 优化标志，可在 CMake 配置时禁用：
+
+```bash
+cmake -DCMAKE_C_FLAGS="-march=x86-64" ..
+```
+
+### Python 脚本运行失败
+
+ElenixOS-Tools.py 需要 Python 3.10。如系统中安装了多个 Python 版本，确保 3.10 是默认版本或在虚拟环境中使用。
