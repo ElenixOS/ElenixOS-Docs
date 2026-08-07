@@ -1,0 +1,170 @@
+---
+title: 对象 (Object)
+sidebar_position: 1
+---
+
+# 对象 (Object)
+
+对象是 ElenixOS 中所有 LVGL 组件的基类，提供了通用的功能和方法。本文档将介绍对象组件的功能、使用方法和注意事项。
+
+## 功能介绍
+
+对象组件是所有 LVGL 组件的基类，提供了以下通用功能：
+
+* 位置和大小管理
+* 样式管理
+* 事件处理
+* 子对象管理
+* 标志管理
+
+## 使用方法
+
+### 创建对象
+
+使用 `new lv.obj()` 构造函数创建对象：
+
+```javascript
+// 创建对象
+const obj = new lv.obj(eos.view.active());
+```
+
+### 配置对象
+
+使用以下方法配置对象：
+
+```javascript
+// 设置对象大小
+obj.setSize(100, 100);
+
+// 设置对象位置
+obj.setPos(10, 10);
+
+// 设置对象对齐方式
+obj.align(lv.ALIGN_CENTER, 0, 0);
+
+// 设置对象背景色
+obj.setStyleBgColor(lv.color_hex(0xFFFFFF), 0);
+
+// 设置对象边框
+obj.setStyleBorderWidth(2, 0);
+obj.setStyleBorderColor(lv.color_hex(0x000000), 0);
+
+// 设置对象圆角
+obj.setStyleRounded(5, 0);
+
+// 设置对象不透明度
+obj.setStyleOpacity(0.8, 0);
+```
+
+### 子对象管理
+
+使用以下方法管理子对象：
+
+```javascript
+// 创建子对象
+const child = new lv.obj(obj);
+child.setSize(50, 50);
+child.setPos(25, 25);
+
+// 获取父对象
+const parent = child.getParent();
+
+// 获取子对象
+const firstChild = obj.getChild(0);
+
+// 移除子对象
+obj.removeChild(child);
+```
+
+### 标志管理
+
+使用以下方法管理对象标志：
+
+```javascript
+// 添加标志
+obj.addFlag(lv.OBJ_FLAG_CLICKABLE);
+obj.addFlag(lv.OBJ_FLAG_CHECKABLE);
+
+// 移除标志
+obj.clearFlag(lv.OBJ_FLAG_CLICKABLE);
+
+// 检查标志
+if (obj.hasFlag(lv.OBJ_FLAG_CLICKABLE)) {
+    eos.console.log("Object is clickable");
+}
+```
+
+### 事件处理
+
+使用以下方法处理事件：
+
+```javascript
+// 添加事件回调
+obj.addEventCb((e) => {
+    eos.console.log("Object clicked!");
+}, lv.EVENT_CLICKED, null);
+
+// 移除事件回调
+obj.removeEventCb(callback);
+
+// 发送事件
+obj.sendEvent(lv.EVENT_CLICKED, null);
+
+// 获取事件计数
+const eventCount = obj.getEventCount();
+```
+
+### 示例：创建简单对象
+
+```javascript
+// 创建对象
+const obj = new lv.obj(eos.view.active());
+obj.setSize(100, 100);
+obj.align(lv.ALIGN_CENTER, 0, 0);
+
+// 设置对象样式
+obj.setStyleBgColor(lv.color_hex(0x007AFF), 0);
+obj.setStyleRounded(10, 0);
+
+// 添加子对象
+const child = new lv.obj(obj);
+child.setSize(50, 50);
+child.align(lv.ALIGN_CENTER, 0, 0);
+child.setStyleBgColor(lv.color_hex(0xFFFFFF), 0);
+```
+
+### 示例：创建可点击对象
+
+```javascript
+// 创建对象
+const obj = new lv.obj(eos.view.active());
+obj.setSize(100, 100);
+obj.align(lv.ALIGN_CENTER, 0, 0);
+
+// 设置对象样式
+obj.setStyleBgColor(lv.color_hex(0x007AFF), 0);
+obj.setStyleRounded(10, 0);
+
+// 添加可点击标志
+obj.addFlag(lv.OBJ_FLAG_CLICKABLE);
+
+// 绑定点击事件
+obj.addEventCb((e) => {
+    eos.console.log("Object clicked!");
+}, lv.EVENT_CLICKED, null);
+```
+
+## 常用标志
+
+| 标志                            | 描述    |
+| ----------------------------- | ----- |
+| `lv.OBJ_FLAG_HIDDEN`          | 隐藏对象  |
+| `lv.OBJ_FLAG_CLICKABLE`       | 可点击对象 |
+| `lv.OBJ_FLAG_CHECKABLE`       | 可检查对象 |
+| `lv.OBJ_FLAG_SCROLLABLE`      | 可滚动对象 |
+| `lv.OBJ_FLAG_SCROLL_ELASTIC`  | 弹性滚动  |
+| `lv.OBJ_FLAG_SCROLL_MOMENTUM` | 动量滚动  |
+| `lv.OBJ_FLAG_SNAPPABLE`       | 可吸附   |
+| `lv.OBJ_FLAG_PRESS_LOCK`      | 按压锁定  |
+| `lv.OBJ_FLAG_EVENT_BUBBLE`    | 事件冒泡  |
+| `lv.OBJ_FLAG_GESTURE_BUBBLE`  | 手势冒泡  |
