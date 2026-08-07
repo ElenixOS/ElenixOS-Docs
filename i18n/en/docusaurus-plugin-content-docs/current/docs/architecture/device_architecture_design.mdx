@@ -1,0 +1,356 @@
+# 设备架构设计
+
+## 概述
+
+ElenixOS 采用分层架构设计，核心原则是**上层发控制指令，下层只做状态上报**。这种设计实现了关注点分离，使得系统各层之间保持松耦合，同时便于移植和扩展。
+
+```
+driver → 上报状态
+        ↓
+device manager 更新 state
+        ↓
+service 查询 state
+```
+
+## 架构分层
+
+### 层级关系
+
+```
+应用层 (Application)
+    ↓ 控制指令 (OPS)
+服务层 (Service Layer)
+    ↓ 查询/控制
+设备管理器 (Device Manager)
+    ↓ 状态上报
+驱动层 (Driver)
+```
+
+### 设计约束
+
+**服务层（Service Layer）**
+
+* 向上提供标准 API 接口
+* 只能使用设备，不能管理设备信息
+* 通过设备管理器获取设备实例，对设备的 OPS 进行操作
+* 禁止直接调用驱动层代码
+
+**设备框架（Device Framework）**
+
+* 通过设备管理器统一管理设备实例
+* 所有设备必须提供 `register` 函数用于注册
+* 设备状态只能由驱动上报给设备管理器
+* 服务层只能通过查询状态机状态获取设备状态
+
+**驱动层（Driver）**
+
+* 由移植方实现
+* 通过实现 OPS 确保上层可操作底层设备
+* 负责硬件状态采集和上报
+
+## 服务层
+
+### 服务列表
+
+| 服务名称   | 服务文件                       | 功能描述            |
+| ------ | -------------------------- | --------------- |
+| 传感器服务  | `eos_service_sensor.c/.h`  | 传感器采样与数据处理      |
+| 显示服务   | `eos_service_display.c/.h` | 屏幕亮度管理与电源控制     |
+| 电池服务   | `eos_service_battery.c/.h` | 电池状态监测与电量管理     |
+| 电源管理服务 | `eos_service_pm.c/.h`      | 系统电源状态与睡眠管理     |
+| 触感服务   | `eos_service_haptic.c/.h`  | 触觉反馈控制          |
+| 时间服务   | `eos_service_time.c/.h`    | 系统时间获取          |
+| 存储服务   | `eos_service_storage.c/.h` | 文件系统操作与 JSON 存储 |
+| 配置服务   | `eos_service_config.c/.h`  | 系统配置管理          |
+| 状态服务   | `eos_service_state.c/.h`   | 运行时持久化状态管理      |
+| 日志服务   | `eos_log.c/.h`             | 日志系统            |
+
+### 服务命名规范
+
+服务文件命名：`eos_service_\<service_name>.c/.h`
+
+服务初始化 API：`eos_service_\<service_name>_init()`
+
+其他 API 统一为：`eos_\<service_name>_\<function_name>()`
+
+## 设备框架
+
+### 设备管理器
+
+设备管理器是上层获取设备实例的唯一路径。
+
+#### 支持的设备类型
+
+| 设备类型  | 设备文件                    | 说明         |
+| ----- | ----------------------- | ---------- |
+| 传感器设备 | `eos_dev_sensor.c/.h`   | 支持多实例，链表管理 |
+| 显示屏设备 | `eos_dev_display.c/.h`  | 单实例        |
+| 电池设备  | `eos_dev_battery.c/.h`  | 单实例        |
+| 电源设备  | `eos_dev_power.c/.h`    | 单实例        |
+| 时间设备  | `eos_dev_time.c/.h`     | 单实例        |
+| 震动器设备 | `eos_dev_vibrator.c/.h` | 单实例        |
+
+#### 设备管理器必须提供的能力
+
+1. **注册函数**（必须命名为 `register`）
+   * 输入参数为 OPS 指针
+   * 用于注册设备实例
+
+2. **查找设备功能**
+   * 单实例设备提供 `get_instance` 或 `get_default`
+   * 多实例设备提供 `find` 和 `find_by_type` API
+
+3. **获取设备状态**（`get_state`）
+   * 用于查询设备当前状态
+
+4. **设备状态上报**（`report`）
+   * 由驱动层调用，上报设备状态变化
+
+#### 设备管理器禁止实现
+
+1. 禁止使用 PORT，提供 OPS 实现设备控制，禁止使用弱定义
+2. 禁止提供业务接口（如采样频率设置、模式切换等）
+3. 禁止提供注销函数
+4. 禁止提供用户数据字段
+
+#### 设备基本结构
+
+```c
+typedef enum {
+    DEV_STATE_NONE = 0,   // 不存在 / 未注册
+    DEV_STATE_READY,      // 已初始化，可用
+    DEV_STATE_BUSY,       // 正在使用
+    DEV_STATE_ERROR,      // 出错
+} eos_dev_state_t;
+
+typedef struct {
+    const eos_<device_name>_ops_t *ops;
+    <private_info>
+    eos_dev_state_t _state; // 私有字段
+} eos_<device_name>_dev_t;
+```
+
+### 传感器设备
+
+传感器设备支持多实例管理，使用链表组织。
+
+#### 传感器类型
+
+```c
+typedef enum {
+    EOS_SENSOR_TYPE_UNKNOWN = 0,
+    EOS_SENSOR_TYPE_ACCE,       // 加速度计
+    EOS_SENSOR_TYPE_GYRO,       // 陀螺仪
+    EOS_SENSOR_TYPE_HR,         // 心率传感器
+    EOS_SENSOR_TYPE_SPO2,       // 血氧传感器
+    EOS_SENSOR_TYPE_LIGHT,      // 环境光传感器
+    EOS_SENSOR_TYPE_PROXIMITY,  // 接近传感器
+    EOS_SENSOR_TYPE_ECG,        // 心电图传感器
+    EOS_SENSOR_TYPE_TEMP,       // 温度传感器
+    EOS_SENSOR_TYPE_MAG,        // 磁力计
+    EOS_SENSOR_TYPE_BARO,       // 气压计
+    EOS_SENSOR_TYPE_CAP,        // 电容传感器
+    EOS_SENSOR_TYPE_STEP,       // 计步器
+    EOS_SENSOR_TYPE_MAX
+} eos_sensor_type_t;
+```
+
+#### 传感器数据结构
+
+```c
+typedef union {
+    eos_sensor_data_acce_t acce;
+    eos_sensor_data_gyro_t gyro;
+    eos_sensor_data_mag_t mag;
+    eos_sensor_data_temp_t temp;
+    eos_sensor_data_baro_t baro;
+    eos_sensor_data_light_t light;
+    eos_sensor_data_proximity_t proximity;
+    eos_sensor_data_hr_t hr;
+    eos_sensor_data_spo2_t spo2;
+    eos_sensor_data_ecg_t ecg;
+    eos_sensor_data_cap_t cap;
+    eos_sensor_data_step_t step;
+    eos_sensor_data_battery_t battery;
+} eos_sensor_data_t;
+
+typedef struct {
+    eos_sensor_type_t type;
+    eos_sensor_data_t data;
+    uint32_t timestamp;  // 使用 eos_tick_get() 获取
+} eos_sensor_raw_data_t;
+```
+
+#### 传感器数据结构设计要求
+
+* 传感器名称（用于查找）
+* 传感器类型
+* 传感器状态
+* 传感器数据缓存（FIFO，环形缓冲区实现）
+* 传感器事件 ID（自动注册）
+* 传感器读取周期（0 表示不自动读取，单位毫秒）
+
+## 设备控制接口（OPS）
+
+OPS（Operations）是向下提供的可移植接口，定义在 `eos_dev_\<device_name>.h` 中。
+
+### OPS 设计原则
+
+* 设备层不提供读操作，数据通过 `eos_sensor_notify()` 推送至服务层
+* 服务层管理 FIFO 并向订阅者广播数据
+* OPS 返回值类型为 `eos_result_t` 或 `bool`，简单操作可返回 `void`
+
+### OPS 示例（传感器）
+
+```c
+typedef struct {
+    void (*init)(eos_dev_sensor_t *dev);
+    void (*deinit)(eos_dev_sensor_t *dev);
+    void (*enable)(eos_dev_sensor_t *dev);
+    void (*disable)(eos_dev_sensor_t *dev);
+    void (*set_sample_rate)(eos_dev_sensor_t *dev, uint32_t hz);
+    void (*get_sample_rate)(eos_dev_sensor_t *dev, uint32_t *hz);
+} eos_dev_sensor_ops_t;
+```
+
+### 设备控制接口约束
+
+* 其他服务禁止直接调用本服务对应的 OPS
+* 每类设备只能被对应的 Service 操作，不能被其他 Service 操作
+* OPS 不应包含 report 函数（report 是设备管理器提供的）
+
+## 传感器数据流
+
+### Pull 模式（同步）
+
+* 调用接口时从传感器数据缓存立即读取
+* 若无数据返回空或错误码
+* 不影响传感器采样行为
+
+### Push 模式（异步）
+
+* 通过注册回调函数订阅传感器数据
+* 由传感器服务按设定频率触发回调
+* 每个订阅者可独立配置期望数据频率
+* 回调在非中断上下文中执行
+
+### 数据上报流程
+
+```
+driver → sensor_report(type, data)
+              ↓
+         快速入队（中断安全）
+              ↓
+         写入环形缓冲区
+              ↓
+         服务层调度
+              ↓
+         回调分发
+```
+
+### 设计约束
+
+* 设备层不得直接调用上层回调函数
+* 所有传感器数据必须先进入缓存，再由服务层统一分发
+* 服务之间不得直接访问传感器设备，必须通过服务接口
+* 中断上下文仅允许执行数据上报
+
+## 事件系统
+
+### 事件注册
+
+```c
+eos_event_code_t eos_event_register_id(void);
+```
+
+获取用户自定义事件 ID，范围从 `EOS_EVENT_LAST` 开始。
+
+### 事件订阅与发布
+
+```c
+// 订阅事件
+void eos_event_subscribe(eos_event_code_t event_id, eos_event_cb_t cb, void *user_data);
+
+// 发布事件
+void eos_event_post(eos_event_code_t event_id, void *param, lv_obj_t *obj);
+```
+
+### 内置事件类型
+
+| 事件名称                                 | 说明     |
+| ------------------------------------ | ------ |
+| `EOS_EVENT_APP_UNINSTALLED`          | 应用已卸载  |
+| `EOS_EVENT_APP_INSTALLED`            | 应用已安装  |
+| `EOS_EVENT_SYSTEM_SLEEP`             | 系统进入睡眠 |
+| `EOS_EVENT_SYSTEM_DISPLAY_ON`        | 系统唤醒   |
+| `EOS_EVENT_SYSTEM_DISPLAY_AOD`       | 息屏显示模式 |
+| `EOS_EVENT_SYSTEM_CONFIG_UPDATE`     | 配置已更新  |
+| `EOS_EVENT_SCRIPT_STARTED`           | 脚本已启动  |
+| `EOS_EVENT_SCRIPT_EXITED`            | 脚本已退出  |
+| `EOS_EVENT_ACTIVITY_SCREEN_SWITCHED` | 页面切换完成 |
+| `EOS_EVENT_LANGUAGE_CHANGED`         | 语言已更改  |
+
+## FIFO 环形缓冲区
+
+FIFO 用于传感器数据缓存，支持统计功能。
+
+### 主要特性
+
+* 写操作覆盖旧数据（满时）
+* 支持统计：写入计数、读取计数、溢出计数、峰值使用量
+* 线程安全（临界区保护）
+
+### 核心 API
+
+```c
+eos_fifo_t *eos_fifo_create(uint16_t capacity);
+uint16_t eos_fifo_write(eos_fifo_t *fifo, const void *data, uint16_t size);
+uint16_t eos_fifo_read(eos_fifo_t *fifo, void *buf, uint16_t size);
+bool eos_fifo_is_empty(eos_fifo_t *fifo);
+bool eos_fifo_is_full(eos_fifo_t *fifo);
+void eos_fifo_get_stats(eos_fifo_t *fifo, eos_fifo_stats_t *stats);
+```
+
+## 日志系统
+
+日志系统采用监听器模式，支持多个监听者。
+
+### 日志级别
+
+```c
+typedef enum {
+    EOS_LOG_LEVEL_DEBUG = 0,
+    EOS_LOG_LEVEL_INFO,
+    EOS_LOG_LEVEL_WARN,
+    EOS_LOG_LEVEL_ERROR
+} eos_log_level_t;
+```
+
+### 日志宏
+
+```c
+#define EOS_LOG_D(fmt, ...)  // Debug
+#define EOS_LOG_I(fmt, ...)  // Info
+#define EOS_LOG_W(fmt, ...)  // Warning
+#define EOS_LOG_E(fmt, ...)  // Error
+```
+
+### 监听器注册
+
+```c
+eos_log_listener_id_t eos_log_register_listener(
+    const char *name,
+    eos_log_listener_cb_t cb,
+    void *user_data,
+    uint8_t flags
+);
+```
+
+## 文件命名规范
+
+| 类型       | 规范                                                                         |
+| -------- | -------------------------------------------------------------------------- |
+| 服务文件     | `eos_service_\<service_name>.c/.h`                        |
+| 设备文件     | `eos_dev_\<device_name>.c/.h`                             |
+| 设备初始化    | `eos_service_\<service_name>_init()`                      |
+| 设备其他 API | `eos_\<service_name>_\<function_name>()` |
