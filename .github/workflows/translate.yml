@@ -1,4 +1,4 @@
-name: Translate docs & blog to English
+name: Translate & Sync to Main
 
 on:
   push:
@@ -61,23 +61,25 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Stage source + translations on dev
-          git add docs/ blog/ i18n/
+          # Stage ALL changes (source edits + deletions + AI translations)
+          git add .
+
           if git diff --cached --quiet; then
             echo "No changes — done."
             exit 0
           fi
-          git commit -m "chore(i18n): AI translate docs/blog changes"
+
+          git commit -m "chore: sync dev → main"
           DEV_SHA=$(git rev-parse HEAD)
 
-          # Create sync branch from main (ensures fast-forward)
+          # Create sync branch from main to guarantee fast-forward
           git fetch origin main
           git checkout -B sync/i18n origin/main
 
-          # Apply dev's docs/blog/i18n onto the sync branch
-          git checkout "$DEV_SHA" -- docs/ blog/ i18n/
-          git commit -m "chore(i18n): AI translate docs/blog changes"
+          # Apply dev's full tree onto the sync branch
+          git checkout "$DEV_SHA" -- .
+          git commit -m "chore: sync dev → main"
 
-          echo "=== Pushing sync/i18n → main ==="
+          echo "=== Pushing to main ==="
           git push origin HEAD:main
-          echo "✓ Synced to main"
+          echo "✓ Done"
