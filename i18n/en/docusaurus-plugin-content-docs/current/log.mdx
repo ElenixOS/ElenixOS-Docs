@@ -1,0 +1,134 @@
+---
+sidebar_position: 9
+title: 日志服务
+---
+
+日志服务采用基于监听器的设计模式，支持多个监听器接收日志消息。
+
+## 日志级别
+
+```c
+typedef enum {
+    EOS_LOG_LEVEL_DEBUG = 0,  // 调试级别
+    EOS_LOG_LEVEL_INFO,       // 信息级别
+    EOS_LOG_LEVEL_WARN,       // 警告级别
+    EOS_LOG_LEVEL_ERROR       // 错误级别
+} eos_log_level_t;
+```
+
+## 日志监听器
+
+### 监听器回调函数
+
+```c
+typedef void (*eos_log_listener_cb_t)(
+    eos_log_level_t level,
+    const char *buf,
+    size_t len,
+    void *user
+);
+```
+
+### 监听器标志
+
+```c
+#define EOS_LOG_FLAG_SYSTEM   (1 << 0)  // 系统监听器，无法删除
+```
+
+### 添加日志监听器
+
+```c
+eos_log_listener_id_t eos_log_add_listener(
+    eos_log_listener_cb_t cb,
+    eos_log_level_t min_level,
+    uint32_t flags,
+    void *user
+);
+```
+
+### 移除日志监听器
+
+```c
+eos_result_t eos_log_remove_listener(eos_log_listener_id_t id);
+```
+
+### 设置监听器级别
+
+```c
+eos_result_t eos_log_set_level(eos_log_listener_id_t id, eos_log_level_t level);
+```
+
+## 日志输出
+
+### 输出日志
+
+```c
+void eos_log(eos_log_level_t level, const char *fmt, ...);
+```
+
+## 日志宏
+
+便捷的日志输出宏（当 `EOS_LOG_DISABLE` 未定义时）：
+
+```c
+#define EOS_LOG_D(fmt, ...)  // 调试级别
+#define EOS_LOG_I(fmt, ...)  // 信息级别
+#define EOS_LOG_W(fmt, ...)  // 警告级别
+#define EOS_LOG_E(fmt, ...)  // 错误级别
+```
+
+如果定义了 `EOS_LOG_TAG`，日志消息会包含标签前缀。
+
+## 彩色日志
+
+当 `EOS_LOG_USE_COLOR` 启用时，支持彩色输出：
+
+```c
+#define EOS_LOG_COLOR_RESET   "\033[0m"
+#define EOS_LOG_COLOR_RED     "\033[31m"
+#define EOS_LOG_COLOR_GREEN   "\033[32m"
+#define EOS_LOG_COLOR_YELLOW  "\033[33m"
+#define EOS_LOG_COLOR_BLUE    "\033[34m"
+#define EOS_LOG_COLOR_CYAN    "\033[36m"
+```
+
+## 指针检查宏
+
+### 检查指针并返回
+
+```c
+#define EOS_CHECK_PTR_RETURN(ptr)
+```
+
+如果指针为 NULL，记录错误并返回。
+
+### 检查指针并返回指定值
+
+```c
+#define EOS_CHECK_PTR_RETURN_VAL(ptr, ret_val)
+```
+
+### 检查指针并释放后返回
+
+```c
+#define EOS_CHECK_PTR_RETURN_FREE(ptr, free_var)
+#define EOS_CHECK_PTR_RETURN_VAL_FREE(ptr, ret_val, free_var)
+```
+
+## 断言宏
+
+当 `EOS_USE_ASSERT` 启用时：
+
+```c
+#define EOS_ASSERT(expr)
+```
+
+如果表达式为 false，记录错误并执行断言处理程序。
+
+## 调试辅助
+
+打印 LVGL 对象的坐标信息：
+
+```c
+#define EOS_DEBUG_PRINT_POS(obj)
+```
