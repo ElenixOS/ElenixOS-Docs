@@ -256,7 +256,7 @@ function translateFrontmatter(frontmatter) {
  * Call DeepSeek chat completions API.
  * Returns the model's response text.
  */
-async function callDeepSeek(systemPrompt, userContent, retries = 3) {
+async function callDeepSeekAPI(systemPrompt, userContent, retries = 3) {
   const body = {
     model: DEEPSEEK_MODEL,
     messages: [
@@ -325,6 +325,12 @@ async function callDeepSeek(systemPrompt, userContent, retries = 3) {
   }
 }
 
+/** Convenience wrapper for callDeepSeekAPI — extracts 'translation' field. */
+async function callDeepSeek(systemPrompt, userContent, retries = 3) {
+  const data = await callDeepSeekAPI(systemPrompt, userContent, retries);
+  return data?.translation || data?.content || JSON.stringify(data);
+}
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -348,6 +354,11 @@ const RETRY_PROMPT = `The following text STILL contains Chinese characters that 
 Translate ALL remaining Chinese text to English. Leave everything else unchanged.
 Output ONLY a JSON object: {"translation": "fully translated text"}`;
 
+const COMMENT_PROMPT = `Translate these code comments from Simplified Chinese to English.
+Keep them concise — code comments should be short and clear.
+Preserve any code symbols, variable names, or technical terms as-is.
+Return ONLY a JSON object: {"translations": ["comment 1", "comment 2", ...]}`;
+
 const DIFF_UPDATE_PROMPT = `You are a professional technical translator. Below is:
 1. The EXISTING English translation of a documentation file
 2. A git diff showing what CHANGED in the Chinese source
@@ -364,6 +375,61 @@ Output ONLY a JSON object: {"translation": "the complete updated English file"}
 
 === CHINESE DIFF ===
 {diff}`;
+
+// ─── Code comment extraction & translation ────────────────────────────────────
+
+function extractComments(content) {
+  const commentMap = [];
+  let counter = 0;
+  const modified = content.replace(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g, (block) => {
+    const lines = block.split('\n');
+    let changed = false;
+    const newLines = lines.map((line, i) => {
+      if (i === 0 || i === lines.length - 1) return line;
+      const trimmed = line.trimStart();
+      const indent = line.slice(0, line.length - trimmed.length);
+      const cmt = trimmed.match(/^(\/\/|#)\s*(.+)$/);
+      if (cmt && /[一-鿿]/.test(cmt[2])) {
+        const marker = `__CMT${counter}__`;
+        commentMap.push({ marker, original: cmt[2], prefix: cmt[1], indent });
+        counter++;
+        changed = true;
+        return `${indent}${cmt[1]} ${marker}`;
+      }
+      return line;
+    });
+    return changed ? newLines.join('\n') : block;
+  });
+  return { modified, commentMap };
+}
+
+async function translateCommentBatch(commentMap) {
+  if (commentMap.length === 0) return [];
+  const lines = commentMap.map((c, i) => `[${i}] ${c.original}`).join('\n');
+  if (DRY_RUN) {
+    console.log(`    → would translate ${commentMap.length} code comment(s)`);
+    return commentMap.map(c => c.original);
+  }
+  try {
+    const data = await callDeepSeekAPI(COMMENT_PROMPT, lines);
+    const translations = data.translations || [];
+    console.log(`    → translated ${translations.length}/${commentMap.length} code comment(s)`);
+    return translations;
+  } catch (err) {
+    console.warn(`    → comment translation failed: ${err.message}, keeping originals`);
+    return commentMap.map(c => c.original);
+  }
+}
+
+function restoreComments(content, commentMap, translations) {
+  let result = content;
+  for (let i = 0; i < commentMap.length; i++) {
+    const { marker } = commentMap[i];
+    const translated = translations[i] || commentMap[i].original;
+    result = result.replaceAll(marker, translated);
+  }
+  return result;
+}
 
 /**
  * Full translation of a new file.
