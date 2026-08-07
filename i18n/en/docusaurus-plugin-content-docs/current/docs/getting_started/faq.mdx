@@ -1,0 +1,32 @@
+---
+sidebar_position: 5
+title: 常见问题与故障排除
+---
+
+# 常见问题与故障排除
+
+## 打开应用再返回后帧率明显下降
+
+### 现象
+
+在应用列表页面来回滑动气泡测试帧率时，打开一个 JS 应用后按返回键回到应用列表，再次滑动气泡的帧率明显低于系统初始化后直接测试时的帧率。FPS 降幅与挂起的应用数量成正比（每个挂起应用约损失 5-10 FPS）。
+
+### 原因
+
+`lv_conf.h` 中的 `LV_USE_ASSERT_MEM_INTEGRITY` 被设为 `1`。
+
+该选项启用后，LVGL 会在 **每次 timer 回调执行后**（`lv_timer.c`）、**每次对象树操作时**（`lv_obj_tree.c`）、以及 **每次绘制矩形/标签时**（`lv_draw_rect.c`、`lv_draw_label.c`）调用 `lv_mem_test()` 完整遍历 TLSF 内存池，检查每个 block 的完整性。
+
+当使用内置 TLSF 分配器（`LV_STDLIB_BUILTIN`）时，每个挂起的应用（Recents）会增加已分配的 block 数量 → 完整性检查耗时线性增长 → 帧率线性下降。
+
+此问题可通过 macOS Instruments（Time Profiler）确认：采样会显示 `lv_tlsf_check` / `integrity_walker` / `block_is_free` 占据了帧预算的主要部分。
+
+### 解决方案
+
+将 `lv_conf.h` 中的 `LV_USE_ASSERT_MEM_INTEGRITY` 设为 `0`：
+
+```c
+#define LV_USE_ASSERT_MEM_INTEGRITY 0
+```
+
+该选项在开发阶段可用于检测堆内存损坏，但进行任何帧率、滚动或动画相关的性能测试时**必须关闭**。其他断言（`LV_USE_ASSERT_NULL`、`LV_USE_ASSERT_MALLOC`）均为 O(1) 检查，可以保持开启。
