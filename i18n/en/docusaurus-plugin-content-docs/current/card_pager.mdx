@@ -1,0 +1,133 @@
+---
+sidebar_position: 4
+title: CardPager
+---
+
+# CardPager
+
+## 简述
+
+卡片式换页组件，页面列表使用链表控制，支持循环翻页。CardPager 提供了一种直观的页面切换机制，适用于需要在多个内容页面之间进行导航的场景，如引导页、图片浏览器等。
+
+## 核心特性
+
+* **链表管理**：使用双向链表存储页面，支持动态添加和删除页面
+* **方向支持**：支持水平和垂直两种滑动方向
+* **循环翻页**：可启用循环模式，实现页面的无缝切换
+* **页面指示器**：自动生成页面指示器，显示当前页面位置
+* **回调机制**：提供页面切换回调，方便应用程序响应页面变化
+
+## 示例
+
+```c
+eos_card_pager_t *cp = eos_card_pager_create(eos_screen_active(), EOS_CARD_PAGER_DIR_HOR);
+lv_obj_t *page = eos_card_pager_create_page(cp);
+lv_obj_set_style_bg_color(page, EOS_COLOR_GREEN, 0);
+page = eos_card_pager_create_page(cp);
+lv_obj_set_style_bg_color(page, EOS_COLOR_YELLOW, 0);
+page = eos_card_pager_create_page(cp);
+lv_obj_set_style_bg_color(page, EOS_COLOR_ORANGE, 0);
+page = eos_card_pager_create_page(cp);
+lv_obj_set_style_bg_color(page, EOS_COLOR_RED, 0);
+eos_card_pager_remove_page(cp,3);
+page = eos_card_pager_create_page(cp);
+lv_obj_set_style_bg_color(page, EOS_COLOR_MINT, 0);
+eos_card_pager_set_loop(cp, false); // 开启循环
+eos_card_pager_move_node(cp,0,3);
+eos_card_pager_move_page(cp,4);
+```
+
+## API 参考
+
+### 方向定义
+
+```c
+typedef enum
+{
+    EOS_CARD_PAGER_DIR_VER,    // 垂直方向
+    EOS_CARD_PAGER_DIR_HOR     // 水平方向
+} eos_card_pager_dir_t;
+```
+
+### 结构体
+
+* **`eos_card_pager_t`**：卡片式页面管理器结构体
+* **`eos_card_pager_node_t`**：页面节点结构体，用于链表存储
+
+### 回调函数
+
+```c
+typedef void (*eos_card_pager_page_changed_cb_t)(eos_card_pager_t *cp,
+                                                  uint8_t current_page_index,
+                                                  void *user_data);
+```
+
+### 函数
+
+* **`eos_card_pager_create(lv_obj_t *parent, eos_card_pager_dir_t dir)`**：创建卡片式页面管理器
+  * 参数：
+    * `parent`：父级 LVGL 对象
+    * `dir`：页面滑动方向
+  * 返回值：成功返回页面管理器指针，失败返回 NULL
+
+* **`eos_card_pager_create_page(eos_card_pager_t *cp)`**：创建新页面
+  * 参数：
+    * `cp`：页面管理器指针
+  * 返回值：成功返回新创建的页面对象，失败返回 NULL
+
+* **`eos_card_pager_set_loop(eos_card_pager_t *cp, bool loop)`**：设置页面循环模式
+  * 参数：
+    * `cp`：页面管理器指针
+    * `loop`：true 启用循环模式，false 禁用循环模式
+
+* **`eos_card_pager_remove_page(eos_card_pager_t *cp, uint8_t page_index)`**：删除指定页面
+  * 参数：
+    * `cp`：页面管理器指针
+    * `page_index`：要删除的页面索引（0基）
+  * 返回值：成功返回 true，失败返回 false
+
+* **`eos_card_pager_get_page(eos_card_pager_t *cp, uint8_t page_index)`**：获取指定页面对象
+  * 参数：
+    * `cp`：页面管理器指针
+    * `page_index`：页面索引（0基）
+  * 返回值：成功返回页面对象，失败返回 NULL
+
+* **`eos_card_pager_get_indicator(eos_card_pager_t *cp, uint8_t page_index)`**：获取指定页面的指示器对象
+  * 参数：
+    * `cp`：页面管理器指针
+    * `page_index`：页面索引（0基）
+  * 返回值：成功返回指示器对象，失败返回 NULL
+
+* **`eos_card_pager_move_page(eos_card_pager_t *cp, uint8_t page_index)`**：切换到指定页面
+  * 参数：
+    * `cp`：页面管理器指针
+    * `page_index`：目标页面索引（0基）
+
+* **`eos_card_pager_move_node(eos_card_pager_t *cp, uint8_t from_index, uint8_t to_index)`**：移动页面节点位置
+  * 参数：
+    * `cp`：页面管理器指针
+    * `from_index`：要移动的页面索引（0基）
+    * `to_index`：目标位置索引（0基）
+  * 返回值：成功返回 true，失败返回 false
+
+* **`eos_card_pager_set_page_changed_cb(eos_card_pager_t *cp, eos_card_pager_page_changed_cb_t cb, void *user_data)`**：设置页面变化回调函数
+  * 参数：
+    * `cp`：页面管理器指针
+    * `cb`：回调函数
+    * `user_data`：用户数据
+
+## 使用方法
+
+1. **创建页面管理器**：指定父对象和滑动方向
+2. **添加页面**：使用 `eos_card_pager_create_page` 创建多个页面
+3. **自定义页面**：在每个页面上添加控件和设置样式
+4. **配置循环模式**：根据需要启用或禁用循环翻页
+5. **页面导航**：使用 `eos_card_pager_move_page` 切换到指定页面
+6. **监听页面变化**：设置页面变化回调函数，响应页面切换事件
+
+## 注意事项
+
+* **内存管理**：创建的页面会占用内存，不再需要时应及时删除
+* **性能考虑**：页面数量过多可能影响性能，建议根据实际需求合理控制页面数量
+* **用户体验**：循环模式适用于内容之间有逻辑关联的场景，非循环模式适用于有明确开始和结束的场景
+* **回调处理**：页面变化回调中应避免执行耗时操作，以免影响界面响应速度
