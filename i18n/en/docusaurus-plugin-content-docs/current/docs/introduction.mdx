@@ -1,0 +1,47 @@
+---
+sidebar_position: 1
+slug: /intro
+title: ElenixOS Introduction
+---
+
+# ElenixOS Introduction
+
+ElenixOS is an open-source operating system designed for smartwatches and other resource-constrained wearable devices.It organizes UI, application logic, and system services on a unified scripting runtime, allowing watch faces, system apps, and third-party apps to run in a more consistent manner while retaining efficient access to underlying hardware.
+
+## Core Features
+
+### Script-Driven Application Model
+
+ElenixOS watch faces and applications are uniformly driven by the scripting engine.Scripts are responsible for describing the UI and business logic, while the underlying native code handles scheduling, rendering, and resource management.This layered approach makes applications easier to iterate and easier to migrate across different hardware platforms.
+
+### LVGL + JerryScript Runtime
+
+The graphics layer is based on LVGL, and script execution is powered by JerryScript.The former handles UI rendering and interaction, while the latter executes JavaScript logic on resource-constrained devices.Combined, ElenixOS provides a relatively consistent UI experience and scriptable extension capabilities on wearable devices.
+
+### Layered Architecture
+
+The project splits system capabilities into an application layer, a kernel layer, a portable interface layer, and a hardware layer.The benefit is that upper-layer applications can reliably depend on a unified API, while the underlying implementation can be replaced for different chips, sensors, and peripherals.
+
+### Developer-Facing Toolchain
+
+In addition to the runtime itself, ElenixOS provides development tools such as application packaging and binding layer generation, helping you combine scripts, resources, and native interfaces into deployable application packages.
+
+### Rich Core Modules
+
+ElenixOS provides a series of core modules, including:
+
+* **Application Management**: Supports installation, uninstallation, management, and running of applications.
+* **System Services**: Provides system-level services such as battery management and sensor management.
+* **UI Components**: Provides a rich set of user interface components based on LVGL.
+* **File System**: Supports operations on files and directories.
+* **Scripting Engine**: Provides a JavaScript execution environment based on JerryScript.
+
+## What to Read First
+
+If you just want to quickly build an overall impression, we recommend reading in this order:
+
+1. First, check [System Architecture](/docs/architecture/arch) to understand ElenixOS layering.
+2. Then, check [Scripting Engine](/docs/architecture/script_engine_overview) to understand how applications and watch faces run.
+3. Next, check [Quick Start](/docs/getting_started/quick_start) to confirm the basic entry point of the project.
+4. When you need to develop or debug, refer to [Development Tools](/docs/development/dev_tools) and [Build and Use](/docs/getting_started/build).
+5. To learn about the detailed implementation of core modules, refer to the documentation related to [Core Modules](./architecture/framework/app).
