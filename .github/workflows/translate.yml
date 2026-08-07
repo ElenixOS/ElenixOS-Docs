@@ -6,6 +6,8 @@ on:
     paths:
       - 'docs/**'
       - 'blog/**'
+      - 'scripts/**'
+      - '.github/workflows/translate.yml'
   workflow_dispatch:
     inputs:
       backfill:
