@@ -1,0 +1,212 @@
+---
+sidebar_position: 7
+title: 开发工具
+---
+
+# 开发工具
+
+ElenixOS 在开发过程中使用多种脚本工具来辅助开发。下面将详细介绍这些工具的使用方法。
+
+## 环境准备
+
+使用开发工具前，需要准备 Python 环境：
+
+### 创建虚拟环境
+
+```bash
+# 创建虚拟环境
+python -m venv venv
+
+# 激活虚拟环境
+source venv/bin/activate
+
+# 安装依赖包
+pip install -r scripts/requirements.txt
+```
+
+## 内核配置工具（Kconfig）
+
+Kconfig 是 ElenixOS 的内核编译配置系统。它源自 Linux 内核，通过结构化方式管理编译选项，使得同一套内核代码能适配不同的硬件平台和产品需求。
+
+### 核心概念
+
+配置经过三层合并：
+
+* **内核定义**（`Kconfig`）：声明全部可配置项的类型、约束及默认值
+* **项目默认值**（`defaults.conf`）：受版本控制的基线配置
+* **本地覆盖**（`.config`）：构建目录级覆盖，不受版本控制
+
+详见 [内核配置系统](./kconfig)。
+
+### 安装依赖
+
+```bash
+pip install kconfiglib
+```
+
+### 使用
+
+```bash
+make menuconfig              # 编辑 build/.config
+```
+
+修改后重新构建：
+
+```bash
+make build
+```
+
+## 应用打包工具
+
+应用打包工具（`eos_pkg_builder.py`）用于将应用打包为 .eapk 或 .ewpk 文件，包含应用所需的所有资源，如应用图标、脚本、资源文件等。
+
+### 功能特性
+
+* 打包应用为 .eapk 文件
+* 打包表盘为 .ewpk 文件
+* 包含应用的所有资源文件
+* 验证应用配置文件
+
+### 使用方法
+
+```bash
+python scripts/eos_pkg_builder.py --input <输入路径> --output <输出文件> --type <类型>
+```
+
+### 参数说明
+
+| 参数           | 说明        | 示例                  |
+| ------------ | --------- | ------------------- |
+| `--input`    | 输入目录路径    | `app/`              |
+| `--output`   | 输出文件路径    | `app.eapk`          |
+| `--type`     | 打包类型      | `app` 或 `watchface` |
+| `--compress` | 压缩等级（0-9） | `9`                 |
+| `--verbose`  | 详细输出      | `--verbose`         |
+
+### 示例
+
+```bash
+# 打包应用
+python scripts/eos_pkg_builder.py --input app/ --output app.eapk --type app
+
+# 打包表盘
+python scripts/eos_pkg_builder.py --input watchface/ --output watchface.ewpk --type watchface
+
+# 带压缩打包
+python scripts/eos_pkg_builder.py --input app/ --output app.eapk --type app --compress 9
+```
+
+## 绑定层生成工具
+
+绑定层生成工具用于自动生成 JavaScript 与原生代码之间的绑定代码，主要包括 SNI（Script Native Interface）和 LVGL 绑定层。
+
+### 工具列表
+
+* `extract_lvgl_types.py`：提取 LVGL 类型
+* `gen_lvgl_desc.py`：生成 LVGL 描述
+* `gen_sni_lv_types.py`：生成 SNI LVGL 类型
+
+### 使用方法
+
+```bash
+# 提取 LVGL 类型
+python scripts/sni/extract_lvgl_types.py --input include/lvgl.h --output scripts/sni/config/lv_types.json
+
+# 生成 LVGL 描述
+python scripts/sni/gen_lvgl_desc.py --input scripts/sni/config/lv_types.json --output scripts/sni/config/lv_desc.json
+
+# 生成 SNI LVGL 类型
+python scripts/sni/gen_sni_lv_types.py --input scripts/sni/config/lv_desc.json --output src/script_engine/sni/sni_gen/sni_lv_types.c
+```
+
+## 图标生成工具
+
+图标生成工具用于将 SVG 图标转换为 C 代码，以便在 ElenixOS 中使用。
+
+### 工具列表
+
+* `gen_icon_def.py`：生成图标定义
+* `ttf_mgr.py`：字体管理工具
+
+### 使用方法
+
+```bash
+# 生成图标定义
+python scripts/icon/gen_icon_def.py --input icons/ --output src/core/lang/eos_icon.c
+
+# 字体管理
+python scripts/icon/ttf_mgr.py --input font.ttf --output font.c --size 24
+```
+
+## 构建脚本
+
+ElenixOS 提供了构建脚本来简化构建流程：
+
+### 工具列表
+
+* `build.sh`：构建脚本
+* `clean.sh`：清理构建
+
+### 使用方法
+
+```bash
+# 构建嵌入式版本
+./scripts/build.sh --platform stm32
+
+# 清理构建
+./scripts/clean.sh
+```
+
+## 调试工具
+
+### 日志工具
+
+ElenixOS 提供了日志工具用于调试和故障排查：
+
+```c
+// 输出日志
+eos_log_i("模块", "消息: %d", value);
+eos_log_e("模块", "错误: %s", error);
+eos_log_w("模块", "警告: %s", warning);
+eos_log_d("模块", "调试: %s", debug);
+```
+
+## 开发工具最佳实践
+
+1. **环境隔离**：使用虚拟环境隔离开发环境，避免依赖冲突
+2. **自动化**：使用构建脚本自动化构建流程
+3. **版本控制**：将生成的代码纳入版本控制，确保代码一致性
+4. **测试**：使用嵌入式设备进行应用测试
+5. **文档记录**：记录工具使用方法和参数，便于后续参考
+
+## 常见问题及解决方案
+
+### 依赖安装失败
+
+**问题**：依赖安装失败
+
+**解决方案**：
+
+1. 检查网络连接是否正常
+2. 检查 Python 版本是否符合要求
+3. 尝试使用 `pip install --upgrade pip` 升级 pip
+
+### 工具执行失败
+
+**问题**：工具执行失败
+
+**解决方案**：
+
+1. 检查输入参数是否正确
+2. 检查依赖是否完整安装
+3. 检查文件路径是否存在
+
+### 生成代码错误
+
+**问题**：生成的代码编译错误
+
+**解决方案**：
+
+1. 检查输入文件是否正确
+2. 检查工具版本是否兼容
+3. 检查生成参数是否合理
