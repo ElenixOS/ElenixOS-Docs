@@ -5,232 +5,27 @@ title: Common Issues and Troubleshooting
 
 # Common Issues and Troubleshooting
 
-This chapter summarizes common issues and their solutions during the development and use of ElenixOS, helping you quickly troubleshoot and resolve problems you encounter.
+## Frame rate drops after opening and returning from an app
 
-## Build Issues
+### Symptoms
 
-### Build Failure
+When scrolling the app list to test frame rate, the FPS after opening a JS app and returning to the list is noticeably lower than testing directly after system boot. The FPS drop scales with the number of suspended apps (~5-10 FPS per suspended app).
 
-**Issue**: Compilation fails, indicating missing dependencies
+### Cause
 
-**Solutions**:
-1. Ensure all dependency libraries are correctly installed
-2. Use `git submodule update --init --recursive` to ensure all submodules are correctly cloned
-3. Check if CMake version meets requirements (3.13+)
-4. Check if the compilation toolchain is correctly configured
+`LV_USE_ASSERT_MEM_INTEGRITY` is set to `1` in `lv_conf.h`.
 
-**Issue**: Cross-compilation fails
+When enabled, LVGL calls `lv_mem_test()` after **every** timer callback (`lv_timer.c`), object-tree operation (`lv_obj_tree.c`), and draw operation (`lv_draw_rect.c`, `lv_draw_label.c`). `lv_mem_test()` walks the entire TLSF memory pool checking every block header. With the built-in TLSF allocator (`LV_STDLIB_BUILTIN`), each suspended app (Recents) adds more allocated blocks → integrity check time grows linearly → FPS drops linearly.
 
-**Solutions**:
-1. Ensure the cross-compilation toolchain is correctly installed
-2. Set correct environment variables, such as `CROSS_COMPILE`
-3. Ensure CMake can find the cross-compilation toolchain
-4. Check if the target platform configuration is correct
+This can be confirmed with macOS Instruments (Time Profiler): samples will show `lv_tlsf_check` / `integrity_walker` / `block_is_free` dominating the frame budget.
 
-### Missing Dependencies
+### Solution
 
-**Issue**: Missing LVGL dependency
+Set `LV_USE_ASSERT_MEM_INTEGRITY` to `0` in `lv_conf.h`:
 
-**Solutions**:
-1. Ensure the LVGL submodule is correctly cloned
-2. Check if the LVGL version is compatible with ElenixOS
-3. Reinitialize submodules: `git submodule update --init --recursive`
+```c
+#define LV_USE_ASSERT_MEM_INTEGRITY 0
+```
 
-**Issue**: Missing JerryScript dependency
+This option is useful for catching heap corruption during development, but **must** be disabled when doing any frame-rate, scrolling, or animation performance testing. The other asserts (`LV_USE_ASSERT_NULL`, `LV_USE_ASSERT_MALLOC`) are O(1) checks and safe to leave on.
 
-**Solutions**:
-1. Ensure the JerryScript submodule is correctly cloned
-2. Check if the JerryScript version is compatible with ElenixOS
-3. Reinitialize submodules: `git submodule update --init --recursive`
-
-## Runtime Issues
-
-### LVGL Import Issues
-
-**Issue**: LVGL import fails, indicating missing header files
-
-**Solutions**:
-1. Ensure the LVGL submodule is correctly cloned
-2. Check if CMake configuration correctly includes the LVGL directory
-3. Rebuild the project: `cmake --build .`
-
-**Issue**: LVGL initialization fails
-
-**Solutions**:
-1. Check if the display driver is correctly implemented
-2. Check if LVGL configuration is appropriate
-3. Check if memory allocation is sufficient
-
-### Device Connection and Debugging Issues
-
-**Issue**: Unable to connect to the device
-
-**Solutions**:
-1. Check if the device is correctly connected to the computer
-2. Check if device drivers are installed
-3. Check if the serial port or debug interface is normal
-
-**Issue**: Debugger cannot connect
-
-**Solutions**:
-1. Check if the debugger is correctly connected
-2. Check if the device is in debug mode
-3. Check if the debugger configuration is correct
-
-## Application Development Issues
-
-### Application Installation Failure
-
-**Issue**: Application installation fails, indicating file format error
-
-**Solutions**:
-1. Check if the application package (.eapk file) is correctly packaged
-2. Check if the application's manifest.json file is in correct format
-3. Check if the application's script files have syntax errors
-
-**Issue**: Application cannot run
-
-**Solutions**:
-1. Check if the application has sufficient permissions
-2. Check if the application's scripts have runtime errors
-3. Check if the application complies with ElenixOS application specifications
-
-### Script Execution Issues
-
-**Issue**: Script execution fails, indicating syntax error
-
-**Solutions**:
-1. Check if the JavaScript code has syntax errors
-2. Use JavaScript syntax checking tools to validate the code
-3. Ensure the code complies with ECMAScript standards
-
-**Issue**: Script execution is slow
-
-**Solutions**:
-1. Optimize JavaScript code to reduce computational load
-2. Avoid using complex algorithms and data structures
-3. Use caching appropriately to reduce repeated calculations
-
-## System Issues
-
-### System Startup Failure
-
-**Issue**: System startup fails, stuck at startup screen
-
-**Solutions**:
-1. Check if hardware is normal
-2. Check if system configuration is correct
-3. Check if the file system is corrupted
-4. Re-flash system firmware
-
-**Issue**: System runs slowly
-
-**Solutions**:
-1. Check if memory usage is reasonable
-2. Close unnecessary applications and services
-3. Optimize system configuration
-4. Consider hardware upgrade
-
-### Battery Issues
-
-**Issue**: Battery level display is inaccurate
-
-**Solutions**:
-1. Calibrate the battery
-2. Check if the battery driver is correctly implemented
-3. Check if the battery hardware is normal
-
-**Issue**: Battery drains too quickly
-
-**Solutions**:
-1. Turn off unnecessary features and services
-2. Reduce screen brightness
-3. Check if any applications are running continuously in the background
-4. Consider replacing the battery
-
-## Network Issues
-
-### Wi-Fi Connection Issues
-
-**Issue**: Unable to connect to Wi-Fi
-
-**Solutions**:
-1. Check if Wi-Fi signal is normal
-2. Check if Wi-Fi password is correct
-3. Restart the Wi-Fi module
-4. Check if the Wi-Fi driver is correctly implemented
-
-### Bluetooth Connection Issues
-
-**Issue**: Unable to connect to Bluetooth devices
-
-**Solutions**:
-1. Check if the Bluetooth device is in discoverable mode
-2. Check if the Bluetooth driver is correctly implemented
-3. Restart the Bluetooth module
-4. Clear Bluetooth pairing information and re-pair
-
-## Other Issues
-
-### Display Issues
-
-**Issue**: Display shows abnormally
-
-**Solutions**:
-1. Check if the display driver is correctly implemented
-2. Check if LVGL configuration is appropriate
-3. Check if resolution settings are correct
-4. Check if the display hardware is normal
-
-### Input Device Issues
-
-**Issue**: Touch screen is unresponsive
-
-**Solutions**:
-1. Check if the touch screen driver is correctly implemented
-2. Calibrate the touch screen
-3. Check if the touch screen hardware is normal
-
-### Sensor Issues
-
-**Issue**: Sensor data is inaccurate
-
-**Solutions**:
-1. Calibrate the sensor
-2. Check if the sensor driver is correctly implemented
-3. Check if the sensor hardware is normal
-
-## Troubleshooting Process
-
-1. **Issue identification**: Clearly identify the specific performance and symptoms of the issue
-2. **Issue localization**: Locate the module or component where the issue is located based on symptoms
-3. **Issue analysis**: Analyze the possible causes of the issue
-4. **Solution**: Try possible solutions
-5. **Verification**: Verify if the issue has been resolved
-6. **Record issue**: Record the issue and solution for future reference
-
-## How to Report Issues
-
-If you encounter issues that cannot be resolved, you can report them through the following methods:
-
-1. **GitHub Issues**: Create an Issue on GitHub, describing the detailed information of the issue
-2. **Community forum**: Post for help on the community forum
-3. **Mailing list**: Seek help through the mailing list
-
-### Information to Provide When Reporting Issues
-
-- **Issue description**: Detailed description of the issue's performance and symptoms
-- **Environment information**: Operating system, hardware platform, ElenixOS version, etc.
-- **Reproduction steps**: How to reproduce the issue
-- **Error information**: Relevant error messages and logs
-- **Tried solutions**: Solutions already tried and their results
-
-## Best Practices
-
-1. **Regular updates**: Keep ElenixOS and dependency libraries updated
-2. **Data backup**: Regularly back up important data
-3. **Test environment**: Test new features and modifications in a test environment
-4. **Documentation reference**: When encountering issues, first refer to relevant documentation
-5. **Community communication**: Actively participate in community communication, share experiences and solutions
-
-Through the above methods, you should be able to solve most issues encountered during the development and use of ElenixOS. If the issue still exists, please do not hesitate to seek help from the community in time.
