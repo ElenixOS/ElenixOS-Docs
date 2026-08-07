@@ -1,0 +1,172 @@
+---
+title: JS API 通用使用方法
+sidebar_position: 1
+---
+
+# JS API 通用使用方法
+
+ElenixOS 提供了丰富的 JavaScript API，用于开发应用和表盘。本文档将介绍 JS API 的通用使用方法，包括基本概念、命名规范、错误处理等内容。
+
+## 脚本引擎架构
+
+ElenixOS 的脚本引擎采用三层架构设计：
+
+### 三层架构
+
+1. **核心引擎层（Script Engine Core）**
+   * 负责 JerryScript 的底层操作
+   * Realm 管理、编译执行、内存操作
+
+2. **SPM层（Script Program Manager）**
+   * 中间管理层，分离程序生命周期与 JS 执行
+   * 管理程序的启动、挂起、恢复和终止
+   * 支持上下文保存/恢复，实现状态持久化
+   * JS 回调门验证和错误快照持久化
+
+3. **SNI层（Script Native Interface）**
+   * 提供脚本与原生代码之间的接口
+   * 包含服务API、UI组件API、事件API等
+
+## 基本概念
+
+### API 命名空间
+
+ElenixOS 的 JavaScript API 通过以下命名空间暴露给脚本：
+
+* `eos` - 系统 API
+* `lv` - LVGL UI API
+
+### 面向对象风格
+
+ElenixOS 的 JavaScript API 采用面向对象的风格，使用构造函数创建对象，使用实例方法操作对象：
+
+```javascript
+// 创建一个按钮
+const button = new lv.button(eos.view.active());
+
+// 设置按钮大小和位置
+button.setSize(100, 50);
+button.setPos(10, 10);
+
+// 添加标签
+const label = new lv.label(button);
+label.setText("Click Me");
+```
+
+### 事件处理
+
+ElenixOS 的 JavaScript API 使用回调函数处理事件：
+
+```javascript
+// 绑定点击事件
+button.addEventCb((e) => {
+    eos.console.log("Button clicked!");
+}, lv.EVENT_CLICKED, null);
+```
+
+## 命名规范
+
+### 常量命名
+
+常量使用全大写字母，单词之间用下划线分隔：
+
+```javascript
+// 事件类型
+lv.EVENT_CLICKED
+lv.EVENT_PRESSED
+
+// 对象标志
+lv.OBJ_FLAG_CLICKABLE
+lv.OBJ_FLAG_CHECKABLE
+
+// 对齐方式
+lv.ALIGN_CENTER
+lv.ALIGN_TOP_LEFT
+```
+
+### 方法命名
+
+方法使用驼峰命名法，首字母小写：
+
+```javascript
+// 设置方法
+button.setSize(width, height);
+button.setPos(x, y);
+
+// 获取方法
+const width = button.getWidth();
+const height = button.getHeight();
+```
+
+### 构造函数命名
+
+构造函数使用驼峰命名法，首字母小写：
+
+```javascript
+// 创建对象
+const button = new lv.button(parent);
+const label = new lv.label(parent);
+```
+
+## 错误处理
+
+### 异常捕获
+
+使用 try-catch 捕获可能的错误：
+
+```javascript
+try {
+    // 可能会抛出错误的代码
+    const button = new lv.button(null);
+} catch (e) {
+    // 处理错误
+    eos.console.error("Error creating button:", e);
+}
+```
+
+### 错误类型
+
+ElenixOS 的 JavaScript API 可能会抛出以下类型的错误：
+
+* **TypeError** - 参数类型错误
+* **ReferenceError** - 引用不存在的对象
+* **RangeError** - 参数值超出范围
+
+## 内存管理
+
+### 对象生命周期
+
+在 ElenixOS 中，对象的生命周期由垃圾回收器管理。当对象不再被引用时，垃圾回收器会自动回收其内存。
+
+### 手动释放
+
+对于一些资源密集型对象，可以手动释放以节省内存：
+
+```javascript
+// 创建对象
+const timer = new lv.timer(parent);
+
+// 使用对象
+// ...
+
+// 手动释放对象
+timer.delete();
+```
+
+## 异步操作
+
+### 定时器
+
+参见 [定时器](./sni/sni_api/lv/special/timer)。
+
+## 调试技巧
+
+### 日志输出
+
+使用 `eos.console.log` 输出日志信息：
+
+```javascript
+eos.console.log("Debug information");
+eos.console.error("Error information");
+eos.console.warn("Warning information");
+```
