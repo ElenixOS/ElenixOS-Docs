@@ -1,0 +1,530 @@
+---
+title: Activity 与 View
+sidebar_position: 6
+---
+
+# Activity 与 View
+
+Activity 是 ElenixOS 中管理页面和用户界面的核心组件。每个 Activity 代表一个独立的屏幕页面（如应用页面、表盘页面），包含与之关联的 View（视图）以及完整的生命周期管理。
+
+## Activity 概述
+
+Activity 是 ElenixOS 页面导航和生命周期管理的核心抽象。每个 Activity 包含：
+
+* 一个关联的 **View**（LVGL 对象树），即页面的 UI 内容
+* 完整的 **生命周期回调**（进入、销毁、暂停、恢复）
+* **标题** 和 **标题颜色** 等 UI 属性
+* **类型** 标识（应用、表盘、应用列表等）
+* **AppHeader** 可见性控制
+
+### Activity 类型
+
+```c
+typedef enum {
+    EOS_ACTIVITY_TYPE_NULL = 0,            // 空类型
+    EOS_ACTIVITY_TYPE_APP,                 // 应用页面
+    EOS_ACTIVITY_TYPE_APP_LIST,            // 应用列表
+    EOS_ACTIVITY_TYPE_WATCHFACE,           // 表盘页面
+    EOS_ACTIVITY_TYPE_WATCHFACE_LIST,      // 表盘列表
+    EOS_ACTIVITY_TYPE_COUNT
+} eos_activity_type_t;
+```
+
+## 生命周期
+
+Activity 拥有完整的生命周期，由以下回调函数管理：
+
+```c
+typedef struct {
+    eos_activity_on_enter_t on_enter;      // 进入时调用
+    eos_activity_on_destroy_t on_destroy;  // 销毁时调用
+    eos_activity_on_pause_t on_pause;      // 暂停时调用
+    eos_activity_on_resume_t on_resume;    // 恢复时调用
+} eos_activity_lifecycle_t;
+```
+
+### 生命周期流程
+
+```
+创建 Activity (eos_activity_create)
+    │
+    ▼
+进入 Activity (eos_activity_enter)
+    │
+    ├── on_enter()  ── 进入回调
+    │
+    ▼
+Activity 可见 (visible)
+    │
+    ├── on_resume()  ── 恢复回调（从其他 Activity 返回时）
+    │
+    ▼
+离开 Activity
+    │
+    ├── on_pause()  ── 暂停回调（切换到其他 Activity 时）
+    │
+    ▼
+返回 Activity ──► on_resume()
+    │
+    ▼
+销毁 Activity (eos_activity_back)
+    │
+    └── on_destroy() ── 销毁回调
+```
+
+### 生命周期回调说明
+
+| 回调           | 触发时机             | 典型用途        |
+| ------------ | ---------------- | ----------- |
+| `on_enter`   | Activity 首次显示时   | 初始化 UI、加载数据 |
+| `on_resume`  | 从其他 Activity 返回时 | 刷新数据、恢复动画   |
+| `on_pause`   | 切换到其他 Activity 时 | 保存状态、暂停动画   |
+| `on_destroy` | Activity 被销毁时    | 释放资源、取消订阅   |
+
+## Activity 栈管理
+
+ElenixOS 使用栈结构管理 Activity。栈底固定为表盘（Watchface）Activity，新打开的 Activity 被压入栈顶。
+
+### Root Activity 机制
+
+**重要概念**：表盘作为 **Root Activity**（根活动），独立于 Activity 栈管理，具有特殊地位：
+
+```mermaid
+flowchart TB
+    subgraph Stack["Activity 栈"]
+        direction TB
+        C["App List (栈顶)"]
+        B["Calculator App"]
+    end
+
+    subgraph Root["Root Activity (独立)"]
+        direction TB
+        WF["Watchface (表盘)"]
+    end
+
+    Stack -->|"back() 退栈"| Root
+    Root -->|"replace_root() 切换"| Root2["New Watchface"]
+```
+
+**Root Activity 特性**：
+
+| 特性          | 普通 Activity             | Root Activity                 |
+| ----------- | ----------------------- | ----------------------------- |
+| **位置**      | 在栈中                     | 独立于栈外                         |
+| **生命周期**    | 随入栈/退栈创建销毁              | 持久存在直到切换                      |
+| **创建方式**    | `eos_activity_create()` | `eos_activity_create_root()`  |
+| **View 创建** | 延迟创建（on_enter 中）        | **立即创建**（create_root 时）       |
+| **退栈影响**    | 销毁并释放                   | 不受退栈影响                        |
+| **切换方式**    | N/A                     | `eos_activity_replace_root()` |
+
+**Root Activity 使用场景**：
+
+* 表盘（内建或 JS）
+* 作为系统的"首页"，始终存在
+* 切换时通过 `replace_root()` 替换，而非入栈/退栈
+
+### 栈结构示意
+
+```
+栈顶  
+      ┌──────────────────┐
+      │  Activity C      │  ← 当前可见的 Activity
+      ├──────────────────┤
+      │  Activity B      │  ← 暂停状态
+      ├──────────────────┤
+      │  Activity A      │  ← 暂停状态
+      └──────────────────┘
+           │
+           │ (独立于栈)
+           ▼
+     ┌─────────────┐
+     │  Watchface  │  ← Root Activity (始终存在)
+     └─────────────┘
+```
+
+### 导航操作
+
+#### 进入新 Activity
+
+```c
+eos_activity_enter(activity);
+```
+
+将 Activity 压入栈顶并显示。之前的 Activity 自动进入暂停状态。
+
+#### 返回上一 Activity
+
+```c
+eos_result_t ret = eos_activity_back();
+```
+
+销毁当前栈顶 Activity，恢复上一 Activity。返回 `EOS_OK` 表示成功。
+
+#### 返回表盘
+
+```c
+eos_result_t ret = eos_activity_back_to_watchface();
+```
+
+销毁所有栈中 Activity，直接返回表盘。
+
+#### 事件回调中返回
+
+```c
+void eos_activity_back_cb(lv_event_t *e);
+```
+
+在 LVGL 事件回调中使用的便捷封装。
+
+## 核心 API
+
+### 创建与初始化
+
+```c
+// 普通 Activity（用于应用、列表等）
+eos_result_t eos_activity_controller_init(eos_activity_t *initial_activity);
+void eos_activity_controller_deinit(void);
+eos_activity_t *eos_activity_create(const eos_activity_lifecycle_t *lifecycle);
+
+// Root Activity（专用于表盘）
+eos_activity_t *eos_activity_create_root(const eos_activity_lifecycle_t *lifecycle);
+eos_result_t eos_activity_replace_root(eos_activity_t *new_root);
+```
+
+| 函数                               | 说明                                     |
+| -------------------------------- | -------------------------------------- |
+| `eos_activity_controller_init`   | 初始化 Activity 控制器，需传入 Root Activity（表盘） |
+| `eos_activity_controller_deinit` | 反初始化，释放所有 Activity                     |
+| `eos_activity_create`            | 创建普通 Activity，View 延迟创建                |
+| **`eos_activity_create_root`**   | **创建 Root Activity（表盘），View 立即创建**     |
+| **`eos_activity_replace_root`**  | **替换当前 Root Activity（切换表盘）**           |
+
+#### 智能懒加载机制
+
+Activity 系统采用**智能懒加载**设计，简化初始化流程：
+
+```mermaid
+flowchart TD
+    A["eos_watchface_init()"] --> B["eos_activity_create_root()"]
+    B --> C{"root_screen 存在?"}
+    C -->|"否"| D["自动创建 root_screen"]
+    C -->|"是"| E["复用已有 root_screen"]
+    D --> F["立即创建 View"]
+    E --> F
+    F --> G["返回完整 Activity"]
+
+    H["eos_activity_controller_init()"] --> I{"root_screen 存在?"}
+    I -->|"否 (create_root 未调用)"| J["自动创建 root_screen + stack"]
+    I -->|"是 (已被 create_root 创建)"| K["跳过，仅创建 stack"]
+    J --> L["设置 Root Activity"]
+    K --> L
+```
+
+### Activity 查询
+
+```c
+eos_activity_t *eos_activity_get_current(void);
+eos_activity_t *eos_activity_get_visible(void);
+eos_activity_t *eos_activity_get_previous(void);
+eos_activity_t *eos_activity_get_bottom(void);
+eos_activity_t *eos_activity_get_watchface(void);
+bool eos_activity_is_transition_in_progress(void);
+```
+
+| 函数                                       | 说明                           |
+| ---------------------------------------- | ---------------------------- |
+| `eos_activity_get_current`               | 获取当前 Activity（栈顶）            |
+| `eos_activity_get_visible`               | 获取当前已完全显示的 Activity          |
+| `eos_activity_get_previous`              | 获取上一个 Activity（用于事件回调中获取来源页） |
+| `eos_activity_get_bottom`                | 获取栈底 Activity（通常是表盘）         |
+| `eos_activity_get_watchface`             | 获取表盘 Activity                |
+| `eos_activity_is_transition_in_progress` | 检查过渡动画是否正在进行                 |
+
+### View 管理
+
+```c
+lv_obj_t *eos_activity_get_view(eos_activity_t *activity);
+void eos_activity_set_view(eos_activity_t *activity, lv_obj_t *view);
+lv_obj_t *eos_activity_get_root_screen(void);
+lv_obj_t *eos_view_active(void);
+```
+
+| 函数                             | 说明                         |
+| ------------------------------ | -------------------------- |
+| `eos_activity_get_view`        | 获取 Activity 关联的 View 对象    |
+| `eos_activity_set_view`        | 设置 Activity 的 View 对象      |
+| `eos_activity_get_root_screen` | 获取根屏幕对象                    |
+| `eos_view_active`              | 获取当前 Activity 的 View（便捷方法） |
+
+### 标题管理
+
+```c
+const char *eos_activity_get_title(eos_activity_t *activity);
+void eos_activity_set_title(eos_activity_t *activity, const char *title);
+void eos_activity_set_title_id(eos_activity_t *activity, lang_string_id_t id);
+lv_color_t eos_activity_get_title_color(eos_activity_t *activity);
+void eos_activity_set_title_color(eos_activity_t *activity, lv_color_t color);
+```
+
+| 函数                             | 说明                  |
+| ------------------------------ | ------------------- |
+| `eos_activity_get_title`       | 获取 Activity 标题      |
+| `eos_activity_set_title`       | 设置 Activity 标题（字符串） |
+| `eos_activity_set_title_id`    | 通过国际化字符串 ID 设置标题    |
+| `eos_activity_get_title_color` | 获取标题颜色              |
+| `eos_activity_set_title_color` | 设置标题颜色              |
+
+### 类型管理
+
+```c
+void eos_activity_set_type(eos_activity_t *activity, eos_activity_type_t type);
+eos_activity_type_t eos_activity_get_type(eos_activity_t *activity);
+```
+
+### AppHeader 可见性控制
+
+```c
+void eos_activity_set_app_header_visible(eos_activity_t *activity, bool visible);
+void eos_activity_set_app_header_visible_animated(eos_activity_t *activity, bool visible, uint32_t duration_ms);
+bool eos_activity_is_app_header_visible(eos_activity_t *activity);
+void eos_activity_set_app_header_time_only(eos_activity_t *activity, bool time_only);
+bool eos_activity_is_app_header_time_only(eos_activity_t *activity);
+void eos_activity_set_app_header_time_only_text_color(eos_activity_t *activity, lv_color_t color);
+lv_color_t eos_activity_get_app_header_time_only_text_color(eos_activity_t *activity);
+```
+
+| 函数                                                 | 说明                                          |
+| -------------------------------------------------- | ------------------------------------------- |
+| `eos_activity_set_app_header_visible`              | 设置 AppHeader 可见性                            |
+| `eos_activity_set_app_header_visible_animated`     | 带动画设置 AppHeader 可见性，`duration_ms` 为 0 时立即切换 |
+| `eos_activity_is_app_header_visible`               | 检查 AppHeader 是否可见                           |
+| `eos_activity_set_app_header_time_only`            | 设置 AppHeader 是否仅显示时间                        |
+| `eos_activity_is_app_header_time_only`             | 检查 AppHeader 是否仅显示时间                        |
+| `eos_activity_set_app_header_time_only_text_color` | 设置仅时间模式下的字体颜色                               |
+| `eos_activity_get_app_header_time_only_text_color` | 获取仅时间模式下的字体颜色                               |
+
+### 用户数据
+
+```c
+void *eos_activity_get_user_data(eos_activity_t *activity);
+void eos_activity_set_user_data(eos_activity_t *activity, void *user_data);
+```
+
+### 快照
+
+```c
+lv_obj_t *eos_activity_take_snapshot(eos_activity_t *activity, bool include_header);
+```
+
+获取 Activity 视图的快照图像。`include_header` 控制是否包含 AppHeader。
+
+**注意**：快照图像资源会在对象被删除时自动释放。
+
+### 过渡动画
+
+```c
+eos_result_t eos_activity_register_anim_route(
+    eos_activity_type_t from_type,
+    eos_activity_type_t to_type,
+    eos_activity_anim_cb_t cb);
+
+eos_activity_anim_cb_t eos_activity_get_anim_route(
+    eos_activity_type_t from_type,
+    eos_activity_type_t to_type);
+```
+
+注册和查询页面间切换的过渡动画路由。
+
+## View 详解
+
+View 是 Activity 关联的 LVGL 对象，作为 Activity 页面 UI 内容的根容器。每个 Activity 在创建后应设置一个 View。
+
+### 创建 View
+
+```c
+// 创建 Activity
+eos_activity_t *activity = eos_activity_create(&lifecycle);
+
+// 创建 View（基于根屏幕）
+lv_obj_t *view = lv_obj_create(eos_activity_get_root_screen());
+lv_obj_remove_style_all(view);
+lv_obj_set_size(view, EOS_DISPLAY_WIDTH, EOS_DISPLAY_HEIGHT);
+
+// 关联 View 到 Activity
+eos_activity_set_view(activity, view);
+```
+
+### 获取当前 View
+
+```c
+// 方法一：通过 Activity
+lv_obj_t *view = eos_activity_get_view(activity);
+
+// 方法二：便捷方法（获取当前 Activity 的 View）
+lv_obj_t *active_view = eos_view_active();
+```
+
+### View 布局建议
+
+由于 ElenixOS 面向智能手表等小屏幕设备（通常为 390x450），View 的布局应遵循以下原则：
+
+* 使用 `lv_obj_remove_style_all(view)` 清除默认样式
+* 设置 View 大小为屏幕尺寸：`lv_obj_set_size(view, EOS_DISPLAY_WIDTH, EOS_DISPLAY_HEIGHT)`
+* 使用 LVGL 的弹性布局（Flex）或手动定位排列子组件
+
+## AppHeader
+
+AppHeader 是 ElenixOS 提供的统一顶部导航栏组件，显示在 `lv_layer_top()` 层，在所有 View 之上。
+
+### AppHeader API
+
+```c
+void eos_app_header_init(void);
+void eos_app_header_hide(void);
+void eos_app_header_show(eos_activity_t *a);
+void eos_app_header_set_visible_animated(eos_activity_t *a, bool visible, uint32_t duration_ms);
+bool eos_app_header_is_visible(void);
+```
+
+| 函数                                    | 说明                             |
+| ------------------------------------- | ------------------------------ |
+| `eos_app_header_init`                 | 初始化 AppHeader（只能调用一次）          |
+| `eos_app_header_hide`                 | 隐藏 AppHeader                   |
+| `eos_app_header_show`                 | 显示 AppHeader，刷新当前 Activity 的标题 |
+| `eos_app_header_set_visible_animated` | 带动画显隐 AppHeader                |
+| `eos_app_header_is_visible`           | 检查 AppHeader 是否可见              |
+
+## 使用示例
+
+### 创建标准应用 Activity
+
+```c
+// 定义生命周期回调
+static void on_enter(eos_activity_t *activity) {
+    lv_obj_t *view = lv_obj_create(eos_activity_get_root_screen());
+    lv_obj_remove_style_all(view);
+    lv_obj_set_size(view, EOS_DISPLAY_WIDTH, EOS_DISPLAY_HEIGHT);
+    eos_activity_set_view(activity, view);
+
+    // 设置标题
+    eos_activity_set_title(activity, "My App");
+
+    // 添加 UI 组件
+    lv_obj_t *label = lv_label_create(view);
+    lv_label_set_text(label, "Hello, ElenixOS!");
+    lv_obj_center(label);
+}
+
+static void on_destroy(eos_activity_t *activity) {
+    // 清理资源
+}
+
+// 创建 Activity
+const eos_activity_lifecycle_t lifecycle = {
+    .on_enter = on_enter,
+    .on_destroy = on_destroy,
+    .on_pause = NULL,
+    .on_resume = NULL,
+};
+
+eos_activity_t *activity = eos_activity_create(&lifecycle);
+eos_activity_set_type(activity, EOS_ACTIVITY_TYPE_APP);
+```
+
+### 页面导航
+
+```c
+// 从当前页面进入新页面
+eos_activity_enter(new_activity);
+
+// 返回上一页
+eos_activity_back();
+
+// 直接返回表盘
+eos_activity_back_to_watchface();
+```
+
+### 控制 AppHeader
+
+```c
+// 隐藏 AppHeader
+eos_activity_set_app_header_visible(activity, false);
+
+// 带动画隐藏
+eos_activity_set_app_header_visible_animated(activity, false, 300);
+
+// 仅显示时间
+eos_activity_set_app_header_time_only(activity, true);
+```
+
+### 注册过渡动画
+
+```c
+static void my_anim_cb(lv_anim_timeline_t *at, eos_activity_t *from, eos_activity_t *to) {
+    // 自定义过渡动画
+    lv_obj_t *from_view = eos_activity_get_view(from);
+    lv_obj_t *to_view = eos_activity_get_view(to);
+
+    // 创建动画时间线
+    // ...
+}
+
+// 注册从应用到应用的过渡动画
+eos_activity_register_anim_route(
+    EOS_ACTIVITY_TYPE_APP,
+    EOS_ACTIVITY_TYPE_APP,
+    my_anim_cb);
+```
+
+## Activity 与事件系统
+
+Activity 系统与[事件系统](/docs/architecture/kernel/event/events)紧密集成。当 Activity 页面切换完成时，会广播 `EOS_EVENT_ACTIVITY_SCREEN_SWITCHED` 事件：
+
+```c
+// 监听页面切换完成事件
+eos_event_add_cb(some_obj, my_cb, EOS_EVENT_ACTIVITY_SCREEN_SWITCHED, NULL);
+
+static void my_cb(lv_event_t *e) {
+    lv_obj_t *current_view = lv_event_get_param(e);
+    // 页面切换完成，current_view 为当前页面的 View
+}
+```
+
+## Activity 系统初始化流程
+
+```
+系统启动
+    │
+    ▼
+eos_activity_controller_init(watchface_activity)
+    │
+    ├── 创建 Activity 栈
+    ├── 获取根屏幕
+    ├── 将表盘 Activity 设为当前
+    └── 调用 on_enter()
+    │
+    ▼
+eos_app_header_init()
+    │
+    ├── 创建 AppHeader UI
+    └── 放置在 lv_layer_top() 层
+    │
+    ▼
+系统运行
+```
+
+## 错误处理
+
+| 情况               | 返回值                                              |
+| ---------------- | ------------------------------------------------ |
+| Activity 控制器未初始化 | 函数返回 `EOS_FAILED`                                |
+| 传入 NULL Activity | 函数内部检查并直接返回                                      |
+| Activity 栈为空     | `eos_activity_get_current` 返回 NULL               |
+| 过渡动画进行中          | `eos_activity_is_transition_in_progress` 返回 true |
+
+## 性能建议
+
+1. **延迟初始化**：在 `on_enter` 回调中创建 UI，不要在构造函数中执行耗时操作
+2. **资源释放**：在 `on_destroy` 回调中释放所有动态分配的资源
+3. **快照管理**：快照会占用额外的内存，避免对多个 Activity 同时持有快照
+4. **过渡动画**：动画时长建议控制在 200-500ms 之间，避免过长影响用户体验
