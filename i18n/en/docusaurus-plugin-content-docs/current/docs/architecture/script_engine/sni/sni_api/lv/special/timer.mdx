@@ -1,0 +1,129 @@
+---
+title: 定时器 (Timer)
+sidebar_position: 8
+---
+
+# 定时器 (Timer)
+
+定时器是 ElenixOS 中用于创建和管理定时器的特殊 API 组件。本文档将介绍定时器组件的功能、使用方法和注意事项。
+
+## 功能介绍
+
+定时器组件允许开发者创建和管理定时器，用于执行定时任务、动画、周期性操作等。定时器组件通常用于需要定时执行的场景，如倒计时、轮询、动画等。
+
+## 使用方法
+
+### 创建定时器
+
+使用 `new lv.timer()` 构造函数创建定时器对象：
+
+```javascript
+// 创建定时器对象
+const timer = new lv.timer();
+```
+
+### 配置定时器
+
+使用以下方法配置定时器：
+
+```javascript
+// 设置定时器回调函数
+timer.setCb(() => {
+    eos.console.log("Timer callback executed");
+});
+
+// 设置定时器周期（毫秒）
+timer.setPeriod(1000); // 1秒
+
+// 设置定时器重复次数
+timer.setRepeatCount(5); // 重复5次
+
+// 设置定时器优先级
+timer.setPriority(lv.TIMER_PRIO.MID);
+
+// 设置定时器自动重置
+timer.setAutoReset(true);
+```
+
+### 启动和停止定时器
+
+使用以下方法启动和停止定时器：
+
+```javascript
+// 启动定时器
+timer.start();
+
+// 停止定时器
+timer.stop();
+
+// 重置定时器
+timer.reset();
+
+// 检查定时器是否正在运行
+const isRunning = timer.isRunning();
+```
+
+### 示例：创建简单定时器
+
+```javascript
+// 创建定时器
+const timer = new lv.timer();
+
+// 设置定时器回调
+let count = 0;
+timer.setCb(() => {
+    eos.console.log("Timer tick:", count);
+    count++;
+    
+    // 停止定时器
+    if (count >= 5) {
+        timer.stop();
+        eos.console.log("Timer stopped");
+    }
+});
+
+// 设置定时器周期
+timer.setPeriod(1000); // 1秒
+
+// 启动定时器
+timer.start();
+```
+
+### 示例：创建周期性定时器
+
+```javascript
+// 创建定时器
+const timer = new lv.timer();
+
+// 设置定时器回调
+let count = 0;
+timer.setCb(() => {
+    eos.console.log("Timer tick:", count);
+    count++;
+});
+
+// 设置定时器周期
+timer.setPeriod(1000); // 1秒
+
+// 设置自动重置
+timer.setAutoReset(true);
+
+// 启动定时器
+timer.start();
+
+// 5秒后停止定时器
+setTimeout(() => {
+    timer.stop();
+    eos.console.log("Timer stopped");
+}, 5000);
+```
+
+## 定时器优先级
+
+| 优先级                     | 描述    |
+| ----------------------- | ----- |
+| `lv.TIMER_PRIO.LOWEST`  | 最低优先级 |
+| `lv.TIMER_PRIO.LOW`     | 低优先级  |
+| `lv.TIMER_PRIO.MID`     | 中等优先级 |
+| `lv.TIMER_PRIO.HIGH`    | 高优先级  |
+| `lv.TIMER_PRIO.HIGHEST` | 最高优先级 |
