@@ -61,18 +61,23 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Commit all changes (dev source + AI translations) to an intermediate branch
-          SYNC_BRANCH="sync/i18n-$(date +%Y%m%d-%H%M%S)"
-          git checkout -b "$SYNC_BRANCH"
+          # Stage source + translations on dev
           git add docs/ blog/ i18n/
-          git commit -m "chore(i18n): AI translate docs/blog changes" || {
-            echo "No changes to sync."
+          if git diff --cached --quiet; then
+            echo "No changes — done."
             exit 0
-          }
+          fi
+          git commit -m "chore(i18n): AI translate docs/blog changes"
+          DEV_SHA=$(git rev-parse HEAD)
 
-          echo "=== Pushing $SYNC_BRANCH → main ==="
-          git push origin "$SYNC_BRANCH:main"
+          # Create sync branch from main (ensures fast-forward)
+          git fetch origin main
+          git checkout -B sync/i18n origin/main
+
+          # Apply dev's docs/blog/i18n onto the sync branch
+          git checkout "$DEV_SHA" -- docs/ blog/ i18n/
+          git commit -m "chore(i18n): AI translate docs/blog changes"
+
+          echo "=== Pushing sync/i18n → main ==="
+          git push origin HEAD:main
           echo "✓ Synced to main"
-
-          # Clean up intermediate branch
-          git push origin --delete "$SYNC_BRANCH" 2>/dev/null || true
