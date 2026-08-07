@@ -1,0 +1,121 @@
+---
+sidebar_position: 11
+title: 传感器服务
+---
+
+传感器服务负责管理设备上的各种传感器，支持两种数据获取模式：Pull（同步轮询）和 Push（异步订阅）。
+
+## 核心概念
+
+### Pull 模式（同步轮询）
+
+上层主动从传感器读取数据，数据源为传感器数据缓存（FIFO）。
+
+### Push 模式（异步订阅）
+
+上层注册传感器数据回调函数，当有新数据时服务主动通知。
+
+两种模式共享相同的数据源（传感器数据缓存/FIFO），由传感器服务统一调度。
+
+## FIFO 容量
+
+```c
+#define EOS_SENSOR_FIFO_CAPACITY    64
+```
+
+## 传感器数据结构
+
+### 传感器实例
+
+```c
+typedef struct {
+    eos_sensor_type_t type;           // 传感器类型
+    eos_dev_sensor_t *device;         // 传感器设备指针
+    eos_fifo_t *fifo;                 // 数据 FIFO
+    eos_sensor_raw_data_t latest_data;// 最新数据
+    uint8_t subscriber_count;         // 订阅者数量
+    uint32_t sample_period_ms;        // 采样周期
+    uint32_t last_sample_time;        // 上次采样时间
+    bool is_active;                   // 是否激活
+} eos_sensor_service_instance_t;
+```
+
+## 服务初始化
+
+```c
+eos_result_t eos_service_sensor_init(void);
+```
+
+## Pull 模式 API
+
+### 从 FIFO 读取传感器数据
+
+```c
+eos_result_t eos_sensor_read(eos_sensor_type_t type, eos_sensor_raw_data_t *data);
+```
+
+### 读取最新传感器数据
+
+```c
+eos_result_t eos_sensor_read_latest(eos_sensor_type_t type, eos_sensor_raw_data_t *data);
+```
+
+## Push 模式 API
+
+### 订阅传感器数据
+
+注册传感器数据回调函数：
+
+```c
+eos_result_t eos_sensor_subscribe(
+    eos_sensor_type_t type,
+    eos_sensor_data_cb_t cb,
+    void *user_data,
+    uint32_t min_interval_ms
+);
+```
+
+参数说明：
+
+* `type`：传感器类型
+* `cb`：回调函数
+* `user_data`：传递给回调的用户数据
+* `min_interval_ms`：最小回调间隔（毫秒）
+
+### 取消订阅
+
+```c
+eos_result_t eos_sensor_unsubscribe(
+    eos_sensor_type_t type,
+    eos_sensor_data_cb_t cb,
+    void *user_data
+);
+```
+
+## 采样周期管理
+
+### 设置采样周期
+
+```c
+eos_result_t eos_sensor_set_sample_period(eos_sensor_type_t type, uint32_t period_ms);
+```
+
+### 获取采样周期
+
+```c
+uint32_t eos_sensor_get_sample_period(eos_sensor_type_t type);
+```
+
+## 传感器数据通知
+
+由驱动程序调用，通知有新数据可用：
+
+```c
+void eos_sensor_notify(eos_sensor_type_t type, const eos_sensor_data_t *data, uint32_t timestamp);
+```
+
+## 传感器数据回调
+
+```c
+typedef eos_event_cb_t eos_sensor_data_cb_t;
+```
