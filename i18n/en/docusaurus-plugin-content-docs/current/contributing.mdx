@@ -1,251 +1,246 @@
----
-sidebar_position: 10
-title: Contribution Guide
----
+# 贡献指南
 
-# Contribution Guide
+本指南将帮助你了解 ElenixOS 的贡献流程、编码规范和贡献方式，为参与 ElenixOS 开发提供完整的指导。
 
-This guide will help you understand the contribution process, coding standards, and contribution methods for ElenixOS, providing complete guidance for participating in ElenixOS development.
+## 编码规范
 
-## Coding Standards
+### C 语言编码规范
 
-### C Language Coding Standards
+#### 命名约定
 
-#### Naming Conventions
+* **文件名**：使用小写字母和下划线，例如 `eos_app.c`
+* **函数名**：使用小写字母和下划线，例如 `eos_app_install`
+* **变量名**：使用小写字母和下划线，例如 `app_id`
+* **常量名与宏定义**：使用大写字母和下划线，例如 `EOS_APP_DIR`
+* **类型名**：使用驼峰命名法，例如 `script_pkg_t`
+* **静态变量名**：使用前下划线+小写字母与下划线，例如 `static int _app_count = 0;`
 
-- **File names**: Use lowercase letters and underscores, e.g., `eos_app.c`
-- **Function names**: Use lowercase letters and underscores, e.g., `eos_app_install`
-- **Variable names**: Use lowercase letters and underscores, e.g., `app_id`
-- **Constants and macros**: Use uppercase letters and underscores, e.g., `EOS_APP_DIR`
-- **Type names**: Use camel case, e.g., `script_pkg_t`
-- **Static variable names**: Use leading underscore + lowercase letters and underscores, e.g., `static int _app_count = 0;`
+#### 代码风格
 
-#### Code Style
+项目使用 **clang-format v20** 进行 C/C++ 代码格式化，配置文件为项目根目录的 `.clang-format`。关键规则如下：
 
-The project uses **clang-format v20** for C/C++ code formatting, with the configuration file `.clang-format` in the project root. Key rules include:
+* **缩进**：使用 4 个空格进行缩进，不使用 Tab
+* **列宽限制**：每行不超过 **120** 个字符
+* **括号风格**：Allman 风格（左括号单独一行）
+* **指针/引用**：靠右对齐，例如 `int *p`、`int &r`
+* **条件/循环语句**：关键字与左括号之间加空格，如 `if (x)`、`while (x)`
+* **函数声明/定义**：返回值类型与函数名在同一行
+* **二元运算符**：在非赋值运算符前换行
+* **连续宏、赋值、声明**：不对齐
+* **块内空行**：块开头不允许有空行
+* **最大连续空行**：不超过 1 行
+* **注释**：使用 Doxygen 风格注释
 
-- **Indentation**: 4 spaces, no tabs
-- **Column limit**: **120** characters per line maximum
-- **Brace style**: Allman style (braces on separate lines)
-- **Pointer/Reference alignment**: Right-aligned, e.g., `int *p`, `int &r`
-- **Condition/Loop statements**: Space between keyword and opening parenthesis, e.g., `if (x)`, `while (x)`
-- **Function declarations/definitions**: Return type on the same line as function name
-- **Binary operators**: Break before non-assignment operators
-- **Consecutive macros/assignments/declarations**: No alignment
-- **Blank lines at block start**: Not allowed
-- **Maximum consecutive blank lines**: 1
-- **Comments**: Doxygen-style comments
+详细规则请直接查看项目根目录的 `.clang-format` 文件。
 
-For detailed rules, see the `.clang-format` file in the project root.
-
-#### Example
+#### 示例
 
 ```c
 /**
- * @brief Install application
- * @param eapk_path eapk installation package path
- * @return eos_result_t Installation result
+ * @brief 安装应用
+ * @param eapk_path eapk 安装包路径
+ * @return eos_result_t 安装结果
  */
 eos_result_t eos_app_install(const char *eapk_path)
 {
-    // Function implementation
+    // 函数实现
     return EOS_OK;
 }
 ```
 
-### JavaScript Coding Standards
+### JavaScript 编码规范
 
-#### Naming Conventions
+#### 命名约定
 
-- **Variable names**: Use camel case, e.g., `appId`
-- **Function names**: Use camel case, e.g., `installApp`
-- **Constant names**: Use uppercase letters and underscores, e.g., `MAX_APP_COUNT`
-- **Object properties**: Use camel case, e.g., `appName`
+* **变量名**：使用驼峰命名法，例如 `appId`
+* **函数名**：使用驼峰命名法，例如 `installApp`
+* **常量名**：使用大写字母和下划线，例如 `MAX_APP_COUNT`
+* **对象属性**：使用驼峰命名法，例如 `appName`
 
-#### Code Style
+#### 代码风格
 
-- **Indentation**: Use 2 spaces for indentation
-- **Brackets**: Left and right brackets on separate lines
-- **Line length**: Each line of code should not exceed 80 characters
-- **Comments**: Use JSDoc-style comments
+* **缩进**：使用 2 个空格进行缩进
+* **括号**：左括号和右括号单独一行
+* **行长度**：每行代码不超过 80 个字符
+* **注释**：使用 JSDoc 风格的注释
 
-#### Example
+#### 示例
 
 ```javascript
 /**
- * Install application
- * @param {string} eapkPath - Application package path
- * @returns {number} Installation result
+ * 安装应用
+ * @param {string} eapkPath - 应用包路径
+ * @returns {number} 安装结果
  */
 function installApp(eapkPath)
 {
-    // Function implementation
+    // 函数实现
     return 0;
 }
 ```
 
-## Code Quality Checks
+## 代码质量检查
 
-ElenixOS provides a unified code quality check framework via `scripts/check.py` to ensure code meets project standards.
+ElenixOS 提供了一套统一的代码质量检查框架 `scripts/check.py`，用于确保代码符合项目规范。
 
-### Check Types
+### 检查类型
 
-Running a check executes the following four checkers sequentially:
+运行一次检查会依次执行以下四个检查器：
 
-| Checker | Name | Description |
-|---------|------|-------------|
-| architecture | Architecture Constraint Check | Validates code against architecture rules, e.g., `jerry_call()` can only be called in specific files, `malloc`/`free` restricted to the port layer |
-| formatting | Code Formatting Check | Uses clang-format v20 to check C/C++ files against `.clang-format` rules |
-| style | Code Style Check | Uses clang-tidy (or custom regex rules) to scan for style issues, such as TODO/FIXME without issue references, forbidden functions (`sprintf`, `gets`, etc.) |
-| static_analysis | Static Analysis | Runs clang-tidy deep analysis (`--checks='*'`) and cppcheck for comprehensive static analysis |
+| 检查器             | 名称     | 功能                                                                                  |
+| --------------- | ------ | ----------------------------------------------------------------------------------- |
+| architecture    | 架构约束检查 | 校验代码是否符合架构规则，例如 `jerry_call()` 只能在指定文件中调用、`malloc`/`free` 只能用于 port 层等              |
+| formatting      | 代码格式检查 | 基于 clang-format v20 检查 C/C++ 文件格式是否符合 `.clang-format` 规范                            |
+| style           | 代码风格检查 | 使用 clang-tidy（或自定义正则规则）扫描常见风格问题，如未关联 Issue 的 TODO/FIXME、禁止使用的函数（`sprintf`、`gets` 等） |
+| static_analysis | 静态分析   | 使用 clang-tidy 深度分析（`--checks='*'`）和 cppcheck 进行全面的静态分析                              |
 
-### Dependency Installation
+### 依赖安装
 
 #### clang-format / clang-tidy
 
-- **Ubuntu / Debian**:
+* **Ubuntu / Debian**：
   ```bash
   sudo apt-get install clang-format-20 clang-tidy-20
   ```
-- **macOS**:
+* **macOS**：
   ```bash
   brew install llvm@20
   ```
-- **Windows**:
+* **Windows**：
   ```powershell
-  # Option 1: Official installer (recommended)
-  # Download LLVM-20.x.x-win64.exe from https://github.com/llvm/llvm-project/releases/
-  # After installation, clang-format.exe is at C:\Program Files\LLVM\bin\
+  # 方式一：官方安装包（推荐）
+  # 从 https://github.com/llvm/llvm-project/releases/ 下载 LLVM-20.x.x-win64.exe
+  # 安装后 clang-format.exe 位于 C:\Program Files\LLVM\bin\
 
-  # Option 2: Chocolatey
+  # 方式二：Chocolatey
   choco install llvm
 
-  # Option 3: Scoop
+  # 方式三：Scoop
   scoop install llvm
 
-  # Option 4: winget
+  # 方式四：winget
   winget install LLVM.LLVM
   ```
-  Verify with `clang-format --version` in `cmd` or `PowerShell`. Since Windows executables don't have versioned names (`clang-format-20` vs `clang-format`), just use `clang-format` with the `--clang-format` parameter.
-- Or build LLVM 20 yourself and ensure `clang-format-20` (Unix) or `clang-format` (Windows) is in your `PATH`
+  安装后在 `cmd` 或 `PowerShell` 中运行 `clang-format --version` 验证。由于 Windows 下可执行文件不区分 `clang-format-20` 与 `clang-format`，使用 `--clang-format` 参数时直接指定 `clang-format` 即可。
+* 或自行编译 LLVM 20，并确保 `clang-format-20`（Unix）或 `clang-format`（Windows）在 `PATH` 中
 
-#### Python Dependencies
+#### Python 依赖
 
 ```bash
 pip install pyyaml
 ```
 
-#### cppcheck (optional, for static analysis)
+#### cppcheck（可选，用于静态分析）
 
 ```bash
 sudo apt-get install cppcheck      # Ubuntu/Debian
 brew install cppcheck              # macOS
 ```
 
-### Usage
+### 使用方法
 
 ```bash
-# Run all checks (project integrity check)
+# 运行全部检查（项目完整性检查）
 python3 scripts/check.py
 
-# Run specific checks (e.g., formatting and architecture only)
+# 运行指定检查（如仅格式检查和架构检查）
 python3 scripts/check.py --check fmt,arch
 
-# Run formatting check only
+# 仅运行格式检查
 python3 scripts/check.py --check fmt
 
-# Auto-fix formatting issues
+# 自动修复代码格式问题
 python3 scripts/check.py --check fmt --fix
 
-# JSON output (CI mode)
+# JSON 输出（CI 模式）
 python3 scripts/check.py --json
 
-# List available checkers
+# 查看可用检查器列表
 python3 scripts/check.py --list-checks
 
-# Specify clang-format path
+# 指定 clang-format 路径
 python3 scripts/check.py --clang-format /usr/bin/clang-format-20
 ```
 
-### Project Integrity Check
+### 项目完整性检查
 
-Running `scripts/check.py` without arguments executes all four checkers as a comprehensive project integrity verification. Please run it before submitting new code to ensure all checks pass.
+`scripts/check.py` 不加参数即运行全部四个检查器，作为项目完整性验证。新提交的代码应在提交前运行一次以确保所有检查通过。
 
-### CI Automation
+### CI 自动检查
 
-The project automatically runs code quality checks via GitHub Actions, configured in `.github/workflows/check.yml`:
+项目通过 GitHub Actions 自动执行代码质量检查，工作流文件为 `.github/workflows/check.yml`：
 
-- **Trigger**: Automatically runs on `push` or `PR` to `main` or `dev` branches
-- **Environment**: Ubuntu latest
-- **Command**: `python3 scripts/check.py --json --clang-format clang-format-20`
-- **On failure**: PRs will be blocked from merging; fix issues based on CI logs
+* **触发条件**：当 `push` 或 `PR` 到 `main` 或 `dev` 分支时自动触发
+* **运行环境**：Ubuntu latest
+* **检查命令**：`python3 scripts/check.py --json --clang-format clang-format-20`
+* **检查未通过时**：PR 将无法合并，需根据 CI 日志修复问题
 
-## Development Process
+## 开发流程
 
-### Branch Management
+### 分支管理
 
-ElenixOS uses Git for version control, adopting the following branch management strategy:
+ElenixOS 使用 Git 进行版本控制，采用以下分支管理策略：
 
-- **main**: Main branch, contains stable versions
-- **dev**: Development branch, contains latest development code
+* **main**：主分支，包含稳定版本
+* **dev**：开发分支，包含最新开发代码
 
-### Development Steps
+### 开发步骤
 
-1. **Fork the project**: Fork the project on GitHub to your repository
+1. **Fork 项目**：在 GitHub 上 Fork 项目到你的仓库
 
-2. **Clone the project**: Clone the forked project to your local repository
+2. **克隆项目**：将 Fork 后的项目克隆到本地仓库
 
 ```bash
-git clone https://github.com/your-username/ElenixOS.git
+git clone https://github.com/你的用户名/ElenixOS.git
 ```
 
-3. **Switch branch**: Switch to the dev branch
+3. **切换分支**：切换到 dev 分支
 
 ```bash
 git checkout dev
 ```
 
-4. **Write code**: Implement features or fix bugs
+4. **编写代码**：实现功能或修复 bug
 
-5. **Test code**: Ensure the code can compile and run normally
+5. **测试代码**：确保代码能够正常编译和运行
 
-6. **Commit code**: Commit code to local repository
+6. **提交代码**：提交代码到本地仓库
 
 ```bash
 git add .
 git commit -m "feat: New feature"
 ```
 
-7. **Push branch**: Push the branch to the remote repository
+7. **推送分支**：将分支推送到远程仓库
 
 ```bash
 git push origin dev
 ```
 
-8. **Create Pull Request**: Create a Pull Request on GitHub, describing the functionality or fix
+8. **创建 Pull Request**：在 GitHub 上创建 Pull Request，描述功能或修复的内容
 
-## Contribution Process
+## 贡献流程
 
-### Contribution Methods
+### 贡献方式
 
-1. **Report issues**: Report bugs or feature requests in GitHub Issues
-2. **Submit code**: Submit code through Pull Request
-3. **Improve documentation**: Improve project documentation
-4. **Test**: Test code and provide feedback
+1. **报告问题**：在 GitHub Issues 中报告 bug 或提出功能请求
+2. **提交代码**：通过 Pull Request 提交代码
+3. **改进文档**：改进项目文档
+4. **测试**：测试代码并提供反馈
 
-### Code Review
+### 代码审查
 
-All submitted code needs to go through code review to ensure code quality and consistency. The focus of code review includes:
+所有提交的代码都需要经过代码审查，确保代码质量和一致性。代码审查的重点包括：
 
-- Whether the code style conforms to the specifications
-- Whether the functionality is correctly implemented
-- Whether the code is secure
-- Whether the performance is reasonable
-- Whether the documentation is complete
+* 代码风格是否符合规范
+* 功能是否正确实现
+* 代码是否安全
+* 性能是否合理
+* 文档是否完整
 
-### Commit Specifications
+### 提交规范
 
-Commit messages should follow the following format:
+提交消息应遵循以下格式：
 
 ```
 type(module): subject
@@ -253,19 +248,19 @@ type(module): subject
 body (optional)
 ```
 
-Where type can be one of the following:
+其中，type 可以是以下之一：
 
-- **feat**: New feature
-- **fix**: Bug fix
-- **docs**: Documentation improvement
-- **style**: Code style adjustment
-- **refactor**: Code refactoring
-- **test**: Test code
-- **chore**: Build or dependency update
+* **feat**：新功能
+* **fix**：bug 修复
+* **docs**：文档改进
+* **style**：代码风格调整
+* **refactor**：代码重构
+* **test**：测试代码
+* **chore**：构建或依赖更新
 
-Module is optional and used to specify the module or component of the commit.
+module 是可选的，用于指定提交的模块或组件。
 
-Examples:
+示例：
 
 ```
 feat: Add app install feature
@@ -276,54 +271,56 @@ Implemented app install feature.
 ```
 refactor(sni): Refactor sni module
 ```
-For internationalization, commit messages should be described in English.
 
-## Testing
+为了国际化，提交消息应使用英文描述。
 
-All new features or bug fixes should include corresponding tests. The project employs multiple testing methods:
+## 测试
 
-- **Unit tests**: Written using the project's built-in test framework
-- **Integration tests**: Verify correct interaction between modules
-- **Performance tests**: Ensure no performance regression on critical paths
+所有新功能或 Bug 修复应包含相应的测试。项目采用多种测试方式：
 
-Please ensure relevant tests pass before submitting code.
+* **单元测试**：使用项目内置的测试框架编写
+* **集成测试**：验证模块间交互的正确性
+* **性能测试**：确保关键路径的性能不会退化
 
-## Documentation Writing
+在提交前，请确保相关测试能够通过。
 
-### Documentation Structure
+## 文档编写
 
-The documentation repository uses Docusaurus multilingual architecture:
+### 文档结构
 
-- `docs/` — Chinese version (Simplified Chinese, primary version)
-- `i18n/en/docusaurus-plugin-content-docs/current/` — English version (translation)
+文档仓库采用 Docusaurus 多语言架构：
 
-Documentation is written in MDX (Markdown + JSX, Docusaurus framework) format, located in the [ElenixOS-Docs](https://github.com/ElenixOS/ElenixOS-Docs) repository.
+* `docs/` — 中文版（简体中文，主版本）
+* `i18n/en/docusaurus-plugin-content-docs/current/` — 英文版（翻译版本）
 
-Each document should have only one "main language version" (Chinese), and content in other languages should be translated versions of the document to avoid content inconsistencies caused by independent modifications between multiple languages.
+文档采用 MDX（Markdown + JSX，Docusaurus 框架）格式编写，位于 [ElenixOS-Docs](https://github.com/ElenixOS/ElenixOS-Docs) 仓库。
 
-Documentation in different languages should try to maintain a consistent directory structure. We recommend creating matching files for the corresponding language, but this is not mandatory. If translations are temporarily missing, they can be added later (we will continue to improve), and contributors do not need to provide multilingual versions at the time of submission.
+每个文档只应有一个"主语言版本"（中文），其他语言的内容作为该文档的翻译版本，以避免多语言之间独立修改而导致内容不一致。
 
-### Documentation Standards
+不同语言的文档应尽量保持一致的目录结构。我们建议为对应语言创建匹配的文件，但这并不是强制要求。如果暂时缺少翻译，可以在后续补充（我们后续会继续完善），贡献者无需在提交时同时提供多语言版本。
 
-ElenixOS documentation uses **MDX** (Markdown + JSX, Docusaurus framework) format and should follow these standards:
+### 文档规范
 
-- **Format**: Use MDX format (`.mdx` files), supporting standard Markdown syntax and JSX components
-- **Heading levels**: Use clear heading hierarchy — `#` for page title, `##` for main sections, `###` for subsections; avoid skipping levels
-- **Code blocks**: Use ``` markers and specify the language (e.g., `c`, `javascript`, `bash`) for syntax highlighting
-- **Line length**: Recommended to keep lines under 120 characters (not mandatory, but helpful for review)
-- **Charts**: Use mermaid syntax for flowcharts, sequence diagrams, etc.
-- **Links**: Use relative paths for internal links; be aware of the multilingual directory structure
-- **Code-documentation consistency**: Keep documentation synchronized with code implementation to avoid outdated descriptions
-- **React components**: Leverage Docusaurus MDX capabilities to use custom components
+ElenixOS 文档采用 **MDX**（Markdown + JSX，Docusaurus 框架）格式编写，应遵循以下规范：
 
-## Community Communication
+* **格式**：使用 MDX 格式（`.mdx` 文件），支持标准 Markdown 语法和 JSX 组件
+* **标题层级**：使用清晰的标题层级，一级标题 `#` 作为页面标题，二级 `##` 作为主要章节，三级 `###` 作为子章节，避免跳级
+* **代码块**：使用 \`\`\` 标记，并指定语言（如 `c`、`javascript`、`bash`），以便语法高亮
+* **行长度**：文档正文建议每行不超过 120 个字符（非强制，但便于 Review）
+* **图表**：使用 mermaid 语法绘制流程图、时序图等
+* **链接**：内部链接使用相对路径，引用文档时注意多语言目录结构
+* **中英文混排**：中文与英文/数字之间建议保留一个空格，提升可读性
+* **代码与文档一致性**：文档应与代码实现保持同步，避免过时描述
+* **React 组件**：可利用 Docusaurus 的 MDX 能力引入自定义组件
 
-- **GitHub Issues**: For reporting issues and feature requests
+## 社区交流
 
-## Next Steps
+* **GitHub Issues**：用于报告问题和提出功能请求
 
-- Check [Core Modules](./architecture/framework/app) documentation to understand the core features of the system
-- Check [API Documentation](./architecture/script_engine/elenix_os) to understand how to use system APIs
-- Check [Development Tools](/docs/development/dev_tools) documentation to understand the use of development tools
+## 后续步骤
 
-Welcome to join the ElenixOS development community and contribute your strength to the project!
+* 查看 [核心模块](./architecture/framework/app) 文档，了解系统的核心功能
+* 查看 [API 文档](./architecture/script_engine/elenix_os)，了解如何使用系统 API
+* 查看 [开发工具](/docs/development/dev_tools) 文档，了解开发工具的使用
+
+欢迎加入 ElenixOS 开发社区，为项目贡献你的力量！
