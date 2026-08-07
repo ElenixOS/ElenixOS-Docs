@@ -16,7 +16,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync, rmSync, renameSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync, rmSync } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -88,25 +88,24 @@ function git(args, opts = {}) {
  * Returns array of { status: 'A'|'M'|'D'|'R', path: string }.
  */
 function getChangedFiles(baseRef) {
-  // -z outputs NUL-delimited fields: status<NUL>path<NUL> (or R<score><NUL>old<NUL>new<NUL>)
+  // Use -z (NUL-delimited) for safe parsing of filenames with spaces
   const out = git(`diff --name-status -z --diff-filter=ADMR ${baseRef} HEAD -- docs/ blog/`);
   if (!out) return [];
-  // filter(Boolean) removes the trailing empty string from the final NUL
   const entries = out.split('\0').filter(Boolean);
   const files = [];
   for (let i = 0; i < entries.length; i++) {
-    const statusField = entries[i];
-    const status = statusField[0]; // 'A', 'M', 'D', or 'R'
+    const entry = entries[i];
+    // Format: "M\0path" or "R100\0old\0new"
+    const status = entry[0];
+    const rest = entry.slice(1).trim();
     if (status === 'R') {
-      // Rename: entries[i]='R100', entries[i+1]=oldPath, entries[i+2]=newPath
-      const oldPath = entries[++i];
-      const newPath = entries[++i];
-      files.push({ status: 'D', path: oldPath });
-      files.push({ status: 'A', path: newPath });
+      // Next entry is the new path
+      files.push({ status: 'D', path: rest });
+      if (i + 1 < entries.length) {
+        files.push({ status: 'A', path: entries[++i] });
+      }
     } else {
-      // Normal add/modify/delete: entries[i]='A', entries[i+1]=path
-      const filePath = entries[++i];
-      files.push({ status, path: filePath });
+      files.push({ status, path: rest });
     }
   }
   return files;
@@ -135,48 +134,83 @@ function protectContent(content) {
   const placeholders = [];
   let counter = 0;
 
-  const ph = (value) => {
+  const ph = () => {
     const id = `__PH${counter++}__`;
-    placeholders.push({ id, value });
+    placeholders.push({ id, value: '' }); // placeholder, will be filled
     return id;
   };
 
-  // Stage 1: Protect fenced code blocks — wrap in double newlines
-  // so the AI keeps them separated from surrounding markdown
-  let text = content.replace(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g,
-    (match) => `\n\n${ph(match)}\n\n`);
+  // We work in stages to avoid nested matches.
 
-  // Stage 2: Protect inline code — exact replacement, keep surrounding spaces
-  text = text.replace(/`([^`]+)`/g, (match) => ` ${ph(match)} `);
+  // Stage 1: Protect fenced code blocks
+  let text = content.replace(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g, (match) => {
+    const id = ph();
+    const idx = placeholders.findIndex(p => p.id === id);
+    placeholders[idx].value = match;
+    return `\n${id}\n`;
+  });
+
+  // Stage 2: Protect inline code
+  text = text.replace(/`([^`]+)`/g, (match) => {
+    const id = ph();
+    const idx = placeholders.findIndex(p => p.id === id);
+    placeholders[idx].value = match;
+    return id;
+  });
 
   // Stage 3: Protect self-closing JSX/HTML tags
-  text = text.replace(/<(\w+)(?:\s[^>]*)?\s*\/>/g, (match) => ph(match));
+  text = text.replace(/<(\w+)(?:\s[^>]*)?\s*\/>/g, (match) => {
+    const id = ph();
+    const idx = placeholders.findIndex(p => p.id === id);
+    placeholders[idx].value = match;
+    return id;
+  });
 
   // Stage 4: Protect import/export lines
-  text = text.replace(/^(import\s|export\s).+$/gm, (match) => `\n${ph(match)}\n`);
+  text = text.replace(/^(import\s|export\s).+$/gm, (match) => {
+    const id = ph();
+    const idx = placeholders.findIndex(p => p.id === id);
+    placeholders[idx].value = match;
+    return id;
+  });
 
-  // Stage 5: Protect admonition markers — double newlines for clear separation
-  text = text.replace(/^:{3,4}\s*\w*.*$/gm, (match) => `\n\n${ph(match)}\n\n`);
+  // Stage 5: Protect admonition markers (:::note, :::warning, :::tip, etc.)
+  // Opening/closing ::: or :::: lines
+  text = text.replace(/^:{3,4}\s*\w*.*$/gm, (match) => {
+    const id = ph();
+    const idx = placeholders.findIndex(p => p.id === id);
+    placeholders[idx].value = match;
+    return id;
+  });
 
-  // Stage 6: Protect markdown link URLs — keep link text translatable
-  text = text.replace(/(\]\([^)]+\))/g, (match) => ph(match));
+  // Stage 6: Protect markdown link/image URLs (but not link text)
+  text = text.replace(/(\]\([^)]+\))/g, (match) => {
+    const id = ph();
+    const idx = placeholders.findIndex(p => p.id === id);
+    placeholders[idx].value = match;
+    return id;
+  });
 
   // Stage 7: Protect markdown image syntax
-  text = text.replace(/(!\[[^\]]*\])/g, (match) => ph(match));
+  text = text.replace(/(!\[[^\]]*\])/g, (match) => {
+    const id = ph();
+    const idx = placeholders.findIndex(p => p.id === id);
+    placeholders[idx].value = match;
+    return id;
+  });
 
   return { text, placeholders };
 }
 
 /**
- * Restore protected content — exact literal replacement, no whitespace eating.
+ * Restore protected content from placeholders.
  */
 function restoreContent(text, placeholders) {
   let result = text;
   for (const { id, value } of placeholders) {
-    result = result.replaceAll(id, value);
+    // Placeholder may have whitespace around it from the protection stage
+    result = result.replace(new RegExp(`\\s*${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`, 'g'), () => value);
   }
-  // Clean up excessive blank lines (3+ → 2) that may have been introduced
-  result = result.replace(/\n{3,}/g, '\n\n');
   return result;
 }
 
@@ -219,9 +253,10 @@ function translateFrontmatter(frontmatter) {
 // ─── DeepSeek API client ─────────────────────────────────────────────────────
 
 /**
- * Raw DeepSeek API call — returns the parsed JSON object from the response.
+ * Call DeepSeek chat completions API.
+ * Returns the model's response text.
  */
-async function callDeepSeekAPI(systemPrompt, userContent, retries = 3) {
+async function callDeepSeek(systemPrompt, userContent, retries = 3) {
   const body = {
     model: DEEPSEEK_MODEL,
     messages: [
@@ -264,33 +299,30 @@ async function callDeepSeekAPI(systemPrompt, userContent, retries = 3) {
       }
 
       if (data.choices?.[0]?.finish_reason === 'length') {
+        // Truncated — retry
         console.warn('  Response truncated (length), retrying...');
         body.max_tokens = Math.min(body.max_tokens * 2, 16384);
         continue;
       }
 
       // Parse JSON from response (strip possible markdown fences)
+      let parsed;
       const cleaned = content.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
-      return JSON.parse(cleaned);
-    } catch (err) {
-      if (err instanceof SyntaxError) {
-        // JSON parse error — not retryable, return raw as string
-        return { _raw: err.message };
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        // If it's not valid JSON, return the raw text
+        return content;
       }
+
+      return parsed.translation || parsed.content || content;
+    } catch (err) {
       if (attempt === retries) throw err;
       const delay = Math.min(1000 * Math.pow(2, attempt) + Math.random() * 1000, 30000);
       console.warn(`  API call failed: ${err.message.slice(0, 100)}. Retrying in ${Math.round(delay / 1000)}s...`);
       await sleep(delay);
     }
   }
-}
-
-/**
- * Convenience wrapper — extracts the 'translation' field for the main translation flow.
- */
-async function callDeepSeek(systemPrompt, userContent, retries = 3) {
-  const data = await callDeepSeekAPI(systemPrompt, userContent, retries);
-  return data?.translation || data?.content || JSON.stringify(data);
 }
 
 function sleep(ms) {
@@ -300,25 +332,21 @@ function sleep(ms) {
 // ─── Translation logic ───────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are a professional technical translator specializing in embedded systems documentation.
-Translate ALL Simplified Chinese (zh-Hans) text to fluent, natural English.
+Translate Simplified Chinese (zh-Hans) to fluent, natural English.
 
 CRITICAL RULES — follow exactly:
-1. Translate EVERY piece of Chinese text you see — headings, paragraphs, list items, table cells,
-   link text, bold/italic text, blockquotes, captions. Leave NO Chinese characters in the output.
-2. NEVER alter PLACEHOLDER tokens (they look like __PH0__, __PH1__). Keep them exactly as-is.
-3. NEVER modify anything inside placeholder tokens — they are replaced after translation.
-4. Keep technical terms consistent: LVGL, JerryScript, SNI, control block, lifecycle, TLSF, etc.
-5. Preserve ALL markdown formatting: headings (#), bold (**), italic (*), lists (-/*), tables (|),
-   blockquotes (>), horizontal rules (---).
-6. Preserve ALL HTML entities like &lt; &gt; &amp; &quot; — do NOT decode them.
-7. Keep numbers, dates, file paths, URLs, and identifiers exactly as-is.
-8. Preserve the paragraph structure — keep blank lines between sections.
-9. Output ONLY a JSON object: {"translation": "your translated text here"}`;
+1. Translate ONLY natural-language text. NEVER alter PLACEHOLDER tokens (they look like __PH0__, __PH1__, etc.).
+2. NEVER alter, translate, or modify anything inside placeholder tokens — they are replaced after translation.
+3. Keep technical terms consistent: LVGL, JerryScript, SNI, control block, lifecycle, object semantics, TLSF, etc.
+4. Preserve ALL markdown formatting: headings (#), bold (**), italic (*), lists (-/*), tables (|), blockquotes (>).
+5. Preserve ALL HTML entities like &lt; &gt; &amp; &quot; — do NOT decode them.
+6. Keep numbers, dates, file paths, URLs, and identifiers exactly as-is.
+7. Use natural, idiomatic English appropriate for technical documentation.
+8. Output ONLY a JSON object: {"translation": "your translated text here"}`;
 
-const COMMENT_PROMPT = `Translate these code comments from Simplified Chinese to English.
-Keep them concise — code comments should be short and clear.
-Preserve any code symbols, variable names, or technical terms as-is.
-Return ONLY a JSON object: {"translations": ["comment 1", "comment 2", ...]}`;
+const RETRY_PROMPT = `The following text STILL contains Chinese characters that were not translated.
+Translate ALL remaining Chinese text to English. Leave everything else unchanged.
+Output ONLY a JSON object: {"translation": "fully translated text"}`;
 
 const DIFF_UPDATE_PROMPT = `You are a professional technical translator. Below is:
 1. The EXISTING English translation of a documentation file
@@ -337,82 +365,6 @@ Output ONLY a JSON object: {"translation": "the complete updated English file"}
 === CHINESE DIFF ===
 {diff}`;
 
-// ─── Code comment extraction & translation ────────────────────────────────────
-
-/**
- * Extract Chinese comments from code blocks, replacing comment text with markers.
- * Returns the modified content and a map for later restoration.
- */
-function extractComments(content) {
-  const commentMap = []; // { marker, original, prefix, indent }
-  let counter = 0;
-
-  const modified = content.replace(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g, (block) => {
-    const lines = block.split('\n');
-    let hasComments = false;
-    const newLines = lines.map((line, i) => {
-      if (i === 0 || i === lines.length - 1) return line; // fence lines
-
-      const trimmed = line.trimStart();
-      const indent = line.slice(0, line.length - trimmed.length);
-
-      // Single-line comment: // or #
-      const cmt = trimmed.match(/^(\/\/|#)\s*(.+)$/);
-      if (cmt && /[一-鿿]/.test(cmt[2])) {
-        const marker = `__CMT${counter}__`;
-        commentMap.push({ marker, original: cmt[2], prefix: cmt[1], indent });
-        counter++;
-        hasComments = true;
-        return `${indent}${cmt[1]} ${marker}`;
-      }
-
-      return line;
-    });
-    return hasComments ? newLines.join('\n') : block;
-  });
-
-  return { modified, commentMap };
-}
-
-/**
- * Batch-translate code comments via DeepSeek API.
- */
-async function translateCommentBatch(commentMap) {
-  if (commentMap.length === 0) return [];
-
-  const lines = commentMap.map((c, i) => `[${i}] ${c.original}`).join('\n');
-
-  if (DRY_RUN) {
-    console.log(`    → would translate ${commentMap.length} code comment(s)`);
-    return commentMap.map(c => c.original); // return originals
-  }
-
-  try {
-    const result = await callDeepSeekAPI(COMMENT_PROMPT, lines);
-    const translations = result.translations || [];
-    console.log(`    → translated ${translations.length}/${commentMap.length} code comment(s)`);
-    return translations;
-  } catch (err) {
-    console.warn(`    → comment translation failed: ${err.message}, keeping originals`);
-    return commentMap.map(c => c.original);
-  }
-}
-
-/**
- * Replace comment markers with translated text in the final output.
- */
-function restoreComments(content, commentMap, translations) {
-  let result = content;
-  for (let i = 0; i < commentMap.length; i++) {
-    const { marker, prefix, indent } = commentMap[i];
-    const translated = translations[i] || commentMap[i].original;
-    // Restore the full comment line: indent + prefix + translated text
-    const fullComment = `${indent}${prefix} ${translated}`;
-    result = result.replaceAll(marker, translated);
-  }
-  return result;
-}
-
 /**
  * Full translation of a new file.
  */
@@ -424,7 +376,7 @@ async function translateFull(sourcePath) {
     return { action: 'skip', reason: 'no Chinese characters detected' };
   }
 
-  // Step 1: Extract code comments for later translation
+  // Step 1: Extract code comments for separate translation
   const { modified: sourceWithMarkers, commentMap } = extractComments(source);
 
   // Step 2: Protect code blocks, inline code, JSX, etc.
@@ -440,12 +392,17 @@ async function translateFull(sourcePath) {
   }
 
   // Step 3: Translate the main document body
-  const translated = await callDeepSeek(SYSTEM_PROMPT, userContent);
-
-  // Step 4: Restore code blocks, inline code, etc.
+  let translated = await callDeepSeek(SYSTEM_PROMPT, userContent);
   let restored = restoreContent(translated, placeholders);
 
-  // Step 5: Translate code comments and restore them
+  // Step 4: Self-correction — if Chinese characters remain, retry once
+  if (/[一-鿿]/.test(restored.replace(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g, ''))) {
+    console.log('  → Chinese characters remaining, retrying with correction prompt...');
+    const retryTranslated = await callDeepSeek(RETRY_PROMPT, restored);
+    restored = restoreContent(retryTranslated, placeholders);
+  }
+
+  // Step 5: Translate code comments
   if (commentMap.length > 0) {
     const commentTranslations = await translateCommentBatch(commentMap);
     restored = restoreComments(restored, commentMap, commentTranslations);
@@ -562,8 +519,7 @@ function writeTranslation(targetPath, content) {
   // Atomic write: write to tmp then rename
   const tmpPath = targetPath + '.tmp';
   writeFileSync(tmpPath, content, 'utf-8');
-  renameSync(tmpPath, targetPath);
-  console.log(`    → wrote ${targetPath} (${Buffer.byteLength(content, 'utf-8')} bytes)`);
+  execSync(`mv "${tmpPath}" "${targetPath}"`);
 }
 
 async function main() {
