@@ -8,243 +8,246 @@ title: Changelog
 
 ### Fixed
 
-- **SNI Lifecycle Export Boundary**: Exempted `SPECIAL_METHOD_WRAPPERS` from lifecycle export boundary checks to prevent special method wrappers from being incorrectly rejected.
-- **SNI GC Safety**: Clear native pointers before JS reference release during GC sweep phase to prevent use-after-free.
-- **SNI Null Pointer Protection**: Ensure event descriptors are zeroed out after deallocation to prevent potential wild pointer dereference.
-- **Script Engine Diagnostics**: Always enable error messages and backtrace, added diagnostic output for improved troubleshooting.
+* **SNI 生命周期导出边界**：豁免 `SPECIAL_METHOD_WRAPPERS` 的生命周期导出边界检查，避免特殊方法包装器被错误拦截。
+* **SNI GC 安全**：在 JS 引用释放前清除原生指针，防止 GC 扫描阶段出现 use-after-free。
+* **SNI 空指针防护**：确保事件描述符在释放后被清零，防止潜在的野指针解引用。
+* **脚本引擎诊断增强**：始终启用错误消息和回溯信息，新增诊断输出，提升问题排查效率。
 
 ## [v0.5.0-alpha]
 
 ### Added
 
-- **Audio Subsystem**: Added complete audio subsystem with speaker/microphone support, audio effects, and decoder pipeline for playback and recording.
-- **LVGL Image Cache Module**: Introduced generic LVGL image cache module with PSRAM support for optimized image loading performance.
-- **Bubble Grid Enhancement**: Added `eos_bubble_set_icon_color` API and support for color-only bubbles without image source.
-- **Kconfig Configuration System**: Introduced Kconfig-based system configuration framework, replacing choice booleans with companion integer configs for more flexible configuration management.
-- **TTF Font Mode**: Switched to TTF font mode with subsetted Chinese font support.
-- **Sensor Service Enhancement**: Added operating modes, per-mode sampling policy, and typed subscriber callback system.
-- **Lock Screen System**: Added lock screen functionality, settings app, SHA256 encryption library, and scroll-focus fixes.
-- **Permission System**: Added permission system and 4-layer UI overlay architecture for enhanced app isolation and security.
-- **Script Engine Recovery**: Added support for engine restart after fatal JerryScript errors, improving fault tolerance.
-- **Watchface List Auto-Positioning**: Auto-scroll to the current watchface in list view.
-- **SDK Versioning**: Introduced `minApiLevel`/`targetApiLevel` SDK versioning system for app compatibility management.
-- **Code Quality Framework**: Added unified code quality check framework with formatting rules and CI validation workflow.
-- **Build System Enhancement**: Enabled `JERRY_ERROR_MESSAGES` for detailed JS error information.
-- **Snapshot Performance Benchmark**: Added snapshot performance and animation benchmark test suite.
+* **音频子系统**：支持扬声器/麦克风、音频效果和解码器流水线，实现完整的音频播放与录音能力。
+* **LVGL 图像缓存模块**：新增通用图像缓存模块，支持 PSRAM，优化图像加载性能。
+* **气泡网格增强**：新增 `eos_bubble_set_icon_color` API，支持纯色气泡（无需图像源）。
+* **Kconfig 配置系统**：引入基于 Kconfig 的系统配置框架，替换选择布尔值为配套整数配置，提供更灵活的配置管理。
+* **TTF 字体模式**：切换为 TTF 字体模式，提供子集化中文字体支持。
+* **传感器服务增强**：新增操作系统模式、按模式采样策略和类型化订阅回调系统。
+* **锁屏系统**：新增锁屏功能、设置应用、SHA256 加密库及滚动焦点修复。
+* **权限系统**：新增权限系统及 4 层 UI Overlay 架构，增强应用隔离和安全性。
+* **脚本引擎恢复**：支持 JerryScript 致命错误后引擎重启，提升容错能力。
+* **表盘列表自动定位**：表盘列表自动滚动到当前表盘位置。
+* **SDK 版本管理**：引入 `minApiLevel`/`targetApiLevel` SDK 版本控制系统。
+* **代码质量框架**：新增统一代码质量检查框架，引入格式化规则和 CI 检查流程。
+* **构建系统增强**：启用 `JERRY_ERROR_MESSAGES` 以获取详细 JS 错误信息。
+* **快照性能测试**：新增快照性能和动画基准测试套件。
 
 ### Changed
 
-- **LVGL Version Upgrade**: Replaced all LVGL v8 API usages with v9 equivalents, completing the full LVGL upgrade.
-- **Error Code Unification**: Unified error codes across kernel, script engine, and file system port layers.
-- **Cache Module Rename**: Renamed `eos_cache` to `eos_service_cache`, cleaned up configuration and naming conventions.
-- **Audio System Refactoring**: Removed VAR audio effects, fixed TTF font system, consolidated audio path prefixes, and replaced audio-specific test framework with generic test framework.
-- **Test Framework Unification**: Replaced audio-specific test framework with generic test framework, unifying test infrastructure.
-- **Code Comment Translation**: Translated Chinese comments to English for improved international maintainability.
-- **Code Formatting Standardization**: Adopted unified code formatting rules, formatted all sources per `.clang-format`, and migrated to `eos_malloc`/`eos_free` unified memory interface.
-- **CI Workflow Simplified**: Simplified code quality workflow to a single Linux job.
-- **Memory Optimization**: Replaced unnecessary heap-allocated paths with stack buffers to reduce memory fragmentation.
-- **App Icon Sizes Updated**.
+* **LVGL 版本升级**：所有 LVGL v8 API 替换为 v9 等价 API，全面升级 LVGL 版本。
+* **错误码统一**：统一内核、脚本引擎和文件系统端口的错误码体系。
+* **缓存模块重命名**：`eos_cache` → `eos_service_cache`，清理配置和命名规范。
+* **音频系统重构**：移除 VAR 音频效果，修复 TTF 字体系统，统一音频路径前缀，替换音频专用测试框架为通用测试框架。
+* **测试框架统一**：替换音频专用测试框架为通用测试框架，统一测试基础设施。
+* **代码注释英文化**：将中文注释翻译为英文，提升国际化可维护性。
+* **代码格式化规范化**：采用统一代码格式化规则，所有源文件按 `.clang-format` 格式化，迁移到 `eos_malloc`/`eos_free` 统一内存接口。
+* **CI 流程简化**：代码质量工作流简化为单 Linux 任务。
+* **内存优化**：用栈缓冲区替代不必要的堆分配路径，减少内存碎片。
+* **应用图标尺寸更新**。
 
 ### Fixed
 
-- Fixed boot logo not displaying due to file system driver not being registered.
-- **App List Transition Optimization**: Used RGB565 snapshot format with image-based snapshot scaling instead of widget transform scaling, reducing animation duration to 350ms for significantly improved transition performance.
-- Fixed app header title animation not syncing with activity transition.
-- Allocated large draw/canvas buffers via dedicated cache allocator.
-- Swapped include order so platform override configurations take priority.
-- MinGW platform compatibility fixes: `__GNUC__` branch matching and `EOS_WEAK` weak symbol linking failures.
-- Fixed overlay z-order, touch visibility, and side-button close logic.
-- Side button and digital crown no longer incorrectly dismiss permission dialogs.
-- Lock screen dismissal now respects activity header visibility.
-- Reordered SNI unregister sequence to prevent use-after-free during GC.
-- Moved title change animation out of snapshot window to prevent animation conflicts.
-- Permission callbacks now run in the correct program context via `spm_call`.
-- Fixed V-001 security vulnerability (memcpy bounds check error).
-- Enforced lifecycle-based SNI export boundary rules, fixed integer width mismatches, and added sub-resource cascade destroy support.
+* 修复 boot logo 因文件系统驱动未注册而导致不显示的问题。
+* **应用列表转场优化**：使用 RGB565 快照格式，以图像快照缩放替代 widget 变换缩放，动画时长缩短至 350ms，大幅提升转场性能。
+* 修复应用标题动画与 activity 转场同步问题。
+* 使用专用缓存分配器分配大绘制/画布缓冲区。
+* 交换 include 顺序，使平台覆盖配置优先。
+* MinGW 平台兼容性修复：`__GNUC__` 分支匹配及 `EOS_WEAK` 弱符号链接失败问题。
+* 修复 Overlay 层级、触摸可见性和侧按钮关闭逻辑。
+* 侧按钮和数字表冠不再误关闭权限对话框。
+* 锁屏解除时尊重 activity header 可见性。
+* SNI 注销顺序调整，防止 GC 后 use-after-free。
+* 标题变化动画移出快照窗口，防止动画错乱。
+* 权限回调在正确程序上下文中运行（通过 `spm_call`）。
+* V-001 安全漏洞修复（memcpy 边界检查错误）。
+* SNI 强制生命周期导出边界，修复整数宽度不匹配，支持子资源级联销毁。
 
 ## [v0.4.0-alpha]
 
 ### Breaking Changes
 
-- **Script Engine Layered Architecture Refactoring**: Introduced Script Program Manager (SPM) as an intermediate layer between the core engine and upper frameworks, separating program lifecycle from JS execution.
-- **Activity Root Mode**: Adopted Root Activity pattern to replace the original watchface-activity singleton, using lifecycle struct instead of pointer for management.
-- **Service Module Refactoring**: Removed `eos_misc` module, replaced with `eos_service_*` series services.
-- **Project Layered Architecture Restructuring**: Refactored project layout into kernel, services, framework, ui, apps layered structure.
+* **脚本引擎分层架构重构**：引入脚本程序管理器 (SPM) 作为核心引擎与上层框架之间的中间层，分离程序生命周期与 JS 执行。
+* **Activity Root 模式**：采用 Root Activity 模式替代原有的 watchface-activity 单例，生命周期结构体替代指针方式管理。
+* **服务模块重构**：移除 `eos_misc` 模块，使用 `eos_service_*` 系列服务替代原有功能。
+* **项目分层架构重组**：重构项目布局为 kernel、services、framework、ui、apps 分层结构。
 
 ### Changed
 
-- **Script Engine**:
-  - Refactored lifecycle management, supporting context save/restore (SUSPEND → IDLE, added SUSPENDED state)
-  - Added per-program realm isolation helper
-  - Improved error backtrace extraction from exception objects
-  - Unified SNI handle types, using single managed resource scope instead of LC_EXTERNAL/LC_REALM separation
+* **脚本引擎**：
+  * 重构生命周期管理，支持上下文保存/恢复（SUSPEND → IDLE，新增 SUSPENDED 状态）
+  * 添加 per-program realm 隔离助手
+  * 从异常对象改进错误回溯提取
+  * 统一 SNI handle 类型，用单一托管资源范围替代 LC_EXTERNAL/LC_REALM 分离
 
-- **Overlay Architecture**:
-  - Implemented unified overlay manager, separating Z-order management and Crown scrollable targets via `get_foreground_obj()` interface
-  - Fixed Z-order bug: Control Center blocking message list after closing
-  - Removed hard-coded crown dependency, using interface queries
+* **Overlay 架构**：
+  * 实现统一的 overlay 管理器，通过 `get_foreground_obj()` 接口分离 Z-order 管理和 Crown scrollable targets
+  * 修复 Z-order bug：关闭后控制中心阻塞消息列表
+  * 移除硬编码的 crown 依赖，使用接口查询
 
-- **Radio Component**: Replaced `eos_radio_list` with `eos_radio_page`, improving radio selection functionality
+* **Radio 组件**：用 `eos_radio_page` 替代 `eos_radio_list`，改进单选功能
 
-- **Code Standards**:
-  - Renamed global variables with underscore prefix for better encapsulation
-  - Updated script engine core comments for improved clarity and consistency
+* **代码规范**：
+  * 重命名全局变量为下划线前缀，提高封装性
+  * 更新脚本引擎核心注释，提高清晰度和一致性
 
 ### Added
 
-- Added `eos_chrome_manager`: Centralized overlay manager
-- Added generic script error handling and `eos_fault_panel` fault panel
-- Added `eos_accordion` accordion component for error backtrace display
-- Added script execution timeout and state-aware function calls
-- Added error location and backtrace handling
-- Added container delete callback (`eos_container_delete_cb_t`) for automatic memory management
-- Added `eos_input_page` input page functionality
-- Added `attach()` and `center_style()` functions for `clock_hand` component
-- Added listener-based logging system (`eos_log`) with standard output support
-- Added enhanced boot message logging showing build time and mode details
-- Added internationalization default language configuration
-- Added FIFO ring buffer implementation
-- Added critical section management (`eos_critical`)
-- Added sensor service (`eos_service_sensor`) with state management
-- Added time service and device (`eos_service_time`)
-- Added double-linked list implementation (`eos_dlist`)
-- Added event registration functionality and user event scope definition
-- Added test application support (`eos_test`) with audio playback capability
+* 新增 `eos_chrome_manager`：集中式 overlay 管理器
+* 新增通用脚本错误处理和 `eos_fault_panel` 故障面板
+* 新增 `eos_accordion` 手风琴组件，用于错误回溯显示
+* 新增脚本执行超时和状态感知函数调用
+* 新增错误位置和回溯处理
+* 新增容器删除回调 (`eos_container_delete_cb_t`)，支持自动内存管理
+* 新增 `eos_input_page` 输入页面功能
+* 新增 `clock_hand` 组件的 `attach()` 和 `center_style()` 函数
+* 新增基于监听器的日志系统 (`eos_log`) 及标准输出支持
+* 新增启动信息日志增强，显示构建时间和模式详情
+* 新增国际化默认语言配置
+* 新增 FIFO 环缓冲区实现
+* 新增临界区管理 (`eos_critical`)
+* 新增传感器服务 (`eos_service_sensor`) 及状态管理
+* 新增时间服务和设备 (`eos_service_time`)
+* 新增双链表实现 (`eos_dlist`)
+* 新增事件注册功能和用户事件范围定义
+* 新增测试应用支持 (`eos_test`)，包含音频播放功能
 
 ### Fixed
 
-- Cleaned up Activity snapshot and teardown leaks
-- Fixed animation not stopping when uninstalling apps
-- Fixed LVGL event callback signature issue (WASM function signature mismatch)
-- Resolved typedef warning in `eos_virtual_display`
-- Added `EOS_WEAK` attribute to critical section functions for correct linking
-- Fixed redundant slide_change toggle in `slide_widget_move` conflicting with chrome manager
+* 清理 Activity 快照和 teardown 泄漏
+* 修复卸载应用时动画未停止的问题
+* 修复 LVGL 事件回调签名问题（WASM 函数签名不匹配）
+* 解决 `eos_virtual_display` 中的 typedef 警告
+* 为临界区函数添加 `EOS_WEAK` 属性，确保正确链接
+* 修复 `slide_widget_move` 中冗余的 slide_change toggle 与 chrome manager 的冲突
 
 ## [v0.3.0-alpha.1]
 
 ### Added
-- Added Chinese documentation (README.zh-CN) to improve consistency between Chinese and English documentation.
-- Added application list bubble grid capability (`bubble_grid`) and related component APIs.
-- Added application management and script hot-reload related functions to enhance runtime management capabilities.
-- Added some resource materials (such as application icons and design resources) for interface and sample improvement.
-- Added online simulator entry in documentation to improve experience and verification efficiency.
+
+* 新增中文说明文档（README.zh-CN），补充中英文文档一致性。
+* 新增应用列表气泡网格能力（`bubble_grid`）及相关组件 API。
+* 新增应用管理与脚本热重载相关函数，增强运行时管理能力。
+* 新增部分资源素材（如应用图标与设计资源）用于界面与示例完善。
+* 在文档中新增在线模拟器入口，提升体验与验证效率。
 
 ### Changed
-- Unified project naming from **ElenaOS** to **ElenixOS**, and completed large-scale naming and path migration (including core modules, interfaces, header files and scripts).
-- Refactored build system: Optimized CMake source/header file collection logic, standardized CMakeLists.txt naming and platform root directory handling.
-- Adjusted core initialization process: Renamed `eos_run` to `eos_init`, and updated related prototypes and calling semantics.
-- Streamlined core logic: Removed logo animation processing path, simplified processing flow and state switching logic in lifecycle.
-- Continued organizing README and documentation structure, unified format and added demonstration instructions.
+
+* 项目命名由 **ElenaOS** 统一调整为 **ElenixOS**，并完成大规模命名与路径迁移（含核心模块、接口、头文件与脚本）。
+* 构建系统重构：优化 CMake 源文件/头文件收集逻辑，规范 CMakeLists.txt 命名与平台根目录处理。
+* 核心初始化流程调整：将 `eos_run` 重命名为 `eos_init`，并同步更新相关原型与调用语义。
+* 精简核心逻辑：移除 logo 动画处理路径，简化处理流程与生命周期中的状态切换逻辑。
+* README 与文档结构持续整理，格式统一并补充演示说明。
 
 ### Fixed
-- Fixed target view briefly flashing issue in Activity lifecycle (transient display anomaly when entering/switching).
-- Fixed quick start and documentation link errors in README.
-- Fixed `mkdir` compatibility issue in Windows environment.
-- Fixed `uthash` header file include path error in CMake.
-- Fixed .gitignore missing build directory configuration to prevent build artifacts from entering version control.
+
+* 修复 Activity 生命周期中目标视图短暂闪现问题（进入/切换时的瞬时显示异常）。
+* 修复 README 中快速开始与文档链接错误问题。
+* 修复 Windows 环境下 `mkdir` 兼容性问题。
+* 修复 CMake 中 `uthash` 头文件包含路径错误。
+* 修复 .gitignore 漏配构建目录的问题，避免构建产物误入版本控制。
 
 ## [v0.2.0-alpha.1]
 
 ### Changed
 
-- Refactored script interface architecture, `lv_bindings` was refactored into SNI layer.
-- Refactored page management architecture, `nav`, `screen_mgr`, `scene` were integrated into Activity concept.
-- Optimized CardPager and SlideWidget.
-- Refactored language interface, `current_lang` was privatized to avoid out-of-bounds access.
-- Optimized list transition animations.
-- Optimized panel retraction logic for control center and message list during activity switching.
-- Optimized flashlight display logic.
-- Optimized application list animation parameters.
-- Optimized null pointer checking and display logic in clock update callback.
-- Optimized activity switching and animation handling.
-- Optimized callback removal logic for scrollable objects.
-- Optimized timer automatic deletion feature.
-- Optimized debug bar position management, added global position synchronization and restoration functions.
-- Optimized scroll object lookup logic.
-- Optimized scroll bar show/hide logic.
-- Optimized script path parsing and image source setting.
-- Optimized generic handle parsing capability.
-- Optimized property setting.
-- Optimized animation variable management.
-- Optimized memory cleanup and color type bridge support.
-- Optimized file directory structure.
-- Optimized animation property configuration, custom callbacks and JS animation path integration.
-- Optimized dynamic update of source files and header files.
-- Optimized script engine initialization and exit callbacks.
-- Optimized parameter checking and type conversion for LVGL object creation functions.
+* 重构了脚本接口架构，`lv_bindings`被重构为 SNI 层。
+* 重构了页面管理架构，`nav`、`screen_mgr`、`scene`被整合为 Activity 概念。
+* 优化了 CardPager 和 SlideWidget。
+* 重构了语言接口，`current_lang`私有化，避免越界访问。
+* 优化了列表转场动画。
+* 优化了活动切换时控制中心和消息列表的面板收回逻辑。
+* 优化了闪光灯显示逻辑。
+* 优化了应用列表动画参数。
+* 优化了时钟更新回调中的空指针检查和显示逻辑。
+* 优化了活动切换和动画处理。
+* 优化了可滚动对象的回调移除逻辑。
+* 优化了定时器自动删除功能。
+* 优化了调试条位置管理，增加全局位置同步与恢复功能。
+* 优化了滚动对象查找逻辑。
+* 优化了滚动条显示与隐藏逻辑。
+* 优化了脚本路径解析与图像源设置。
+* 优化了通用句柄解析能力。
+* 优化了属性设置。
+* 优化了动画变量管理。
+* 优化了内存清理与颜色类型桥接支持。
+* 优化了文件目录结构。
+* 优化了动画属性配置、自定义回调及 JS 动画路径集成。
+* 优化了源文件和头文件的动态更新。
+* 优化了脚本引擎初始化和退出回调。
+* 优化了 LVGL 对象创建函数的参数检查和类型转换。
 
 ### Added
 
-- Added Activity lifecycle management functionality, supporting Activity creation, destruction, pause, resume and other operations.
-- Added page management module, pages are managed using stack uniformly, and Activity concept is introduced.
-- Added SNI module, providing clearer script interface definition and supporting object-oriented LVGL operations.
-- Added SNI encapsulation for LVGL components, including:
-  - image component
-  - dropdown component
-  - checkbox component
-  - canvas component
-  - button matrix component
-  - calendar component
-- Added Activity page switching animation support, including start and end callbacks.
-- Added application header logic and title change animation support.
-- Added OPEN sliding panel state and improved state flow.
-- Added built-in backup watchface support.
-- Added module import functionality, supporting JS module import.
-- Added interface to get previous Activity.
-- Added system initialization error handling and watchface activity acquisition functionality.
-- Added theme primary color definition.
-- Added LOGO display in device information view.
-- Added Toast prompt function with character icon color.
-- Added encoder target setting as Activity View, added sliding component open and close events.
-- Added sliding component state management and animation transition functionality.
-- Added chart component and related APIs.
-- Added image button support.
-- Added script application Debug page.
-- Added float type bridge support.
-- Added global constant export functionality.
-- Added new color types and related methods.
-- Added snake_case to camelCase conversion function.
-- Added alias fallback functionality to support type mapping.
-- Added console logging functionality, added support for different log levels.
-- Added ElenixOS API initialization and mounting functionality.
+* 新增了 Activity 生命周期管理功能，支持 Activity 的创建、销毁、暂停、恢复等操作。
+* 新增了页面管理模块，页面统一使用栈管理，且引入了 Activity 概念。
+* 新增了 SNI 模块，提供更清晰的脚本接口定义，支持面向对象的 LVGL 操作。
+* 新增了 LVGL 组件的 SNI 封装，包括：
+  * image 组件
+  * dropdown 组件
+  * checkbox 组件
+  * canvas 组件
+  * button matrix 组件
+  * calendar 组件
+* 新增了 Activity 页面切换动画支持，包括开始和结束回调。
+* 新增了应用头逻辑和标题变化动画支持。
+* 新增了 OPEN 滑动面板状态并完善状态流转。
+* 新增了内置备用表盘支持。
+* 新增了模块导入功能，支持 JS 模块导入。
+* 新增了获取前一个 Activity 的接口。
+* 新增了系统初始化错误处理和获取表盘活动的功能。
+* 新增了主题主色调的定义。
+* 新增了设备信息视图中添加 LOGO 显示。
+* 新增了字符图标颜色的 Toast 提示功能。
+* 新增了编码器目标设置为 Activity View，添加滑动组件打开和关闭事件。
+* 新增了滑动组件的状态管理和动画过渡功能。
+* 新增了图表组件及相关 API。
+* 新增了图像按钮支持。
+* 新增了脚本应用 Debug 页面。
+* 新增了 float 类型桥接支持。
+* 新增了全局常数的导出功能。
+* 新增了新的颜色类型和相关方法。
+* 新增了蛇形命名转驼峰命名的转换函数。
+* 新增了别名回退功能以支持类型映射。
+* 新增了控制台日志功能，添加不同日志级别的支持。
+* 新增了 ElenixOS API 的初始化和挂载功能。
 
 ### Fixed
 
-- Fixed watchface list unable to touch watchface image to slide issue.
-- Fixed memory leak issues.
-- Fixed script engine issues to prevent entering error state during normal operation.
-- Fixed scrollable object callback management, optimized scroll bar show/hide logic, resolved scroll bar flickering issue.
-- Fixed null pointer checking in clock update callback.
-- Prevented showing application title bar in watchface activity.
-- Fixed scroll object loss issue when control center bounces back automatically.
-- Fixed unable to get scrollable object when returning to Activity issue.
-- Fixed root screen null handling logic during activity creation.
-- Fixed constructor parameter type checking to ensure only objects or null are accepted.
-- Fixed scroll object validity checking.
-- Fixed method name possibly empty issue.
+* 修复了表盘列表无法触摸表盘图片滑动的问题。
+* 修复了内存泄漏问题。
+* 修复了脚本引擎的问题，防止正常运行时进入错误状态。
+* 修复了可滚动对象的回调管理，优化了滚动条显示与隐藏逻辑，解决了滚动条闪烁问题。
+* 修复了时钟更新回调中的空指针检查。
+* 防止在表盘活动显示应用标题栏。
+* 修复了控制中心自动回弹时滚动对象丢失的问题。
+* 修复了返回 Activity 时无法获取 scrollable 对象的问题。
+* 修复了活动创建时根屏幕为空的处理逻辑。
+* 修复了构造函数参数类型检查，确保只接受对象或 null。
+* 修复了滚动对象有效性检查。
+* 修复了方法名可能为空的问题。
 
 ## [v0.1.0-alpha.1]
 
 ### Added
 
-- Provides basic functional framework for smartwatch systems.
-- Provides JavaScript script running and lifecycle management capabilities.
-- Provides JavaScript API support, including:
-  - Partial LVGL Widget functionality;
-  - LVGL event system registration and deletion;
-  - LVGL animation creation and running;
-  - LVGL timer related functionality.
-- Provides virtual display for PC-side simulation running and debugging.
-- Provides preliminary hardware abstraction and portable interface design for supporting multi-platform adaptation.
-- Establishes basic structure for engineering and development documentation.
-- Provides developer tool scripts for quickly generating project structure.
-- Provides modular system architecture, supporting core functions to be combined and extended by modules.
-- Provides isolation mechanism between scripts and system core, improving system stability and security.
-- Provides basic debugging and development support capabilities, improving desktop-side development and debugging efficiency.
+* 提供智能手表系统的基础功能框架。
+* 提供 JavaScript 脚本运行与生命周期管理能力。
+* 提供 JavaScript API 支持，包括：
+  * 部分 LVGL Widget 功能；
+  * LVGL 事件系统的注册与删除；
+  * LVGL 动画的创建与运行；
+  * LVGL 定时器相关功能。
+* 提供虚拟显示器，用于 PC 端模拟运行与调试。
+* 提供初步的硬件抽象与可移植接口设计，用于支持多平台适配。
+* 建立工程与开发文档的基础结构。
+* 提供了开发者工具脚本，用于快速生成项目结构。
+* 提供模块化系统架构，支持核心功能按模块组合与扩展。
+* 提供脚本与系统核心之间的隔离机制，提升系统稳定性与安全性。
+* 提供基础调试与开发支持能力，提升桌面端开发与调试效率。
 
-[v0.5.1-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.1-alpha
-[v0.5.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.0-alpha
-[v0.4.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.4.0-alpha
-[v0.3.0-alpha.1]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.3.0-alpha.1
-[v0.2.0-alpha.1]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.2.0-alpha.1
-[v0.1.0-alpha.1]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.1.0-alpha.1
+[v0.5.1-alpha]: https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.1-alpha
+[v0.5.0-alpha]: https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.0-alpha
+[v0.4.0-alpha]: https://github.com/ElenixOS/ElenixOS/releases/tag/v0.4.0-alpha
+[v0.3.0-alpha.1]: https://github.com/ElenixOS/ElenixOS/releases/tag/v0.3.0-alpha.1
+[v0.2.0-alpha.1]: https://github.com/ElenixOS/ElenixOS/releases/tag/v0.2.0-alpha.1
+[v0.1.0-alpha.1]: https://github.com/ElenixOS/ElenixOS/releases/tag/v0.1.0-alpha.1
