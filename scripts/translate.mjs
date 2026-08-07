@@ -16,7 +16,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync, rmSync, renameSync } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -498,7 +498,8 @@ function writeTranslation(targetPath, content) {
   // Atomic write: write to tmp then rename
   const tmpPath = targetPath + '.tmp';
   writeFileSync(tmpPath, content, 'utf-8');
-  execSync(`mv "${tmpPath}" "${targetPath}"`);
+  renameSync(tmpPath, targetPath);
+  console.log(`    → wrote ${targetPath} (${Buffer.byteLength(content, 'utf-8')} bytes)`);
 }
 
 async function main() {

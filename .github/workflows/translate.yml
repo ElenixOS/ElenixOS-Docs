@@ -64,6 +64,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "=== Checking for i18n changes ==="
+          git status --short i18n/ || true
+
           # Stage only i18n/ changes
           git add i18n/
 
@@ -72,6 +75,9 @@ jobs:
             exit 0
           fi
 
+          echo "=== Staged i18n files ==="
+          git diff --cached --name-only
+
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -79,17 +85,20 @@ jobs:
           I18N_SHA=$(git rev-parse HEAD)
           echo "i18n commit: $I18N_SHA"
 
-          # Cherry-pick the i18n commit onto main (ensures only i18n/ changes reach main)
+          # Apply only i18n/ changes to main (no cherry-pick, no history pollution)
+          echo "=== Applying i18n changes to main ==="
           git fetch origin main
           git checkout -B ci-i18n origin/main
-          git cherry-pick -X theirs "$I18N_SHA" || {
-            echo "Cherry-pick conflict — resolving by keeping incoming i18n changes"
-            # If cherry-pick fails (unlikely for i18n-only), resolve with ours
-            git diff --name-only --diff-filter=U | xargs -r git rm
-            git cherry-pick --continue
-          }
 
-          # Push to main with retry (in case main moves during our run)
+          # Copy only the i18n/ directory from the translation commit
+          git checkout "$I18N_SHA" -- i18n/
+
+          echo "=== Files to be committed to main ==="
+          git diff --cached --name-only || git diff --name-only
+
+          git commit -m "chore(i18n): AI translate docs/blog changes [skip ci]"
+
+          # Push to main with retry
           for attempt in 1 2 3; do
             if git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main; then
               echo "✓ Pushed translations to main (attempt $attempt)."
@@ -99,7 +108,8 @@ jobs:
             sleep 5
             git fetch origin main
             git checkout -B ci-i18n origin/main
-            git cherry-pick -X theirs "$I18N_SHA" || true
+            git checkout "$I18N_SHA" -- i18n/
+            git commit -m "chore(i18n): AI translate docs/blog changes [skip ci]" || true
           done
 
           echo "✗ Failed to push translations to main after 3 attempts."
