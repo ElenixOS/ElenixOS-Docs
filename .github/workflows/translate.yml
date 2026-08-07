@@ -76,7 +76,8 @@ jobs:
           git fetch origin main
           git checkout -B sync/i18n origin/main
 
-          # Apply dev's full tree onto the sync branch
+          # Remove everything first, then apply dev's tree (handles deletions)
+          git rm -rf --quiet . 2>/dev/null || true
           git checkout "$DEV_SHA" -- .
           git commit -m "chore: sync dev → main"
 
