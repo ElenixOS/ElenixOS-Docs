@@ -1,0 +1,215 @@
+---
+sidebar_position: 2
+title: 本地运行（Native Simulator）
+---
+
+# 本地运行（Native Simulator）
+
+本页面将介绍如何在本地环境中编译和运行 ElenixOS 模拟器。
+
+## 开发环境要求
+
+### 硬件要求
+
+* CPU：任意 x86 / ARM
+* 内存：512MB+
+* 显卡：支持基础 2D 渲染
+
+### 软件要求
+
+* **操作系统**：Linux、macOS 或 Windows
+* **编译工具链**：
+  * GCC (用于 x86 模拟)
+  * 对应开发板的交叉编译工具链
+* **依赖库**：
+  * SDL2
+  * CMake (3.13+)
+  * Python 3.7+
+  * kconfiglib（用于 Kconfig 内核配置）
+
+[Visual Studio Code](https://code.visualstudio.com/)。
+
+## 获取代码
+
+```bash
+git clone --recursive https://github.com/ElenixOS/ElenixOS-Simulator.git
+```
+
+:::note
+注意：使用 `--recursive` 参数确保同时克隆子模块。
+如果您没有使用 `--recursive` 克隆，可以通过以下命令获取子模块：
+
+```bash
+git submodule update --init --recursive
+```
+
+:::
+
+## 安装依赖
+
+根据操作系统安装 SDL2 与基础构建工具。
+
+### Ubuntu / Debian
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential libsdl2-dev cmake
+```
+
+### Arch Linux
+
+```bash
+sudo pacman -Syu
+sudo pacman -S sdl2 base-devel gcc make cmake
+```
+
+### macOS
+
+```bash
+brew install sdl2 cmake llvm
+```
+
+:::tip
+macOS 默认 clang 不支持 `-fsanitize=leak`，建议在 VSCode 中切换到 Homebrew 安装的 LLVM clang。
+:::
+
+### Windows
+
+推荐使用 MSYS2 安装依赖：
+
+#### MSYS2 安装
+
+MSYS2 是一个 Windows 上的类 Unix 环境，提供了一个包管理器来安装开发工具和库。
+
+官网地址：https://www.msys2.org/
+
+:::warning
+非必要请勿修改 MSYS2 的安装路径，若修改，需要同步修改`ElenixOS-Simulator`根目录中`simulator.code-workspace`文件的路径配置。
+:::
+
+安装 MSYS2 后，使用 **MSYS2 Shell** 执行：
+
+```MSY32 Shell
+pacman -Syu
+```
+
+更新 MSYS2 系统和所有已安装包。
+
+#### 安装依赖库
+
+```MSY32 Shell
+pacman -S mingw-w64-x86_64-toolchain
+# 全选安装所有工具链组件
+pacman -S mingw-w64-x86_64-cmake
+pacman -S mingw-w64-x86_64-SDL2
+```
+
+## 使用 VSCode 运行模拟器
+
+1. 使用 VSCode 打开项目（建议直接打开工作区文件 `simulator.code-workspace`）。
+2. 安装项目推荐扩展。
+3. 打开左侧 Run and Debug。
+4. 选择调试配置 `Debug LVGL demo with gdb`。
+5. 按 `F5` 启动调试与运行。
+
+如果您在 macOS 上使用 Homebrew LLVM：
+
+1. `Cmd+Shift+P` -> `CMake: Select a Kit`
+2. 选择 `Scan for kits`
+3. 再次执行 `CMake: Select a Kit`，选择 `/opt/homebrew/opt/llvm/bin/clang` 对应工具链
+4. 执行 `CMake: Configure`
+5. 再按 `F5` 运行
+
+## 使用命令行构建
+
+### 安装 Python 依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+安装 `kconfiglib`，用于构建系统自动生成内核配置头文件。未安装时构建不会中断，但回退至内核默认值。
+
+### 基本构建步骤
+
+项目根目录的 `Makefile` 提供快捷命令：
+
+```bash
+make          # 配置并构建
+make run      # 构建并运行
+```
+
+底层等价于 `cmake -B build && cmake --build build`。
+
+### 启用 FreeRTOS 模式
+
+如果希望在命令行构建中启用 FreeRTOS 模式，可以在 CMake 配置时添加 `-DUSE_FREERTOS=ON` 选项：
+
+```bash
+cmake -B build -DUSE_FREERTOS=ON
+```
+
+### 自定义构建选项
+
+项目支持以下 CMake 选项：
+
+* `-DUSE_FREERTOS=ON/OFF`：启用/禁用 FreeRTOS
+* `-DLV_USE_DRAW_SDL=ON/OFF`：启用/禁用 SDL 绘制单元
+* `-DLV_USE_LIBPNG=ON/OFF`：启用/禁用 libpng 支持
+* `-DLV_USE_LIBJPEG_TURBO=ON/OFF`：启用/禁用 libjpeg-turbo 支持
+* `-DLV_USE_FFMPEG=ON/OFF`：启用/禁用 FFmpeg 支持
+* `-DLV_USE_FREETYPE=ON/OFF`：启用/禁用 FreeType 支持
+
+### 不同操作系统的注意事项
+
+#### Linux
+
+* 确保已安装 SDL2 开发库和 CMake
+* 构建命令与基本步骤相同
+
+#### macOS
+
+* 确保已通过 Homebrew 安装 SDL2 和 CMake
+* 如使用 Homebrew LLVM，可在 CMake 配置时指定编译器：
+
+```bash
+cmake -B build -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++
+```
+
+#### Windows (MSYS2)
+
+* 使用 MSYS2 Shell 执行构建命令
+* 确保已安装 mingw-w64-x86_64-toolchain、mingw-w64-x86_64-cmake 和 mingw-w64-x86_64-SDL2
+* 构建命令与基本步骤相同
+
+### 调整内核配置
+
+内核编译选项（内存分配策略、文件系统类型、字体源等）通过 Kconfig 系统配置。详见 [内核配置系统](../development/kconfig)。
+
+```bash
+make menuconfig             # 编辑 build/.config
+```
+
+### 清理构建
+
+```bash
+rm -rf build
+```
+
+## 验证是否运行成功
+
+* 可以看到模拟器窗口正常弹出
+* 日志中无 SDL 初始化失败报错
+* 在 VSCode 中可正常命中断点并单步调试
+
+## 常见问题
+
+### 找不到 SDL2
+
+* Linux: 确认已安装 `libsdl2-dev` 或 `sdl2`
+* macOS: 重新执行 `brew install sdl2`
+* Windows: 确认已通过 MSYS2 安装 `mingw-w64-x86_64-SDL2`
+
+### macOS 编译器不兼容
+
+请按上文切换到 Homebrew LLVM clang 后重新 `CMake: Configure`。
