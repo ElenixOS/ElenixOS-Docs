@@ -1,0 +1,95 @@
+---
+title: 下拉菜单 (Dropdown)
+sidebar_position: 5
+---
+
+# 下拉菜单 (Dropdown)
+
+下拉菜单是 ElenixOS 中用于显示和选择下拉选项的特殊 API 组件。本文档将介绍下拉菜单组件的功能、使用方法和注意事项。
+
+## 功能介绍
+
+下拉菜单组件允许开发者创建一个下拉列表，用于显示和选择选项。下拉菜单通常用于选择列表、设置选项等场景。
+
+## 使用方法
+
+### 创建下拉菜单
+
+使用 `new lv.dropdown()` 构造函数创建下拉菜单对象：
+
+```javascript
+// 创建下拉菜单对象
+const dropdown = new lv.dropdown(eos.view.active());
+```
+
+### 配置下拉菜单
+
+使用以下方法配置下拉菜单：
+
+```javascript
+// 设置下拉菜单大小
+ dropdown.setSize(200, 50);
+
+// 设置下拉菜单位置
+ dropdown.setPos(10, 10);
+
+// 设置下拉菜单选项
+const options = "Option 1\nOption 2\nOption 3\nOption 4";
+ dropdown.setOptions(options);
+
+// 设置下拉菜单默认选项
+ dropdown.setSelected(0);
+
+// 设置下拉菜单展开方向
+ dropdown.setDir(lv.DIR.BOTTOM);
+```
+
+### 绑定事件
+
+使用 `addEventCb` 方法绑定事件：
+
+```javascript
+// 绑定选项选择事件
+ dropdown.addEventCb((e) => {
+    const selected =  dropdown.getSelected();
+    eos.console.log("Selected option:", selected);
+}, lv.EVENT_VALUE_CHANGED, null);
+```
+
+### 示例：创建简单下拉菜单
+
+```javascript
+// 创建下拉菜单
+const dropdown = new lv.dropdown(eos.view.active());
+dropdown.setSize(200, 50);
+dropdown.align(lv.ALIGN_CENTER, 0, 0);
+
+// 设置选项
+const options = "Option 1\nOption 2\nOption 3\nOption 4";
+dropdown.setOptions(options);
+
+// 绑定事件
+dropdown.addEventCb((e) => {
+    const selected = dropdown.getSelected();
+    eos.console.log("Selected option:", selected);
+}, lv.EVENT_VALUE_CHANGED, null);
+```
+
+### 示例：创建带图标的下拉菜单
+
+```javascript
+// 创建下拉菜单
+const dropdown = new lv.dropdown(eos.view.active());
+dropdown.setSize(200, 50);
+dropdown.align(lv.ALIGN_CENTER, 0, 0);
+
+// 设置带图标的选项
+const options = "\uF001 Option 1\n\uF002 Option 2\n\uF003 Option 3";
+dropdown.setOptions(options);
+
+// 绑定事件
+dropdown.addEventCb((e) => {
+    const selected = dropdown.getSelected();
+    eos.console.log("Selected option:", selected);
+}, lv.EVENT_VALUE_CHANGED, null);
+```
