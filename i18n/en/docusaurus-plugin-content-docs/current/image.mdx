@@ -1,0 +1,92 @@
+---
+title: 图片 (Image)
+sidebar_position: 6
+---
+
+# 图片 (Image)
+
+图片是 ElenixOS 中用于显示图片的特殊 API 组件。本文档将介绍图片组件的功能、使用方法和注意事项。
+
+## 功能介绍
+
+图片组件允许开发者在应用中显示各种图片，如图标、背景图、照片等。图片组件通常用于增强应用的视觉效果，提高用户体验。
+
+## 使用方法
+
+### 创建图片
+
+使用 `new lv.image()` 构造函数创建图片对象：
+
+```javascript
+// 创建图片对象
+const image = new lv.image(eos.view.active());
+```
+
+### 配置图片
+
+使用以下方法配置图片：
+
+```javascript
+// 设置图片大小
+image.setSize(100, 100);
+
+// 设置图片位置
+image.setPos(10, 10);
+
+// 设置图片源
+// 方法 1：使用图片路径
+image.setSrc("/path/to/image.png");
+
+// 方法 2：使用图片数据
+const imgData = /* 图片数据 */;
+image.setSrc(imgData);
+
+// 设置图片缩放模式
+image.setScale(2); // 放大 2 倍
+
+// 设置图片透明度
+image.setOpacity(0.5); // 半透明
+```
+
+### 绑定事件
+
+使用 `addEventCb` 方法绑定事件：
+
+```javascript
+// 绑定点击事件
+image.addEventCb((e) => {
+    eos.console.log("Image clicked!");
+}, lv.EVENT_CLICKED, null);
+```
+
+### 示例：创建简单图片
+
+```javascript
+// 创建图片
+const image = new lv.image(eos.view.active());
+image.setSize(100, 100);
+image.align(lv.ALIGN_CENTER, 0, 0);
+
+// 设置图片源
+image.setSrc("/path/to/image.png");
+```
+
+### 示例：创建可点击图片
+
+```javascript
+// 创建图片
+const image = new lv.image(eos.view.active());
+image.setSize(100, 100);
+image.align(lv.ALIGN_CENTER, 0, 0);
+
+// 设置图片源
+image.setSrc("/path/to/image.png");
+
+// 添加可点击标志
+image.addFlag(lv.OBJ_FLAG_CLICKABLE);
+
+// 绑定点击事件
+image.addEventCb((e) => {
+    eos.console.log("Image clicked!");
+}, lv.EVENT_CLICKED, null);
+```
