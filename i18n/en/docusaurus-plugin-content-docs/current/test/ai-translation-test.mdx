@@ -15,7 +15,9 @@ ElenixOS is an open-source operating system designed for smartwatches and other 
 
 ## Code Block Test
 
-### C Language Code```c
+### C Language Code
+
+```c
 #include "elenix_os.h"
 
 static void app_main(void) {
@@ -25,7 +27,11 @@ static void app_main(void) {
     lv_obj_t *screen = lv_obj_create(NULL);
     lv_scr_load(screen);
 }
-```### JavaScript Code```javascript
+```
+
+### JavaScript Code
+
+```javascript
 // Register a watch face app in ElenixOS
 const watchface = ElenixOS.registerApp({
   name: 'My Watchface',
@@ -36,32 +42,52 @@ const watchface = ElenixOS.registerApp({
     ui.drawTime();
   },
 });
-```### Shell Commands```bash
+```
+
+### Shell Commands
+
+```bash
 # Clone ElenixOS repository
 git clone https://github.com/ElenixOS/ElenixOS.git
 cd ElenixOS
 # Initialize submodules
 git submodule update --init --recursive
-```## Inline Code and Formatting
+```
 
-Use`lv_obj_create(NULL)`to create a new LVGL object. The system achieves efficient communication between **JavaScript** and the *C layer* through`SNI`(Script Native Interface).
+## Inline Code and Formatting
 
-The configuration item`LV_USE_ASSERT_MEM_INTEGRITY`should be set to`1`during debugging, but must be set to`0`during performance testing.
+Use `lv_obj_create(NULL)` to create a new LVGL object. The system achieves efficient communication between **JavaScript** and the *C layer* through `SNI` (Script Native Interface).
 
-## Callout Test:::noteThis is a normal callout. During translation, the`:::note`marker should be preserved, and only the Chinese content inside should be translated.:::
+The configuration item `LV_USE_ASSERT_MEM_INTEGRITY` should be set to `1` during debugging, but must be set to `0` during performance testing.
 
-:::warning**Note**: Before deploying to production, be sure to thoroughly test all features in the simulator. Unverified code may cause system crashes.:::
+## Callout Box Test
 
-:::tipIt is recommended to use the online simulator for quick previews: [ElenixOS Simulator](https://simulator.elenixos.com):::
+:::note
+This is a normal callout box. During translation, the `:::note` marker should be preserved, and only the Chinese content inside the box should be translated.
+:::
 
-## Link Test- [Quick Start Guide](./getting_started/quick_start.mdx)- [LVGL Official Documentation](https://docs.lvgl.io/)- [JerryScript Project](https://github.com/jerryscript-project/jerryscript)## Table Test
+:::warning
+**Note**: Before deploying to production, be sure to thoroughly test all features in the simulator. Unverified code may cause system crashes.
+:::
+
+:::tip
+It is recommended to use the online simulator for quick previews: [ElenixOS Simulator](https://simulator.elenixos.com)
+:::
+
+## Link Test
+
+- [Quick Start Guide](./getting_started/quick_start.mdx)
+- [LVGL Official Documentation](https://docs.lvgl.io/)
+- [JerryScript Project](https://github.com/jerryscript-project/jerryscript)
+
+## Table Test
 
 | Feature | Description | Status |
 |---------|-------------|--------|
 | Script Engine | JavaScript runtime based on JerryScript | Completed |
 | Display Driver | Supports multiple screen resolutions and color depths | Completed |
-| Sensor Framework | Unified sensor data collection interface | In Development |
-| Bluetooth Protocol Stack | Low-power Bluetooth communication support | Planned |
+| Sensor Framework | Unified sensor data acquisition interface | In Development |
+| Bluetooth Protocol Stack | Low-energy Bluetooth communication support | Planned |
 
 ## List Test
 
@@ -82,11 +108,8 @@ The configuration item`LV_USE_ASSERT_MEM_INTEGRITY`should be set to`1`during deb
 
 ## Mixed Content
 
-> ElenixOS's architecture design follows the principle of "minimal kernel, maximum flexibility." The system core is only responsible for resource management and process scheduling, while all upper-layer functionality is extended through the script engine.
+> ElenixOS's architecture design follows the principle of "minimal kernel, maximum flexibility." The system core is only responsible for resource management and process scheduling, and all upper-layer functionality is extended through the script engine.
 
-After enabling`LV_USE_FILE_EXPLORER`in`lv_conf.h`, you can use the`lv_file_explorer_open()`function to open the file browser component.
+After enabling `LV_USE_FILE_EXPLORER` in `lv_conf.h`, you can use the `lv_file_explorer_open()` function to open the file browser component.
 
-> This text is used to test the effect after fixing the translation format.
-
-
-test trigger
+> This text is used to test the effect of translation format fixes.
