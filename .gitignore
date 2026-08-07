@@ -16,6 +16,10 @@ yarn-error.log*
 .DS_Store
 __MACOSX/
 
+# Environment variables
+.env
+.env.local
+
 # Temp files
 .temp/
 tmp/

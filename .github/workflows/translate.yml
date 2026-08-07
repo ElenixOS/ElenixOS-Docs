@@ -1,0 +1,106 @@
+name: Translate docs & blog to English
+
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'docs/**'
+      - 'blog/**'
+  workflow_dispatch:
+    inputs:
+      backfill:
+        description: 'Translate all source files missing an English translation'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: i18n-en-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  translate-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Translate changed files
+        id: translate
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          ARGS=("--out" "$RUNNER_TEMP/translate-summary.json")
+
+          if [ "${{ inputs.backfill }}" = "true" ]; then
+            ARGS+=("--backfill")
+          fi
+
+          node scripts/translate.mjs "${ARGS[@]}"
+
+      - name: Show summary
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/translate-summary.json" ]; then
+            echo "Translation summary:"
+            cat "$RUNNER_TEMP/translate-summary.json"
+          fi
+
+      - name: Push translations to main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Stage only i18n/ changes
+          git add i18n/
+
+          if git diff --cached --quiet; then
+            echo "No i18n changes to commit — nothing to push."
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git commit -m "chore(i18n): AI translate docs/blog changes [skip ci]"
+          I18N_SHA=$(git rev-parse HEAD)
+          echo "i18n commit: $I18N_SHA"
+
+          # Cherry-pick the i18n commit onto main (ensures only i18n/ changes reach main)
+          git fetch origin main
+          git checkout -B ci-i18n origin/main
+          git cherry-pick -X theirs "$I18N_SHA" || {
+            echo "Cherry-pick conflict — resolving by keeping incoming i18n changes"
+            # If cherry-pick fails (unlikely for i18n-only), resolve with ours
+            git diff --name-only --diff-filter=U | xargs -r git rm
+            git cherry-pick --continue
+          }
+
+          # Push to main with retry (in case main moves during our run)
+          for attempt in 1 2 3; do
+            if git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main; then
+              echo "✓ Pushed translations to main (attempt $attempt)."
+              exit 0
+            fi
+            echo "Push attempt $attempt failed — re-fetching and retrying..."
+            sleep 5
+            git fetch origin main
+            git checkout -B ci-i18n origin/main
+            git cherry-pick -X theirs "$I18N_SHA" || true
+          done
+
+          echo "✗ Failed to push translations to main after 3 attempts."
+          exit 1
