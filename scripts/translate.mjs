@@ -301,16 +301,13 @@ async function callDeepSeekAPI(systemPrompt, userContent, retries = 3) {
       }
 
       // Parse JSON from response (strip possible markdown fences)
-      let parsed;
       const cleaned = content.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
       try {
-        parsed = JSON.parse(cleaned);
+        return JSON.parse(cleaned);
       } catch {
-        // If it's not valid JSON, return the raw text
-        return content;
+        // If it's not valid JSON, return as raw object for caller to handle
+        return { _raw: content };
       }
-
-      return parsed.translation || parsed.content || content;
     } catch (err) {
       if (attempt === retries) throw err;
       const delay = Math.min(1000 * Math.pow(2, attempt) + Math.random() * 1000, 30000);
