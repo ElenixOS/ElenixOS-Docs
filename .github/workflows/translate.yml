@@ -32,7 +32,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,79 +39,53 @@ jobs:
           node-version: 20
 
       - name: Translate changed files
-        id: translate
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
-          ARGS=("--out" "$RUNNER_TEMP/translate-summary.json")
-
-          if [ "${{ inputs.backfill }}" = "true" ]; then
-            ARGS+=("--backfill")
+          set -x
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.backfill }}" = "true" ]; then
+            node scripts/translate.mjs --backfill --out translate-summary.json
+          else
+            node scripts/translate.mjs --out translate-summary.json
           fi
-
-          node scripts/translate.mjs "${ARGS[@]}"
 
       - name: Show summary
         if: always()
         run: |
-          if [ -f "$RUNNER_TEMP/translate-summary.json" ]; then
-            echo "Translation summary:"
-            cat "$RUNNER_TEMP/translate-summary.json"
+          if [ -f translate-summary.json ]; then
+            echo "=== Translation summary ==="
+            cat translate-summary.json
           fi
 
       - name: Push translations to main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
-
-          echo "=== Checking for i18n changes ==="
-          git status --short i18n/ || true
-
-          # Stage only i18n/ changes
-          git add i18n/
-
-          if git diff --cached --quiet; then
-            echo "No i18n changes to commit — nothing to push."
-            exit 0
-          fi
-
-          echo "=== Staged i18n files ==="
-          git diff --cached --name-only
-
+          set -x
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          echo "=== i18n status ==="
+          git status --short i18n/ 2>&1 || true
+
+          git add i18n/
+
+          if git diff --cached --quiet; then
+            echo "No i18n changes — done."
+            exit 0
+          fi
+
+          echo "=== Committing i18n ==="
+          git diff --cached --name-only
           git commit -m "chore(i18n): AI translate docs/blog changes [skip ci]"
           I18N_SHA=$(git rev-parse HEAD)
-          echo "i18n commit: $I18N_SHA"
 
-          # Apply only i18n/ changes to main (no cherry-pick, no history pollution)
-          echo "=== Applying i18n changes to main ==="
+          echo "=== Applying to main ==="
           git fetch origin main
           git checkout -B ci-i18n origin/main
-
-          # Copy only the i18n/ directory from the translation commit
           git checkout "$I18N_SHA" -- i18n/
-
-          echo "=== Files to be committed to main ==="
-          git diff --cached --name-only || git diff --name-only
-
           git commit -m "chore(i18n): AI translate docs/blog changes [skip ci]"
 
-          # Push to main with retry
-          for attempt in 1 2 3; do
-            if git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main; then
-              echo "✓ Pushed translations to main (attempt $attempt)."
-              exit 0
-            fi
-            echo "Push attempt $attempt failed — re-fetching and retrying..."
-            sleep 5
-            git fetch origin main
-            git checkout -B ci-i18n origin/main
-            git checkout "$I18N_SHA" -- i18n/
-            git commit -m "chore(i18n): AI translate docs/blog changes [skip ci]" || true
-          done
-
-          echo "✗ Failed to push translations to main after 3 attempts."
-          exit 1
+          echo "=== Pushing to main ==="
+          git push origin HEAD:main
+          echo "✓ Done"
