@@ -1,0 +1,56 @@
+---
+sidebar_position: 8
+title: 触觉服务
+---
+
+触觉服务负责管理设备振动功能，提供不同强度的触觉反馈。
+
+## 振动强度预设
+
+```c
+typedef enum {
+    EOS_HAPTIC_STRENGTH_OFF = 0,       // 关闭
+    EOS_HAPTIC_STRENGTH_NORMAL = 128,   // 正常强度
+    EOS_HAPTIC_STRENGTH_INTENSE = 255,  // 强烈强度
+} eos_haptic_strength_t;
+```
+
+## 触觉反馈模式
+
+### 短促轻振动
+
+用于轻微的触觉反馈提示：
+
+```c
+void eos_haptic_tick(void);
+```
+
+### 较强较长振动
+
+用于需要更强触觉反馈的场景：
+
+```c
+void eos_haptic_buzz(void);
+```
+
+### 最强最长振动
+
+用于重要通知或警报：
+
+```c
+void eos_haptic_vibrate_long(void);
+```
+
+## 服务管理
+
+### 初始化
+
+```c
+void eos_service_haptic_init(void);
+```
+
+### 设置全局振动强度
+
+```c
+void eos_haptic_set_strength(eos_haptic_strength_t s);
+```
