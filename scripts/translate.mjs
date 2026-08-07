@@ -135,83 +135,48 @@ function protectContent(content) {
   const placeholders = [];
   let counter = 0;
 
-  const ph = () => {
+  const ph = (value) => {
     const id = `__PH${counter++}__`;
-    placeholders.push({ id, value: '' }); // placeholder, will be filled
+    placeholders.push({ id, value });
     return id;
   };
 
-  // We work in stages to avoid nested matches.
+  // Stage 1: Protect fenced code blocks — wrap in double newlines
+  // so the AI keeps them separated from surrounding markdown
+  let text = content.replace(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g,
+    (match) => `\n\n${ph(match)}\n\n`);
 
-  // Stage 1: Protect fenced code blocks
-  let text = content.replace(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g, (match) => {
-    const id = ph();
-    const idx = placeholders.findIndex(p => p.id === id);
-    placeholders[idx].value = match;
-    return `\n${id}\n`;
-  });
-
-  // Stage 2: Protect inline code
-  text = text.replace(/`([^`]+)`/g, (match) => {
-    const id = ph();
-    const idx = placeholders.findIndex(p => p.id === id);
-    placeholders[idx].value = match;
-    return id;
-  });
+  // Stage 2: Protect inline code — exact replacement, keep surrounding spaces
+  text = text.replace(/`([^`]+)`/g, (match) => ` ${ph(match)} `);
 
   // Stage 3: Protect self-closing JSX/HTML tags
-  text = text.replace(/<(\w+)(?:\s[^>]*)?\s*\/>/g, (match) => {
-    const id = ph();
-    const idx = placeholders.findIndex(p => p.id === id);
-    placeholders[idx].value = match;
-    return id;
-  });
+  text = text.replace(/<(\w+)(?:\s[^>]*)?\s*\/>/g, (match) => ph(match));
 
   // Stage 4: Protect import/export lines
-  text = text.replace(/^(import\s|export\s).+$/gm, (match) => {
-    const id = ph();
-    const idx = placeholders.findIndex(p => p.id === id);
-    placeholders[idx].value = match;
-    return id;
-  });
+  text = text.replace(/^(import\s|export\s).+$/gm, (match) => `\n${ph(match)}\n`);
 
-  // Stage 5: Protect admonition markers (:::note, :::warning, :::tip, etc.)
-  // Opening/closing ::: or :::: lines
-  text = text.replace(/^:{3,4}\s*\w*.*$/gm, (match) => {
-    const id = ph();
-    const idx = placeholders.findIndex(p => p.id === id);
-    placeholders[idx].value = match;
-    return id;
-  });
+  // Stage 5: Protect admonition markers — double newlines for clear separation
+  text = text.replace(/^:{3,4}\s*\w*.*$/gm, (match) => `\n\n${ph(match)}\n\n`);
 
-  // Stage 6: Protect markdown link/image URLs (but not link text)
-  text = text.replace(/(\]\([^)]+\))/g, (match) => {
-    const id = ph();
-    const idx = placeholders.findIndex(p => p.id === id);
-    placeholders[idx].value = match;
-    return id;
-  });
+  // Stage 6: Protect markdown link URLs — keep link text translatable
+  text = text.replace(/(\]\([^)]+\))/g, (match) => ph(match));
 
   // Stage 7: Protect markdown image syntax
-  text = text.replace(/(!\[[^\]]*\])/g, (match) => {
-    const id = ph();
-    const idx = placeholders.findIndex(p => p.id === id);
-    placeholders[idx].value = match;
-    return id;
-  });
+  text = text.replace(/(!\[[^\]]*\])/g, (match) => ph(match));
 
   return { text, placeholders };
 }
 
 /**
- * Restore protected content from placeholders.
+ * Restore protected content — exact literal replacement, no whitespace eating.
  */
 function restoreContent(text, placeholders) {
   let result = text;
   for (const { id, value } of placeholders) {
-    // Placeholder may have whitespace around it from the protection stage
-    result = result.replace(new RegExp(`\\s*${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`, 'g'), () => value);
+    result = result.replaceAll(id, value);
   }
+  // Clean up excessive blank lines (3+ → 2) that may have been introduced
+  result = result.replace(/\n{3,}/g, '\n\n');
   return result;
 }
 
@@ -335,17 +300,20 @@ function sleep(ms) {
 // ─── Translation logic ───────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are a professional technical translator specializing in embedded systems documentation.
-Translate Simplified Chinese (zh-Hans) to fluent, natural English.
+Translate ALL Simplified Chinese (zh-Hans) text to fluent, natural English.
 
 CRITICAL RULES — follow exactly:
-1. Translate ONLY natural-language text. NEVER alter PLACEHOLDER tokens (they look like __PH0__, __PH1__, etc.).
-2. NEVER alter, translate, or modify anything inside placeholder tokens — they are replaced after translation.
-3. Keep technical terms consistent: LVGL, JerryScript, SNI, control block, lifecycle, object semantics, TLSF, etc.
-4. Preserve ALL markdown formatting: headings (#), bold (**), italic (*), lists (-/*), tables (|), blockquotes (>).
-5. Preserve ALL HTML entities like &lt; &gt; &amp; &quot; — do NOT decode them.
-6. Keep numbers, dates, file paths, URLs, and identifiers exactly as-is.
-7. Use natural, idiomatic English appropriate for technical documentation.
-8. Output ONLY a JSON object: {"translation": "your translated text here"}`;
+1. Translate EVERY piece of Chinese text you see — headings, paragraphs, list items, table cells,
+   link text, bold/italic text, blockquotes, captions. Leave NO Chinese characters in the output.
+2. NEVER alter PLACEHOLDER tokens (they look like __PH0__, __PH1__). Keep them exactly as-is.
+3. NEVER modify anything inside placeholder tokens — they are replaced after translation.
+4. Keep technical terms consistent: LVGL, JerryScript, SNI, control block, lifecycle, TLSF, etc.
+5. Preserve ALL markdown formatting: headings (#), bold (**), italic (*), lists (-/*), tables (|),
+   blockquotes (>), horizontal rules (---).
+6. Preserve ALL HTML entities like &lt; &gt; &amp; &quot; — do NOT decode them.
+7. Keep numbers, dates, file paths, URLs, and identifiers exactly as-is.
+8. Preserve the paragraph structure — keep blank lines between sections.
+9. Output ONLY a JSON object: {"translation": "your translated text here"}`;
 
 const COMMENT_PROMPT = `Translate these code comments from Simplified Chinese to English.
 Keep them concise — code comments should be short and clear.
