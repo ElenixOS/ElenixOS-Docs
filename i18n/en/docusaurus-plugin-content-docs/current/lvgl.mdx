@@ -1,0 +1,275 @@
+---
+title: LVGL UI API
+sidebar_position: 2
+---
+
+# LVGL UI API
+
+ElenixOS 基于 LVGL（LittlevGL）图形库提供了丰富的 UI 组件和接口，允许开发者在 JavaScript 中创建和管理用户界面。本文档将详细介绍 ElenixOS 暴露给脚本运行时的 LVGL UI API，基于实际项目工程中的使用方式。
+
+## 基本概念
+
+### LVGL 简介
+
+LVGL 是一个轻量级的嵌入式图形库，专为资源受限的设备设计，如微控制器。它提供了丰富的 UI 组件和功能，包括：
+
+* 各种 UI 控件（按钮、标签、输入框等）
+* 布局系统
+* 样式系统
+* 动画效果
+* 事件处理
+
+### API 命名空间
+
+在 ElenixOS 中，LVGL API 通过 `lv` 命名空间暴露给 JavaScript 脚本：
+
+```javascript
+// 创建一个标签
+const label = new lv.label(eos.view.active());
+label.setText("Hello, ElenixOS!");
+```
+
+## 组件创建与布局
+
+### 组件创建
+
+使用构造函数方式创建 UI 组件：
+
+```javascript
+// 创建一个按钮
+const button = new lv.button(eos.view.active());
+
+// 创建一个标签
+const label = new lv.label(button);
+label.setText("Click Me");
+```
+
+### 布局系统
+
+LVGL 提供了多种布局方式，包括：
+
+#### 绝对布局
+
+```javascript
+// 设置组件位置
+button.setPos(10, 10);
+
+// 设置组件大小
+button.setSize(100, 50);
+```
+
+#### 弹性布局
+
+```javascript
+// 创建一个弹性布局容器
+const container = new lv.obj(eos.view.active());
+container.setSize(lv.pct(100), 50);
+container.align(lv.ALIGN_CENTER, 0, 0);
+container.setFlexFlow(lv.FLEX_FLOW_ROW);
+
+// 添加子组件
+const button1 = new lv.button(container);
+const label1 = new lv.label(button1);
+label1.setText("Button 1");
+
+const button2 = new lv.button(container);
+const label2 = new lv.label(button2);
+label2.setText("Button 2");
+```
+
+#### 网格布局
+
+```javascript
+// 创建一个网格布局容器
+const container = new lv.obj(eos.view.active());
+container.setSize(lv.pct(100), 100);
+container.align(lv.ALIGN_CENTER, 0, 0);
+
+// 添加子组件
+const button1 = new lv.button(container);
+button1.setSize(100, 50);
+button1.align(lv.ALIGN_TOP_LEFT, 10, 10);
+
+const button2 = new lv.button(container);
+button2.setSize(100, 50);
+button2.align(lv.ALIGN_TOP_RIGHT, -10, 10);
+
+const button3 = new lv.button(container);
+button3.setSize(100, 50);
+button3.align(lv.ALIGN_BOTTOM_LEFT, 10, -10);
+
+const button4 = new lv.button(container);
+button4.setSize(100, 50);
+button4.align(lv.ALIGN_BOTTOM_RIGHT, -10, -10);
+```
+
+## 事件绑定方式
+
+### 事件类型
+
+LVGL 支持多种事件类型，如点击、释放、长按等：
+
+| 事件类型                     | 描述      |
+| ------------------------ | ------- |
+| `lv.EVENT_CLICKED`       | 组件被点击   |
+| `lv.EVENT_PRESSED`       | 组件被按下   |
+| `lv.EVENT_RELEASED`      | 组件被释放   |
+| `lv.EVENT_LONG_PRESSED`  | 组件被长按   |
+| `lv.EVENT_VALUE_CHANGED` | 组件值发生变化 |
+
+### 绑定事件
+
+使用 `addEventCb` 方法绑定事件：
+
+```javascript
+// 绑定点击事件
+button.addEventCb((e) => {
+    console.log("Button clicked!");
+}, lv.EVENT_CLICKED, null);
+
+// 绑定值变化事件
+const slider = new lv.slider(eos.view.active());
+slider.addEventCb((e) => {
+    const value = slider.getValue();
+    console.log("Slider value:", value);
+}, lv.EVENT_VALUE_CHANGED, null);
+```
+
+### 事件处理
+
+```javascript
+const container = new lv.obj(eos.view.active());
+const button = new lv.button(container);
+
+// 绑定容器的点击事件
+container.addEventCb((e) => {
+    console.log("Container clicked!");
+}, lv.EVENT_CLICKED, null);
+
+// 绑定按钮的点击事件
+button.addEventCb((e) => {
+    console.log("Button clicked!");
+}, lv.EVENT_CLICKED, null);
+```
+
+## 样式与主题
+
+### 样式设置
+
+```javascript
+// 设置按钮样式
+const button = new lv.button(eos.view.active());
+button.setSize(180, 64);
+button.align(lv.ALIGN_CENTER, 0, 20);
+
+// 设置标签样式
+const label = new lv.label(button);
+label.setText("Click Me");
+label.center();
+```
+
+### 组件状态
+
+```javascript
+// 设置组件标志
+button.addFlag(lv.OBJ_FLAG_CLICKABLE);
+button.addFlag(lv.OBJ_FLAG_CHECKABLE);
+
+// 检查组件标志
+if (button.hasFlag(lv.OBJ_FLAG_CLICKABLE)) {
+    console.log("Button is clickable");
+}
+
+if (button.hasFlag(lv.OBJ_FLAG_CHECKABLE)) {
+    console.log("Button is checkable");
+}
+```
+
+## 常用控件示例
+
+### 按钮（Button）
+
+```javascript
+// 创建按钮
+const button = new lv.button(eos.view.active());
+button.setSize(180, 64);
+button.align(lv.ALIGN_CENTER, 0, 20);
+
+// 添加标签
+const label = new lv.label(button);
+label.setText("Click Me");
+label.center();
+
+// 设置标志
+button.addFlag(lv.OBJ_FLAG_CLICKABLE);
+button.addFlag(lv.OBJ_FLAG_CHECKABLE);
+
+// 绑定事件
+let cbFired = false;
+button.addEventCb((e) => {
+    cbFired = true;
+    console.log("Button clicked!");
+}, lv.EVENT_CLICKED, null);
+
+// 发送事件
+button.sendEvent(lv.EVENT_CLICKED, null);
+```
+
+### 标签（Label）
+
+```javascript
+// 创建标签
+const label = new lv.label(eos.view.active());
+label.setText("Hello, ElenixOS!");
+label.align(lv.ALIGN_TOP_MID, 0, 10);
+```
+
+### 滑块（Slider）
+
+```javascript
+// 创建滑块
+const slider = new lv.slider(eos.view.active());
+slider.setSize(200, 20);
+slider.align(lv.ALIGN_CENTER, 0, 0);
+slider.setRange(0, 100);
+slider.setValue(50, false);
+
+// 绑定事件
+slider.addEventCb((e) => {
+    const value = slider.getValue();
+    console.log("Slider value:", value);
+}, lv.EVENT_VALUE_CHANGED, null);
+```
+
+### 屏幕（Screen）
+
+```javascript
+// 获取当前活动屏幕
+const scr = eos.view.active();
+
+// 创建组件到屏幕
+const button = new lv.button(scr);
+button.setSize(180, 64);
+button.align(lv.ALIGN_CENTER, 0, 0);
+```
+
+## 动画效果
+
+### 创建动画
+
+```javascript
+// 创建一个对象
+const obj = new lv.obj(eos.view.active());
+obj.setSize(100, 100);
+obj.setPos(50, 50);
+
+// 创建动画
+const anim = new lv.anim();
+anim.setVar(obj);
+anim.setValues(50, 200);
+anim.setDuration(1000);
+anim.setExecCb((varObj, value) => {
+    varObj.setX(value);
+});
+anim.start();
+```
