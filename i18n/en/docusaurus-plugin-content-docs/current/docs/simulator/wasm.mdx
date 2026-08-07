@@ -1,0 +1,188 @@
+---
+sidebar_position: 3
+title: 网页运行（WASM Simulator）
+---
+
+# 网页运行（WASM Simulator）
+
+ElenixOS 提供了 WASM（WebAssembly）版本的模拟器，您可以通过浏览器直接访问，无需安装任何依赖，即可体验 ElenixOS。
+
+在线体验：[ElenixOS Simulator](https://simulator.elenixos.com/wasm/latest/main.html)
+
+## WASM 构建方法
+
+### 环境要求
+
+* **操作系统**：Linux、macOS 或 Windows
+* **构建工具**：
+  * CMake (3.13+)
+  * Emscripten SDK (4.0.11 或更高版本)
+
+### 安装 Emscripten SDK
+
+1. **下载并安装 Emscripten SDK**
+
+   ```bash
+   # 克隆 Emscripten 仓库
+   git clone https://github.com/emscripten-core/emsdk.git
+
+   # 进入 emsdk 目录
+   cd emsdk
+
+   # 安装指定版本的 Emscripten
+   ./emsdk install 4.0.11
+
+   # 激活 Emscripten
+   ./emsdk activate 4.0.11
+
+   # 配置环境变量
+   source ./emsdk_env.sh
+   ```
+
+### 构建 WASM 版本
+
+1. **克隆 ElenixOS-Simulator 仓库**
+
+   ```bash
+   git clone --recursive https://github.com/ElenixOS/ElenixOS-Simulator
+   cd ElenixOS-Simulator
+   ```
+
+2. **配置 WASM 构建**
+
+   ```bash
+   emcmake cmake -S . -B build-wasm -DEOS_PLATFORM=WASM -DCMAKE_BUILD_TYPE=Release
+   ```
+
+3. **构建 WASM 产物**
+
+   ```bash
+   cmake --build build-wasm --parallel
+   ```
+
+4. **查看构建产物**
+
+   构建完成后，产物将位于 `build-wasm/bin` 目录中，包括：
+
+   * `main.html`：WASM 模拟器的 HTML 入口文件
+   * `main.js`：JavaScript 胶水代码
+   * `main.wasm`：WebAssembly 二进制文件
+   * `main.data`：数据文件
+
+## 在浏览器中运行
+
+### 本地运行
+
+1. **启动本地服务器**
+
+   ```bash
+   cd build-wasm/bin
+   python3 -m http.server 8000
+   ```
+
+2. **在浏览器中访问**
+
+   打开浏览器，访问 `http://localhost:8000/build-wasm/bin/main.html`，即可看到 ElenixOS 模拟器。
+
+### 通过 GitHub Pages 访问
+
+ElenixOS-Simulator 仓库包含了自动构建和部署 WASM 版本到 GitHub Pages 的工作流。构建完成后，您可以通过以下链接访问：
+
+`https://\<owner>.github.io/\<repo>/wasm/latest/main.html`
+
+## 在其他页面中嵌入
+
+### 直接链接
+
+如果您的页面与 WASM 模拟器托管在同一个 GitHub Pages 站点下，可以直接链接：
+
+```html
+<a href="/ElenixOS-Simulator/wasm/latest/main.html" target="_blank" rel="noopener">打开 ElenixOS 模拟器</a>
+```
+
+### 使用 iframe 嵌入
+
+您也可以在其他页面中使用 iframe 嵌入 ElenixOS 模拟器：
+
+```html
+<iframe
+    src="/ElenixOS-Simulator/wasm/latest/main.html"
+    width="100%"
+    height="720"
+    style="border:0"
+    loading="lazy"
+    referrerpolicy="no-referrer"
+></iframe>
+```
+
+如果您的页面托管在其他位置，请使用完整的绝对 URL：
+
+```html
+<iframe
+    src="https://<owner>.github.io/<repo>/wasm/latest/main.html"
+    width="100%"
+    height="720"
+    style="border:0"
+    loading="lazy"
+    referrerpolicy="no-referrer"
+></iframe>
+```
+
+## VSCode 使用方法
+
+### 配置 VSCode
+
+1. **安装推荐扩展**
+
+   * C/C++ 扩展
+   * CMake Tools 扩展
+   * GDB 扩展（用于调试）
+
+2. **打开项目**
+
+   使用 VSCode 打开 ElenixOS-Simulator 项目，建议直接打开工作区文件 `simulator.code-workspace`。
+
+3. **配置构建目标**
+
+   * 按 `Cmd+Shift+P` (macOS) 或 `Ctrl+Shift+P` (Windows/Linux) 打开命令面板
+   * 输入 `CMake: Select a Kit` 并选择 Emscripten 工具链
+   * 输入 `CMake: Configure` 配置项目
+   * 输入 `CMake: Set Build Target` 并选择 `main`
+
+### 构建和运行
+
+1. **构建项目**
+
+   * 按 `Cmd+Shift+P` (macOS) 或 `Ctrl+Shift+P` (Windows/Linux) 打开命令面板
+   * 输入 `CMake: Build` 构建项目
+
+2. **运行模拟器**
+
+   * 构建完成后，在 `build-wasm/bin` 目录中启动本地服务器
+   * 在浏览器中访问 `http://localhost:8000/build-wasm/bin/main.html`
+
+## 常见问题
+
+### Emscripten SDK 安装失败
+
+* 确保网络连接正常
+* 尝试使用不同版本的 Emscripten SDK
+* 参考 [Emscripten 官方文档](https://emscripten.org/docs/getting_started/downloads.html) 进行安装
+
+### 构建失败
+
+* 确保 Emscripten SDK 已正确激活
+* 检查 CMake 版本是否满足要求（3.13+）
+* 确保所有子模块已正确克隆
+
+### 浏览器中运行失败
+
+* 确保使用现代浏览器（Chrome、Firefox、Safari、Edge 等）
+* 检查浏览器是否支持 WebAssembly
+* 确保本地服务器已正确启动
+
+## 相关链接
+
+* [ElenixOS-Simulator 仓库](https://github.com/ElenixOS/ElenixOS-Simulator)
+* [Emscripten 官方文档](https://emscripten.org/docs/)
+* [WebAssembly 官方文档](https://webassembly.org/docs/)
