@@ -317,9 +317,30 @@ async function callDeepSeekAPI(systemPrompt, userContent, retries = 3) {
   }
 }
 
-/** Convenience wrapper for callDeepSeekAPI — extracts 'translation' field. */
+/**
+ * Try to salvage a DeepSeek response that isn't valid JSON (literal \n, etc.)
+ */
+function fixLiteralEscapes(raw) {
+  return raw
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\"/g, '"');
+}
+
+/** Convenience wrapper — extracts 'translation' field, with fallback repair. */
 async function callDeepSeek(systemPrompt, userContent, retries = 3) {
   const data = await callDeepSeekAPI(systemPrompt, userContent, retries);
+  if (data?._raw) {
+    // JSON parse failed — try to salvage by unescaping the raw content
+    const repaired = fixLiteralEscapes(data._raw);
+    // Try to extract a translation-like field from the repaired JSON
+    try {
+      const parsed = JSON.parse(repaired);
+      return parsed.translation || parsed.content || repaired;
+    } catch {
+      return repaired;
+    }
+  }
   return data?.translation || data?.content || JSON.stringify(data);
 }
 
@@ -403,8 +424,16 @@ async function translateCommentBatch(commentMap) {
     return commentMap.map(c => c.original);
   }
   try {
-    const data = await callDeepSeekAPI(COMMENT_PROMPT, lines);
+    let data = await callDeepSeekAPI(COMMENT_PROMPT, lines);
+    // Handle JSON parse failure fallback
+    if (data?._raw) {
+      try { data = JSON.parse(fixLiteralEscapes(data._raw)); } catch { /* keep as-is */ }
+    }
     const translations = data.translations || [];
+    if (translations.length === 0) {
+      console.warn(`    → comment translation returned empty, keeping originals`);
+      return commentMap.map(c => c.original);
+    }
     console.log(`    → translated ${translations.length}/${commentMap.length} code comment(s)`);
     return translations;
   } catch (err) {
