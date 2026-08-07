@@ -1,0 +1,212 @@
+---
+sidebar_position: 4
+title: 文件系统模块
+---
+
+ElenixOS 使用统一的路径格式，即 POSIX-style 路径。所有文件操作都必须通过存储服务进行，系统内无法直接访问底层文件系统。
+
+## LVGL 文件系统集成
+
+LVGL 文件系统驱动作为适配层工作：
+
+* 拦截所有 LVGL 文件操作
+* 将其转换为 eos_service_storage API 调用
+* 确保所有文件访问都通过 ElenixOS 存储沙箱
+
+### 架构
+
+LVGL → FS driver → eos_service_storage → eos_fs_port
+
+### 为什么 LV_FS_DEFAULT_DRIVE_LETTER 必须固定？
+
+LVGL 使用"驱动器字母"机制（例如 'S:/path'）来选择文件系统驱动。如果路径不包含驱动器字母，LVGL 会回退到 LV_FS_DEFAULT_DRIVE_LETTER。
+
+在 ElenixOS 中：
+
+* 向应用程序暴露单一的统一文件系统
+* 所有路径应为 POSIX-style（例如 "/data/config.json"）
+* LVGL 驱动在内部处理驱动器字母转换
+
+因此，LV_FS_DEFAULT_DRIVE_LETTER 必须指向 ElenixOS 驱动，否则 LVGL 可能会将文件操作路由到意外的后端。
+
+```c
+#if LV_FS_DEFAULT_DRIVE_LETTER != EOS_LVGL_FS_LETTER
+#error "LV_FS_DEFAULT_DRRIVE_LETTER must match EOS_LVGL_FS_LETTER"
+#endif
+```
+
+## 路径处理
+
+### 路径解析
+
+所有路径在 `eos_fs_port` 层解析，不再由存储服务处理前缀。仿真器中调用 `eos_fs_set_root()` 设置沙箱根目录；`eos_fs_open_read()` / `eos_fs_open_write()` 等函数内部通过 `eos_fs_realpath()` 将虚拟路径透明映射到实际文件系统路径。量产硬件上根目录默认为 `"/"`，路径透传。
+
+## JSON 存储 API
+
+存储服务提供了一套完整的 JSON 文件操作接口，用于读取和修改 JSON 格式的配置文件。
+
+### 加载 JSON 文件
+
+从存储中加载 JSON 文件：
+
+```c
+cJSON *eos_storage_json_load(const char *path);
+```
+
+返回 cJSON 根对象，失败时返回 NULL。
+
+### 保存 JSON 文件
+
+将 cJSON 对象保存到文件：
+
+```c
+eos_result_t eos_storage_json_save(const char *path, cJSON *root);
+```
+
+### 布尔值操作
+
+```c
+bool eos_storage_json_get_bool(const char *path, const char *key, bool default_value);
+eos_result_t eos_storage_json_set_bool(const char *path, const char *key, bool value);
+```
+
+### 字符串操作
+
+```c
+char *eos_storage_json_get_string(const char *path, const char *key, const char *default_value);
+eos_result_t eos_storage_json_set_string(const char *path, const char *key, const char *value);
+```
+
+返回的字符串需要使用 `eos_free` 释放内存。
+
+### 数值操作
+
+```c
+double eos_storage_json_get_number(const char *path, const char *key, double default_value);
+eos_result_t eos_storage_json_set_number(const char *path, const char *key, double value);
+```
+
+### JSON 对象操作
+
+```c
+cJSON *eos_storage_json_get_json(const char *path, const char *key);
+eos_result_t eos_storage_json_set_json(const char *path, const char *key, cJSON *json_value);
+```
+
+返回的 cJSON 对象使用完后需要调用 `cJSON_Delete` 释放。
+
+### 创建 JSON 文件
+
+如果文件不存在，则创建包含默认内容的 JSON 文件：
+
+```c
+eos_result_t eos_storage_json_create_if_not_exist(const char *path, const char *default_json);
+```
+
+## 文件系统操作
+
+### 检查文件类型
+
+```c
+bool eos_storage_is_dir(const char *path);
+bool eos_storage_is_file(const char *path);
+bool eos_storage_is_valid_filename(const char *name);
+```
+
+### 写入文件
+
+向文件写入字符串（自动在末尾添加换行符）：
+
+```c
+eos_result_t eos_storage_puts(const char *s, eos_file_t fp);
+```
+
+### 创建目录
+
+如果目录不存在，则创建：
+
+```c
+eos_result_t eos_storage_mkdir_if_not_exist(const char *path);
+```
+
+递归创建目录树：
+
+```c
+eos_result_t eos_storage_mkdir_recursive(const char *path);
+```
+
+### 创建文件
+
+如果文件不存在，则创建并写入默认内容：
+
+```c
+eos_result_t eos_storage_create_file_if_not_exist(const char *path, const char *default_content);
+```
+
+### 读取文件
+
+将整个文件内容读入动态分配的缓冲区（仅适用于文本文件）：
+
+```c
+char *eos_storage_read_file(const char *path);
+```
+
+返回动态分配的缓冲区，使用完后需要使用 `eos_free` 释放。
+
+### 写入文件
+
+```c
+eos_result_t eos_storage_write_file(const char *path, const void *data, size_t data_size);
+```
+
+### 立即写入（绕过延迟写入器）
+
+```c
+eos_result_t eos_storage_write_file_immediate(const char *path, const void *data, size_t data_size);
+char *eos_storage_read_file_immediate(const char *path);
+```
+
+## 延迟文件写入器 (Deferred File Writer)
+
+延迟文件写入器用于批量写入文件，减少频繁的 Flash 写入操作，延长 Flash 寿命。
+
+### 工作原理
+
+* 写入数据时，先写入缓冲区
+* 调用 `eos_dfw_sync()` 时，将缓冲区数据同步到文件系统
+
+### 同步缓冲区到文件系统
+
+```c
+void eos_dfw_sync(void);
+```
+
+### 写入数据
+
+```c
+bool eos_dfw_write(const char *path, const uint8_t *data, size_t data_size);
+```
+
+返回 true 表示任务已添加到队列，将在下一次调用 `eos_dfw_sync()` 时写入文件。
+
+### 读取文件数据
+
+```c
+uint8_t *eos_dfw_read(const char *path);
+```
+
+成功返回文件内容，失败返回 NULL。需要手动释放返回的指针。
+
+### 初始化
+
+```c
+void eos_dfw_init(void);
+```
+
+## LVGL 文件系统注册
+
+注册 LVGL 文件系统驱动，将所有文件操作路由到 ElenixOS 存储服务：
+
+```c
+void eos_lvgl_fs_register(void);
+```
