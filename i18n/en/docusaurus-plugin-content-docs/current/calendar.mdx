@@ -1,0 +1,105 @@
+---
+title: 日历 (Calendar)
+sidebar_position: 3
+---
+
+# 日历 (Calendar)
+
+日历是 ElenixOS 中用于显示和选择日期的特殊 API 组件。本文档将介绍日历组件的功能、使用方法和注意事项。
+
+## 功能介绍
+
+日历组件允许开发者创建一个日历界面，用于显示和选择日期。日历组件通常用于日期选择、日程安排等场景。
+
+## 使用方法
+
+### 创建日历
+
+使用 `new lv.calendar()` 构造函数创建日历对象：
+
+```javascript
+// 创建日历对象
+const calendar = new lv.calendar(eos.view.active());
+```
+
+### 配置日历
+
+使用以下方法配置日历：
+
+```javascript
+// 设置日历大小
+calendar.setSize(200, 200);
+
+// 设置日历位置
+calendar.setPos(10, 10);
+
+// 设置当前日期
+const date = { year: 2024, month: 1, day: 1 };
+calendar.setDate(date);
+
+// 设置标记日期
+const markedDates = [
+    { year: 2024, month: 1, day: 5 },
+    { year: 2024, month: 1, day: 10 },
+    { year: 2024, month: 1, day: 15 }
+];
+calendar.setMarkedDates(markedDates);
+```
+
+### 绑定事件
+
+使用 `addEventCb` 方法绑定事件：
+
+```javascript
+// 绑定日期选择事件
+calendar.addEventCb((e) => {
+    const date = calendar.getDate();
+    eos.console.log("Selected date:", date);
+}, lv.EVENT_VALUE_CHANGED, null);
+```
+
+### 示例：创建简单日历
+
+```javascript
+// 创建日历
+const calendar = new lv.calendar(eos.view.active());
+calendar.setSize(200, 200);
+calendar.align(lv.ALIGN_CENTER, 0, 0);
+
+// 设置当前日期
+const date = { year: 2024, month: 1, day: 1 };
+calendar.setDate(date);
+
+// 绑定事件
+calendar.addEventCb((e) => {
+    const date = calendar.getDate();
+    eos.console.log("Selected date:", date);
+}, lv.EVENT_VALUE_CHANGED, null);
+```
+
+### 示例：创建带标记的日历
+
+```javascript
+// 创建日历
+const calendar = new lv.calendar(eos.view.active());
+calendar.setSize(200, 200);
+calendar.align(lv.ALIGN_CENTER, 0, 0);
+
+// 设置当前日期
+const date = { year: 2024, month: 1, day: 1 };
+calendar.setDate(date);
+
+// 设置标记日期
+const markedDates = [
+    { year: 2024, month: 1, day: 5 },
+    { year: 2024, month: 1, day: 10 },
+    { year: 2024, month: 1, day: 15 }
+];
+calendar.setMarkedDates(markedDates);
+
+// 绑定事件
+calendar.addEventCb((e) => {
+    const date = calendar.getDate();
+    eos.console.log("Selected date:", date);
+}, lv.EVENT_VALUE_CHANGED, null);
+```
