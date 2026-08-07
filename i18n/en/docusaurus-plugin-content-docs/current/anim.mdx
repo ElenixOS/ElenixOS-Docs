@@ -1,0 +1,114 @@
+---
+title: 动画 (Animation)
+sidebar_position: 7
+---
+
+# 动画 (Animation)
+
+动画是 ElenixOS 中用于创建和管理动画效果的特殊 API 组件。本文档将介绍动画组件的功能、使用方法和注意事项。
+
+## 功能介绍
+
+动画组件允许开发者创建和管理各种动画效果，如位置变化、大小变化、透明度变化等。通过动画组件，开发者可以为应用添加生动的视觉效果，提高用户体验。
+
+## 使用方法
+
+### 创建动画
+
+使用 `new lv.anim()` 构造函数创建动画对象：
+
+```javascript
+// 创建动画对象
+const anim = new lv.anim();
+```
+
+### 配置动画
+
+使用以下方法配置动画：
+
+```javascript
+// 设置动画目标对象
+anim.setVar(obj);
+
+// 设置动画值范围
+anim.setValues(startValue, endValue);
+
+// 设置动画持续时间（毫秒）
+anim.setDuration(1000);
+
+// 设置动画执行回调
+anim.setExecCb((varObj, value) => {
+    // 执行动画逻辑，如设置位置、大小等
+    varObj.setX(value);
+});
+
+// 设置动画完成回调
+anim.setReadyCb(() => {
+    eos.console.log("Animation completed");
+});
+
+// 设置动画路径（缓动函数）
+anim.setPathCb(lv.anim_path_ease_in_out);
+```
+
+### 启动动画
+
+使用 `start()` 方法启动动画：
+
+```javascript
+// 启动动画
+anim.start();
+```
+
+### 示例：创建平移动画
+
+```javascript
+// 创建一个对象
+const obj = new lv.obj(eos.view.active());
+obj.setSize(100, 100);
+obj.setPos(50, 50);
+
+// 创建动画
+const anim = new lv.anim();
+anim.setVar(obj);
+anim.setValues(50, 200);
+anim.setDuration(1000);
+anim.setExecCb((varObj, value) => {
+    varObj.setX(value);
+});
+anim.setPathCb(lv.anim_path_ease_in_out);
+anim.start();
+```
+
+### 示例：创建缩放动画
+
+```javascript
+// 创建一个对象
+const obj = new lv.obj(eos.view.active());
+obj.setSize(100, 100);
+obj.setPos(100, 100);
+
+// 创建动画
+const anim = new lv.anim();
+anim.setVar(obj);
+anim.setValues(100, 150);
+anim.setDuration(1000);
+anim.setExecCb((varObj, value) => {
+    varObj.setSize(value, value);
+});
+anim.setPathCb(lv.anim_path_ease_in_out);
+anim.start();
+```
+
+## 动画路径（缓动函数）
+
+ElenixOS 提供了以下动画路径（缓动函数）：
+
+| 路径函数                       | 描述     |
+| -------------------------- | ------ |
+| `lv.anim_path_linear`      | 线性动画   |
+| `lv.anim_path_ease_in`     | 缓入动画   |
+| `lv.anim_path_ease_out`    | 缓出动画   |
+| `lv.anim_path_ease_in_out` | 缓入缓出动画 |
+| `lv.anim_path_overshoot`   | 过冲动画   |
+| `lv.anim_path_bounce`      | 弹跳动画   |
