@@ -4,7 +4,6 @@ title: AI Translation Workflow Test
 description: This is a test document for verifying the DeepSeek AI automatic translation workflow
 ---
 
-
 # AI Translation Workflow Test
 
 This document is used to test whether the AI translation workflow works correctly. It covers various MDX syntax elements.
@@ -19,28 +18,28 @@ ElenixOS is an open-source operating system designed for smartwatches and other 
 #include "elenix_os.h"
 
 static void app_main(void) {
-    // 初始化显示驱动
+    // Initialize display driver
     display_init();
-    // 创建主界面
+    // Create main interface
     lv_obj_t *screen = lv_obj_create(NULL);
     lv_scr_load(screen);
 }
 ```### JavaScript Code```javascript
-// 在 ElenixOS 中注册一个表盘应用
+// Register a watch face app in ElenixOS
 const watchface = ElenixOS.registerApp({
   name: '我的表盘',
   type: 'watchface',
   render() {
-    // 绘制表盘界面
+    // Draw watch face interface
     ui.drawBackground();
     ui.drawTime();
   },
 });
 ```### Shell Commands```bash
-# 克隆 ElenixOS 仓库
+# Clone ElenixOS repository
 git clone https://github.com/ElenixOS/ElenixOS.git
 cd ElenixOS
-# 初始化子模块
+# Initialize submodules
 git submodule update --init --recursive
 ```## Inline Code and Formatting
 
@@ -48,16 +47,16 @@ Use`lv_obj_create(NULL)`to create a new LVGL object. The system achieves efficie
 
 The configuration item`LV_USE_ASSERT_MEM_INTEGRITY`should be set to`1`during debugging, but must be set to`0`during performance testing.
 
-## Callout Test:::noteThis is a normal callout. During translation, the`:::note`marker should be preserved, and only the Chinese content inside should be translated.:::
+## Callout Test:::noteThis is a normal callout. During translation, the`:::note`markers should be preserved, and only the Chinese content inside should be translated.:::
 
 :::warning**Note**: Before deploying to production, be sure to thoroughly test all features in the simulator. Unverified code may cause system crashes.:::
 
-:::tipIt is recommended to use the online simulator for quick previews: [ElenixOS Simulator](https://simulator.elenixos.com):::
+:::tipIt is recommended to use the online simulator for quick preview: [ElenixOS Simulator](https://simulator.elenixos.com):::
 
 ## 链接测试- [Quick Start Guide](./getting_started/quick_start.mdx)- [LVGL Official Documentation](https://docs.lvgl.io/)- [JerryScript Project](https://github.com/jerryscript-project/jerryscript)## Table Test
 
 | Feature | Description | Status |
-|------|------|------|
+|---------|-------------|--------|
 | Script Engine | JavaScript runtime based on JerryScript | Completed |
 | Display Driver | Supports multiple screen resolutions and color depths | Completed |
 | Sensor Framework | Unified sensor data acquisition interface | In Development |
@@ -82,6 +81,6 @@ The configuration item`LV_USE_ASSERT_MEM_INTEGRITY`should be set to`1`during deb
 
 ## Mixed Content
 
-> ElenixOS's architecture design follows the principle of "minimal kernel, maximum flexibility." The system core is only responsible for resource management and process scheduling, and all upper-layer functionality is extended through the script engine.
+> The architecture design of ElenixOS follows the principle of "minimal kernel, maximum flexibility." The system core is only responsible for resource management and process scheduling, and all upper-layer functionality is extended through the script engine.
 
 After enabling`LV_USE_FILE_EXPLORER`in`lv_conf.h`, you can use the`lv_file_explorer_open()`function to open the file browser component.
