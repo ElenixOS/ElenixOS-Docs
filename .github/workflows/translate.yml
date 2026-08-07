@@ -2,12 +2,7 @@ name: Translate docs & blog to English
 
 on:
   push:
-    branches-ignore: [main]
-    paths:
-      - 'docs/**'
-      - 'blog/**'
-      - 'scripts/**'
-      - '.github/workflows/translate.yml'
+    branches: [dev]
   workflow_dispatch:
     inputs:
       backfill:
@@ -19,18 +14,19 @@ permissions:
   contents: write
 
 concurrency:
-  group: i18n-en-${{ github.ref }}
+  group: i18n-sync
   cancel-in-progress: false
 
 jobs:
-  translate-and-push:
+  translate-and-sync:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
+      - name: Checkout dev
         uses: actions/checkout@v4
         with:
+          ref: dev
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -57,7 +53,7 @@ jobs:
             cat translate-summary.json
           fi
 
-      - name: Push translations to main
+      - name: Sync to main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -65,27 +61,18 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          echo "=== i18n status ==="
-          git status --short i18n/ 2>&1 || true
-
-          git add i18n/
-
-          if git diff --cached --quiet; then
-            echo "No i18n changes — done."
+          # Commit all changes (dev source + AI translations) to an intermediate branch
+          SYNC_BRANCH="sync/i18n-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$SYNC_BRANCH"
+          git add docs/ blog/ i18n/
+          git commit -m "chore(i18n): AI translate docs/blog changes" || {
+            echo "No changes to sync."
             exit 0
-          fi
+          }
 
-          echo "=== Committing i18n ==="
-          git diff --cached --name-only
-          git commit -m "chore(i18n): AI translate docs/blog changes "
-          I18N_SHA=$(git rev-parse HEAD)
+          echo "=== Pushing $SYNC_BRANCH → main ==="
+          git push origin "$SYNC_BRANCH:main"
+          echo "✓ Synced to main"
 
-          echo "=== Applying to main ==="
-          git fetch origin main
-          git checkout -B ci-i18n origin/main
-          git checkout "$I18N_SHA" -- i18n/
-          git commit -m "chore(i18n): AI translate docs/blog changes "
-
-          echo "=== Pushing to main ==="
-          git push origin HEAD:main
-          echo "✓ Done"
+          # Clean up intermediate branch
+          git push origin --delete "$SYNC_BRANCH" 2>/dev/null || true
