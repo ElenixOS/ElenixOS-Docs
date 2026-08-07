@@ -1,0 +1,80 @@
+---
+sidebar_position: 6
+title: 配置服务
+---
+
+配置服务负责管理系统配置信息，包括设备名称、语言、显示设置、背光亮度等系统级配置。所有配置都存储在系统配置文件中（config.json）。
+
+## 配置键
+
+### 系统配置键
+
+```c
+#define EOS_CONFIG_KEY_DEVICE_NAME_STR "device_name"                  // 设备名称
+#define EOS_CONFIG_KEY_LANGUAGE_STR "language"                       // 语言
+#define EOS_CONFIG_KEY_WATCHFACE_ID_STR "wf_id"                       // 表盘 ID
+#define EOS_CONFIG_KEY_BLUETOOTH_BOOL "bluetooth"                     // 蓝牙开关
+#define EOS_CONFIG_KEY_DISPLAY_BRIGHTNESS_NUMBER "display_brightness" // 显示亮度
+#define EOS_CONFIG_KEY_SPEAKER_VOLUME_NUMBER "speaker_volume"         // 扬声器音量
+#define EOS_CONFIG_KEY_MUTE_BOOL "mute"                               // 静音开关
+#define EOS_CONFIG_KEY_SLEEP_TIMEOUT_SEC_NUMBER "sleep_timeout_sec"   // 休眠超时时间
+#define EOS_CONFIG_KEY_AOD_MODE_BOOL "aod_mode"                       // AOD 模式开关
+#define EOS_CONFIG_KEY_WAKE_ON_RAISE_BOOL "wake_on_raise"             // 抬腕唤醒开关
+#define EOS_CONFIG_KEY_VIBRATOR_STRENGTH_NUMBER "vibrator_strength"   // 振动强度
+#define EOS_CONFIG_KEY_APP_ORDER_ARRAY "app_order"                     // 应用排序
+```
+
+## 默认值
+
+```c
+#define EOS_CONFIG_DEFAULT_DEVICE_NAME "Elenix Watch"                  // 默认设备名称
+#define EOS_CONFIG_DEFAULT_WATCHFACE_ID_STR "cn.sab1e.clock"           // 默认表盘 ID
+```
+
+## 服务初始化
+
+首次系统运行时初始化配置服务：
+
+```c
+void eos_service_config_init(void);
+```
+
+## 布尔类型配置
+
+```c
+eos_result_t eos_config_set_bool(const char *key, bool value);
+bool eos_config_get_bool(const char *key, bool default_value);
+```
+
+## 字符串类型配置
+
+```c
+eos_result_t eos_config_set_string(const char *key, const char *value);
+char *eos_config_get_string(const char *key, const char *default_value);
+```
+
+返回的字符串不再使用时需要使用 `eos_malloc(str)` 释放内存。
+
+## 数值类型配置
+
+```c
+eos_result_t eos_config_set_number(const char *key, double value);
+double eos_config_get_number(const char *key, double default_value);
+```
+
+## JSON 类型配置
+
+```c
+cJSON *eos_config_get_json(const char *key);
+eos_result_t eos_config_set_json(const char *key, cJSON *json_value);
+```
+
+获取的 cJSON 对象使用完后需要调用 `cJSON_Delete()` 释放。
+
+## 添加配置项
+
+向系统配置文件添加新的配置项：
+
+```c
+eos_result_t eos_config_add_item(const char *key, const char *value);
+```
