@@ -1,0 +1,72 @@
+---
+sidebar_position: 10
+title: 电源管理服务
+---
+
+电源管理服务负责管理设备的电源状态，包括唤醒、休眠和 AOD（Always-On Display）模式。
+
+## 电源状态
+
+```c
+typedef enum {
+    EOS_PM_DISPLAY_ON,      // 唤醒模式（屏幕开启）
+    EOS_PM_DISPLAY_AOD,     // AOD 模式（屏幕始终显示）
+    EOS_PM_SLEEP,           // 休眠模式
+} eos_pm_state_t;
+```
+
+## 服务初始化
+
+```c
+void eos_service_pm_init(void);
+```
+
+## 电源控制
+
+### 唤醒设备
+
+```c
+void eos_pm_wake_up(void);
+```
+
+### 请求进入休眠
+
+如果启用了 AOD 模式，则进入 AOD 模式；否则进入休眠模式：
+
+```c
+void eos_pm_request_sleep(void);
+```
+
+### 重置定时器
+
+重置休眠定时器：
+
+```c
+void eos_pm_reset_timer(void);
+```
+
+### 设置休眠超时
+
+设置多长时间无操作后进入休眠（单位：秒）：
+
+```c
+void eos_pm_set_sleep_timeout(uint32_t sec);
+```
+
+## AOD 模式
+
+### 设置 AOD 模式
+
+```c
+void eos_pm_set_aod_mode(bool enable);
+```
+
+参数为 true 启用 AOD 模式，false 禁用 AOD 模式。
+
+## 获取电源状态
+
+```c
+eos_pm_state_t eos_pm_get_state(void);
+```
+
+返回当前的电源状态。
