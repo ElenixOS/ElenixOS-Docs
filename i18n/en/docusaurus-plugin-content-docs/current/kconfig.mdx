@@ -1,0 +1,75 @@
+---
+sidebar_position: 8
+title: 内核配置系统
+---
+
+# 内核配置系统
+
+ElenixOS 采用 Kconfig 管理内核编译期配置。最终生效的取值由两个独立阶段合并决定：Kconfig 合并层与 C 预处理层。
+
+## Kconfig 合并层
+
+脚本 `kconfig.py genconfig` 对以下三层以 `replace=True` 方式合并，**后载入的值覆盖先载入的值**：
+
+1. Kconfig 内置 `default` 声明 — 内核定义的基线默认值
+2. `defaults.conf` — 受版本控制的文件，为当前项目设定基线
+3. `build/.config` — 不受版本控制，存储经由 `menuconfig` 产生的本地修改
+
+合并产物写入 `build/generated/eos_config_gen.h`，每个值与 native 宏名一一对应，以 `#ifndef` 守卫输出。
+
+## C 预处理层
+
+头文件 `eos_config.h` 按固定顺序引入配置定义，全部符号使用 `#ifndef` 守卫，**先定义者胜**：
+
+1. 编译器 `-D` 参数
+2. `eos_platform_config.h` — 手动平台覆盖（可选）
+3. `eos_config_gen.h` — Kconfig 合并产物（可选，由构建自动生成）
+4. `eos_config_defaults.h` — 内核兜底默认值
+
+任一阶段均可阻止后续阶段的定义生效，形成从构建命令行到内核回退的完整覆盖链。
+
+## 操作
+
+项目根目录 `Makefile` 提供以下目标：
+
+| 目标                    | 操作                                                                              |
+| --------------------- | ------------------------------------------------------------------------------- |
+| `make` / `make build` | `cmake --build build`（CMake 按需自动重配置）                                            |
+| `make menuconfig`     | 编辑 `build/.config`（`cmake -B build && cmake --build build --target menuconfig`） |
+| `make run`            | 构建并运行                                                                           |
+
+### 依赖安装
+
+```bash
+pip install kconfiglib
+```
+
+### 多构建目录
+
+各构建目录的 `.config` 完全隔离。Native 与 WASM 构建可持有不同配置：
+
+```bash
+# Native
+cmake -B build
+make menuconfig        # 编辑 build/.config
+
+# WASM
+cmake -B build-wasm -D EOS_PLATFORM=WASM
+cmake --build build-wasm --target menuconfig    # 编辑 build-wasm/.config
+```
+
+:::note
+`menuconfig` 依赖终端 curses 支持。Windows 平台使用 MSYS2 终端。
+:::
+
+## 与 CMake 选项的边界
+
+CMake 选项（`-DUSE_FREERTOS=ON` 等）控制构建行为——编译单元、链接目标、编译标志。Kconfig 选项控制内核运行时行为——内存策略、文件系统类型、字体引擎、日志策略等。二者作用于不同阶段，不存在功能重叠。
+
+## CI 行为
+
+GitHub Actions 在构建前执行 `pip install -r requirements.txt`。CMake 配置自动完成 Kconfig 合并与头文件生成。若 `genconfig` 失败，构建不中断，回退至 `eos_config_defaults.h`。
+
+## 回退机制
+
+Kconfig 未安装或 `genconfig` 失败时，内核以 `eos_config_defaults.h` 兜底。`cmake -B build && cmake --build build` 在任何情况下均可用。
