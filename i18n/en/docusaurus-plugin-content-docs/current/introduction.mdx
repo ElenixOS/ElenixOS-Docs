@@ -1,51 +1,47 @@
 ---
 sidebar_position: 1
 slug: /intro
-title: Introduction to ElenixOS
+title: ElenixOS 介绍
 ---
 
-# Introduction to ElenixOS
+# ElenixOS 介绍
 
-ElenixOS is an open-source operating system designed for smartwatches and other resource-constrained wearable devices. It organizes UI, application logic, and system services on top of a unified scripting runtime, allowing watch faces, system apps, and third-party apps to run in a more consistent way while retaining efficient access to underlying hardware.
+ElenixOS 是一个面向智能手表与其他资源受限可穿戴设备的开源操作系统。它把 UI、应用逻辑和系统服务组织在统一的脚本运行时之上，让表盘、系统应用和第三方应用能够以更一致的方式运行，同时保留对底层硬件的高效访问能力。
 
-## Key Features
+## 核心特性
 
-### Script-driven Application Model
+### 脚本驱动的应用模型
 
-Watch faces and applications in ElenixOS are driven by a scripting engine. Scripts describe the user interface and business logic, while native code handles scheduling, rendering, and resource management. This layered approach makes applications easier to iterate on and simplifies porting to different hardware platforms.
+ElenixOS 的表盘和应用程序统一由脚本引擎驱动。脚本负责描述界面和业务逻辑，底层原生代码负责调度、渲染与资源管理。这种分层方式让应用更容易迭代，也便于在不同硬件平台间迁移。
 
-### LVGL + JerryScript Runtime
+### LVGL + JerryScript 运行时
 
-The graphics layer is based on LVGL, and scripts are executed by JerryScript. LVGL handles UI rendering and interaction, while JerryScript provides a JavaScript execution environment suitable for resource-limited devices. Together they enable a consistent UI experience and scriptable extensibility on wearables.
+图形层基于 LVGL，脚本执行则由 JerryScript 提供支持。前者负责界面绘制和交互，后者负责在资源受限设备上执行 JavaScript 逻辑。两者结合后，ElenixOS 能在可穿戴设备上提供相对一致的 UI 体验和脚本化扩展能力。
 
-### Layered Architecture
+### 分层架构
 
-The project separates system capabilities into application, kernel, portability, and hardware layers. This allows upper-layer applications to rely on a stable API while the lower-layer implementations can be adapted for different chips, sensors, and peripherals.
+项目把系统能力拆分为应用层、内核层、可移植接口层和硬件层。这样做的好处是：上层应用可以稳定依赖统一 API，而底层实现可以针对不同芯片、传感器和外设进行替换。
 
-### Developer Tooling
+### 面向开发者的工具链
 
-Besides the runtime, ElenixOS provides developer tools such as app packaging and binding generation to help combine scripts, resources, and native interfaces into deployable application bundles.
+除了运行时本身，ElenixOS 还提供了应用打包、绑定层生成等开发工具，帮助你把脚本、资源和原生接口组合成可部署的应用包。
 
-### Rich Core Modules
+### 丰富的核心模块
 
-ElenixOS offers a set of core modules, including:
+ElenixOS 提供了一系列核心模块，包括：
 
-- **Application Management**: install, uninstall, manage, and run apps
-- **System Services**: battery management, sensor management, and other system-level services
-- **UI Components**: a rich set of UI widgets built on LVGL
-- **Filesystem**: file and directory operations
-- **Scripting Engine**: a JavaScript runtime based on JerryScript
+* **应用管理**：支持应用的安装、卸载、管理和运行
+* **系统服务**：提供电池管理、传感器管理等系统级服务
+* **UI组件**：基于 LVGL 提供丰富的用户界面组件
+* **文件系统**：支持文件和目录的操作
+* **脚本引擎**：基于 JerryScript 提供 JavaScript 执行环境
 
-## Where to Read First
+## 适合先读什么
 
-If you want a quick overview, read in this order:
+如果你只想快速建立整体印象，建议按这个顺序阅读：
 
-1. [System Architecture](/docs/architecture/arch) to understand ElenixOS's layering.
-2. [Scripting Engine](/docs/architecture/script_engine_overview) to learn how apps and watch faces run.
-3. [Quick Start](/docs/getting_started/quick_start) to get the basic project entry points.
-4. For development and debugging, see [Developer Tools](/docs/development/dev_tools) and [Build & Usage](/docs/getting_started/build).
-5. For implementation details of core modules, consult [Core Modules](./architecture/framework/app).
-
-## Documentation Conventions
-
-This site evolves alongside ElenixOS's implementation. Some sections may be more complete than others, but the overall goal is consistent: to help you build a full understanding of the project from architecture and runtime behavior to development workflows.
+1. 先看 [系统架构](/docs/architecture/arch)，了解 ElenixOS 的分层方式。
+2. 再看 [脚本引擎](/docs/architecture/script_engine_overview)，理解应用和表盘是如何运行的。
+3. 接着看 [快速开始](/docs/getting_started/quick_start)，确认项目的基本入口。
+4. 需要开发或调试时，再查看 [开发工具](/docs/development/dev_tools) 和 [构建与使用](/docs/getting_started/build)。
+5. 想了解核心模块的详细实现，可查看 [核心模块](./architecture/framework/app) 相关文档。
