@@ -88,24 +88,19 @@ function git(args, opts = {}) {
  * Returns array of { status: 'A'|'M'|'D'|'R', path: string }.
  */
 function getChangedFiles(baseRef) {
-  // Use -z (NUL-delimited) for safe parsing of filenames with spaces
+  // -z outputs NUL-delimited: status<NUL>path<NUL> (or R<score><NUL>old<NUL>new<NUL>)
   const out = git(`diff --name-status -z --diff-filter=ADMR ${baseRef} HEAD -- docs/ blog/`);
   if (!out) return [];
   const entries = out.split('\0').filter(Boolean);
   const files = [];
   for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i];
-    // Format: "M\0path" or "R100\0old\0new"
-    const status = entry[0];
-    const rest = entry.slice(1).trim();
+    const statusField = entries[i];
+    const status = statusField[0];
     if (status === 'R') {
-      // Next entry is the new path
-      files.push({ status: 'D', path: rest });
-      if (i + 1 < entries.length) {
-        files.push({ status: 'A', path: entries[++i] });
-      }
+      files.push({ status: 'D', path: entries[++i] });
+      files.push({ status: 'A', path: entries[++i] });
     } else {
-      files.push({ status, path: rest });
+      files.push({ status, path: entries[++i] });
     }
   }
   return files;
