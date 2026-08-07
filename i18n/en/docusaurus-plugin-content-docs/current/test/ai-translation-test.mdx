@@ -58,7 +58,7 @@ git submodule update --init --recursive
 
 Use `lv_obj_create(NULL)` to create a new LVGL object. The system achieves efficient communication between **JavaScript** and the *C layer* through `SNI` (Script Native Interface).
 
-The configuration item `LV_USE_ASSERT_MEM_INTEGRITY` should be set to `1` during debugging, but must be set to `0` during performance testing.
+The configuration option `LV_USE_ASSERT_MEM_INTEGRITY` should be set to `1` during debugging, but must be set to `0` during performance testing.
 
 ## Callout Box Test
 
@@ -87,7 +87,7 @@ It is recommended to use the online simulator for quick previews: [ElenixOS Simu
 | Script Engine | JavaScript runtime based on JerryScript | Completed |
 | Display Driver | Supports multiple screen resolutions and color depths | Completed |
 | Sensor Framework | Unified sensor data acquisition interface | In Development |
-| Bluetooth Protocol Stack | Low-energy Bluetooth communication support | Planned |
+| Bluetooth Protocol Stack | Low-power Bluetooth communication support | Planned |
 
 ## List Test
 
@@ -108,7 +108,7 @@ It is recommended to use the online simulator for quick previews: [ElenixOS Simu
 
 ## Mixed Content
 
-> ElenixOS's architecture design follows the principle of "minimal kernel, maximum flexibility." The system core is only responsible for resource management and process scheduling, and all upper-layer functionality is extended through the script engine.
+> The architecture design of ElenixOS follows the principle of "minimal kernel, maximum flexibility." The system core is only responsible for resource management and process scheduling, while all upper-layer functionality is extended through the script engine.
 
 After enabling `LV_USE_FILE_EXPLORER` in `lv_conf.h`, you can use the `lv_file_explorer_open()` function to open the file browser component.
 
