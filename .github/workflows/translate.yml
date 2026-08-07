@@ -1,11 +1,8 @@
-name: Translate docs & blog to English
+name: Translate & Sync to Main
 
 on:
   push:
-    branches-ignore: [main]
-    paths:
-      - 'docs/**'
-      - 'blog/**'
+    branches: [dev]
   workflow_dispatch:
     inputs:
       backfill:
@@ -17,20 +14,20 @@ permissions:
   contents: write
 
 concurrency:
-  group: i18n-en-${{ github.ref }}
+  group: i18n-sync
   cancel-in-progress: false
 
 jobs:
-  translate-and-push:
+  translate-and-sync:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
+      - name: Checkout dev
         uses: actions/checkout@v4
         with:
+          ref: dev
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -38,69 +35,51 @@ jobs:
           node-version: 20
 
       - name: Translate changed files
-        id: translate
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
-          ARGS=("--out" "$RUNNER_TEMP/translate-summary.json")
-
-          if [ "${{ inputs.backfill }}" = "true" ]; then
-            ARGS+=("--backfill")
+          set -x
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.backfill }}" = "true" ]; then
+            node scripts/translate.mjs --backfill --out translate-summary.json
+          else
+            node scripts/translate.mjs --out translate-summary.json
           fi
-
-          node scripts/translate.mjs "${ARGS[@]}"
 
       - name: Show summary
         if: always()
         run: |
-          if [ -f "$RUNNER_TEMP/translate-summary.json" ]; then
-            echo "Translation summary:"
-            cat "$RUNNER_TEMP/translate-summary.json"
+          if [ -f translate-summary.json ]; then
+            echo "=== Translation summary ==="
+            cat translate-summary.json
           fi
 
-      - name: Push translations to main
+      - name: Sync to main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
-
-          # Stage only i18n/ changes
-          git add i18n/
-
-          if git diff --cached --quiet; then
-            echo "No i18n changes to commit — nothing to push."
-            exit 0
-          fi
-
+          set -x
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git commit -m "chore(i18n): AI translate docs/blog changes [skip ci]"
-          I18N_SHA=$(git rev-parse HEAD)
-          echo "i18n commit: $I18N_SHA"
+          # Stage ALL changes (source edits + deletions + AI translations)
+          git add .
 
-          # Cherry-pick the i18n commit onto main (ensures only i18n/ changes reach main)
+          if git diff --cached --quiet; then
+            echo "No changes — done."
+            exit 0
+          fi
+
+          git commit -m "chore: sync dev → main"
+          DEV_SHA=$(git rev-parse HEAD)
+
+          # Create sync branch from main to guarantee fast-forward
           git fetch origin main
-          git checkout -B ci-i18n origin/main
-          git cherry-pick -X theirs "$I18N_SHA" || {
-            echo "Cherry-pick conflict — resolving by keeping incoming i18n changes"
-            # If cherry-pick fails (unlikely for i18n-only), resolve with ours
-            git diff --name-only --diff-filter=U | xargs -r git rm
-            git cherry-pick --continue
-          }
+          git checkout -B sync/i18n origin/main
 
-          # Push to main with retry (in case main moves during our run)
-          for attempt in 1 2 3; do
-            if git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main; then
-              echo "✓ Pushed translations to main (attempt $attempt)."
-              exit 0
-            fi
-            echo "Push attempt $attempt failed — re-fetching and retrying..."
-            sleep 5
-            git fetch origin main
-            git checkout -B ci-i18n origin/main
-            git cherry-pick -X theirs "$I18N_SHA" || true
-          done
+          # Apply dev's full tree onto the sync branch
+          git checkout "$DEV_SHA" -- .
+          git commit -m "chore: sync dev → main"
 
-          echo "✗ Failed to push translations to main after 3 attempts."
-          exit 1
+          echo "=== Pushing to main ==="
+          git push origin HEAD:main
+          echo "✓ Done"

@@ -1,0 +1,12 @@
+{
+  "translated": [],
+  "deleted": [],
+  "skipped": [
+    {
+      "path": "docs/test/ai-translation-test.mdx",
+      "action": "skip",
+      "reason": "target does not exist"
+    }
+  ],
+  "failed": []
+}
