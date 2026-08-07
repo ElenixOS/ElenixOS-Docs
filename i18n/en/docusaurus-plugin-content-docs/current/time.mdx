@@ -1,0 +1,22 @@
+---
+sidebar_position: 13
+title: 时间服务
+---
+
+时间服务提供获取系统时间的功能。
+
+## 服务初始化
+
+```c
+eos_result_t eos_service_time_init(void);
+```
+
+成功返回 `EOS_OK`，失败返回错误码。
+
+## 获取系统时间
+
+```c
+eos_datetime_t eos_time_get(void);
+```
+
+返回带有毫秒精度的当前日期时间。
