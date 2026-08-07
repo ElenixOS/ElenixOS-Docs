@@ -1,0 +1,806 @@
+---
+title: ElenixOS 系统 API
+sidebar_position: 1
+---
+
+# ElenixOS 系统 API
+
+`eos` 命名空间是 ElenixOS 提供给 JavaScript 脚本运行时的核心系统 API。通过该 API，应用和表盘可以访问系统服务、页面导航、时间信息、配置存储、控制台日志等功能。
+
+## 命名空间结构
+
+```
+eos
+├── eos.console      — 控制台日志
+│   ├── .log()
+│   ├── .info()
+│   ├── .warn()
+│   ├── .error()
+│   └── .debug()
+├── eos.view         — 视图管理
+│   └── .active()
+├── eos.activity     — Activity 页面管理
+│   ├── .current()
+│   ├── .visible()
+│   ├── .bottom()
+│   ├── .watchface()
+│   ├── .rootScreen()
+│   ├── .getView()
+│   ├── .setView()
+│   ├── .getTitle()
+│   ├── .setTitle()
+│   ├── .getType()
+│   ├── .setType()
+│   ├── .setAppHeaderVisible()
+│   ├── .isAppHeaderVisible()
+│   ├── .enter()
+│   ├── .back()
+│   └── .isTransitionInProgress()
+├── eos.config       — 配置存储
+│   ├── .setStr()
+│   ├── .setBool()
+│   ├── .setNumber()
+│   ├── .getStr()
+│   ├── .getBool()
+│   └── .getNumber()
+├── eos.time         — 时间服务
+│   └── .getNow()
+├── eos.appHeader    — 应用标题栏
+│   ├── .setTitle()
+│   ├── .hide()
+│   └── .show()
+├── eos.clockHand    — 表盘指针
+│   ├── .create()
+│   ├── .center()
+│   └── .placePivot()
+├── 常量
+│   ├── eos.FONT_SIZE_*
+│   ├── eos.DISPLAY_*
+│   ├── eos.CLOCK_HAND_*
+│   └── eos.ACTIVITY_TYPE_*
+```
+
+## 控制台日志 (eos.console)
+
+提供不同级别的日志输出，用于调试和信息记录。
+
+### 方法
+
+```javascript
+eos.console.log(message)
+eos.console.info(message)
+eos.console.warn(message)
+eos.console.error(message)
+eos.console.debug(message)
+```
+
+**参数**：
+
+* `message`：字符串类型，要输出的日志信息
+
+**返回值**：无
+
+**说明**：所有日志方法接受一个字符串参数，将其输出到系统日志。输出时会自动添加当前脚本 ID 作为标签前缀，便于区分不同应用的日志。
+
+### 示例
+
+```javascript
+eos.console.log("Application started");
+eos.console.info("User logged in");
+eos.console.warn("Low battery");
+eos.console.error("Failed to load resource");
+eos.console.debug("Position: x=" + x + ", y=" + y);
+```
+
+## 视图管理 (eos.view)
+
+用于获取当前 Activity 的活跃 View 对象，是创建 UI 组件的基础。
+
+### eos.view.active()
+
+```javascript
+const view = eos.view.active();
+```
+
+**参数**：无
+
+**返回值**：`lv_obj_t` 类型的 LVGL 对象，即当前 Activity 的 View
+
+**说明**：此方法返回当前 Activity 关联的 LVGL 对象，所有 UI 组件都应以此作为父对象创建。等价于 C 层的 `eos_view_active()`。
+
+### 示例
+
+```javascript
+// 获取当前 View 并创建 UI 组件
+const view = eos.view.active();
+const label = new lv.label(view);
+label.setText("Hello, ElenixOS!");
+label.center();
+
+const button = new lv.button(view);
+button.setSize(100, 50);
+button.align(lv.ALIGN_CENTER, 0, 40);
+```
+
+## Activity 管理 (eos.activity)
+
+提供页面导航和 Activity 查询功能。Activity 是 ElenixOS 的页面管理单元。
+
+### 查询方法
+
+#### eos.activity.current()
+
+```javascript
+const activity = eos.activity.current();
+```
+
+获取当前 Activity（栈顶 Activity）。
+
+**参数**：无
+
+**返回值**：`eos_activity_t` 类型的 Activity 对象，失败返回 `undefined`
+
+#### eos.activity.visible()
+
+```javascript
+const activity = eos.activity.visible();
+```
+
+获取当前已完全显示（过渡动画完成）的 Activity。
+
+**参数**：无
+
+**返回值**：`eos_activity_t` 类型的 Activity 对象，失败返回 `undefined`
+
+#### eos.activity.bottom()
+
+```javascript
+const activity = eos.activity.bottom();
+```
+
+获取栈底 Activity（通常是表盘 Activity）。
+
+**参数**：无
+
+**返回值**：`eos_activity_t` 类型的 Activity 对象，失败返回 `undefined`
+
+#### eos.activity.watchface()
+
+```javascript
+const activity = eos.activity.watchface();
+```
+
+获取表盘 Activity。
+
+**参数**：无
+
+**返回值**：`eos_activity_t` 类型的 Activity 对象，失败返回 `undefined`
+
+#### eos.activity.rootScreen()
+
+```javascript
+const screen = eos.activity.rootScreen();
+```
+
+获取根屏幕对象。
+
+**参数**：无
+
+**返回值**：`lv_obj_t` 类型的根屏幕对象
+
+#### eos.activity.isTransitionInProgress()
+
+```javascript
+const isTransitioning = eos.activity.isTransitionInProgress();
+```
+
+检查 Activity 过渡动画是否正在进行。
+
+**参数**：无
+
+**返回值**：`boolean` — `true` 表示过渡动画进行中，`false` 表示空闲
+
+### View 管理
+
+#### eos.activity.getView(activity)
+
+```javascript
+const view = eos.activity.getView(activity);
+```
+
+获取指定 Activity 的 View 对象。
+
+**参数**：
+
+* `activity`：Activity 对象（由 `eos.activity.current()` 等方法返回）
+
+**返回值**：`lv_obj_t` 类型的 View 对象，失败返回 `undefined`
+
+#### eos.activity.setView(activity, view)
+
+```javascript
+eos.activity.setView(activity, view);
+```
+
+设置指定 Activity 的 View 对象。
+
+**参数**：
+
+* `activity`：Activity 对象
+* `view`：LVGL 对象，作为 Activity 的 View
+
+**返回值**：无
+
+### 标题管理
+
+#### eos.activity.getTitle(activity)
+
+```javascript
+const title = eos.activity.getTitle(activity);
+```
+
+获取 Activity 的标题。
+
+**参数**：
+
+* `activity`：Activity 对象
+
+**返回值**：`string` 类型，失败返回 `undefined`
+
+#### eos.activity.setTitle(activity, title)
+
+```javascript
+eos.activity.setTitle(activity, title);
+```
+
+设置 Activity 的标题。
+
+**参数**：
+
+* `activity`：Activity 对象
+* `title`：字符串标题
+
+**返回值**：无
+
+### 类型管理
+
+#### eos.activity.getType(activity)
+
+```javascript
+const type = eos.activity.getType(activity);
+```
+
+获取 Activity 的类型。
+
+**参数**：
+
+* `activity`：Activity 对象
+
+**返回值**：数字类型，对应 `eos.ACTIVITY_TYPE_*` 常量
+
+#### eos.activity.setType(activity, type)
+
+```javascript
+eos.activity.setType(activity, type);
+```
+
+设置 Activity 的类型。
+
+**参数**：
+
+* `activity`：Activity 对象
+* `type`：数字类型，使用 `eos.ACTIVITY_TYPE_*` 常量
+
+**返回值**：无
+
+### AppHeader 可见性
+
+#### eos.activity.setAppHeaderVisible(activity, visible)
+
+```javascript
+eos.activity.setAppHeaderVisible(activity, visible);
+```
+
+设置 Activity 的 AppHeader 可见性。
+
+**参数**：
+
+* `activity`：Activity 对象
+* `visible`：布尔值
+
+**返回值**：无
+
+#### eos.activity.isAppHeaderVisible(activity)
+
+```javascript
+const visible = eos.activity.isAppHeaderVisible(activity);
+```
+
+检查 Activity 的 AppHeader 是否可见。
+
+**参数**：
+
+* `activity`：Activity 对象
+
+**返回值**：`boolean`
+
+### 导航方法
+
+#### eos.activity.enter(activity)
+
+```javascript
+eos.activity.enter(activity);
+```
+
+进入指定 Activity（将 Activity 压入栈顶并显示）。
+
+**参数**：
+
+* `activity`：要进入的 Activity 对象
+
+**返回值**：无
+
+#### eos.activity.back()
+
+```javascript
+eos.activity.back();
+```
+
+返回上一 Activity（销毁当前栈顶 Activity，恢复上一 Activity）。
+
+**参数**：无
+
+**返回值**：`boolean` — `true` 表示操作成功，`false` 表示失败
+
+## 配置存储 (eos.config)
+
+提供基于 JSON 文件的持久化键值存储功能，每个应用/表盘拥有独立的存储空间。
+
+**存储路径**：
+
+* 应用：`\<EOS_SYS_DIR>/app/app_data/\<app_id>/config.json`
+* 表盘：`\<EOS_SYS_DIR>/app/watchface_data/\<wf_id>/config.json`
+
+### 写方法
+
+#### eos.config.setStr(key, value)
+
+```javascript
+eos.config.setStr("username", "Alice");
+```
+
+存储字符串值。
+
+**参数**：
+
+* `key`：字符串，键名
+* `value`：字符串，要存储的值
+
+**返回值**：无
+
+#### eos.config.setBool(key, value)
+
+```javascript
+eos.config.setBool("dark_mode", true);
+```
+
+存储布尔值。
+
+**参数**：
+
+* `key`：字符串，键名
+* `value`：布尔值
+
+**返回值**：无
+
+#### eos.config.setNumber(key, value)
+
+```javascript
+eos.config.setNumber("volume", 75);
+```
+
+存储数值。
+
+**参数**：
+
+* `key`：字符串，键名
+* `value`：数值
+
+**返回值**：无
+
+### 读方法
+
+#### eos.config.getStr(key)
+
+```javascript
+const username = eos.config.getStr("username");
+```
+
+读取字符串值。如果键不存在，返回 `undefined`。
+
+**参数**：
+
+* `key`：字符串，键名
+
+**返回值**：`string` 或 `undefined`
+
+#### eos.config.getBool(key)
+
+```javascript
+const darkMode = eos.config.getBool("dark_mode");
+```
+
+读取布尔值。如果键不存在，返回 `false`。
+
+**参数**：
+
+* `key`：字符串，键名
+
+**返回值**：`boolean`
+
+#### eos.config.getNumber(key)
+
+```javascript
+const volume = eos.config.getNumber("volume");
+```
+
+读取数值。如果键不存在，返回 `0`。
+
+**参数**：
+
+* `key`：字符串，键名
+
+**返回值**：`number`
+
+### 完整示例
+
+```javascript
+// 保存用户设置
+eos.config.setStr("username", "Alice");
+eos.config.setBool("dark_mode", true);
+eos.config.setNumber("volume", 75);
+
+// 读取用户设置
+const username = eos.config.getStr("username");
+const darkMode = eos.config.getBool("dark_mode");
+const volume = eos.config.getNumber("volume");
+
+eos.console.log("User: " + username + ", Dark Mode: " + darkMode + ", Volume: " + volume);
+```
+
+## 时间服务 (eos.time)
+
+提供获取当前系统时间的功能。
+
+### eos.time.getNow()
+
+```javascript
+const now = eos.time.getNow();
+```
+
+**参数**：无
+
+**返回值**：包含以下字段的时间对象：
+
+| 字段            | 类型     | 说明  | 范围         |
+| ------------- | ------ | --- | ---------- |
+| `year`        | number | 年份  | 例如 2026    |
+| `month`       | number | 月份  | 1-12       |
+| `day`         | number | 日期  | 1-31       |
+| `hour`        | number | 小时  | 0-23       |
+| `min`         | number | 分钟  | 0-59       |
+| `sec`         | number | 秒钟  | 0-59       |
+| `ms`          | number | 毫秒  | 0-999      |
+| `day_of_week` | number | 星期几 | 0-6（0=星期日） |
+
+### 示例
+
+```javascript
+const now = eos.time.getNow();
+eos.console.log("Current time: " + now.year + "-" + now.month + "-" + now.day + " " + now.hour + ":" + now.min + ":" + now.sec);
+
+// 在表盘上显示时间
+const view = eos.view.active();
+const timeLabel = new lv.label(view);
+
+function updateTime() {
+    const t = eos.time.getNow();
+    const timeStr = String(t.hour).padStart(2, '0') + ":" + String(t.min).padStart(2, '0');
+    timeLabel.setText(timeStr);
+    timeLabel.center();
+}
+```
+
+## 应用标题栏 (eos.appHeader)
+
+控制应用的顶部导航栏（AppHeader）。
+
+### eos.appHeader.setTitle(view, title)
+
+```javascript
+eos.appHeader.setTitle(view, "Settings");
+```
+
+设置当前 Activity 的应用标题栏标题。
+
+**参数**：
+
+* `view`：View 对象或 `null`
+* `title`：标题字符串或 `null`/`undefined`
+
+**返回值**：无
+
+### eos.appHeader.hide()
+
+```javascript
+eos.appHeader.hide();
+```
+
+隐藏应用标题栏。
+
+**参数**：无
+
+**返回值**：无
+
+### eos.appHeader.show()
+
+```javascript
+eos.appHeader.show();
+```
+
+显示应用标题栏，并刷新当前 Activity 的标题。
+
+**参数**：无
+
+**返回值**：无
+
+### 示例
+
+```javascript
+// 设置标题
+eos.appHeader.setTitle(null, "My App");
+
+// 隐藏标题栏
+eos.appHeader.hide();
+
+// 显示标题栏
+eos.appHeader.show();
+```
+
+## 表盘指针 (eos.clockHand)
+
+创建和管理表盘的时钟指针（时针、分针、秒针）。
+
+### eos.clockHand.create(obj, src, type, cx, cy)
+
+```javascript
+const hand = eos.clockHand.create(parent, "path/to/hand.png", eos.CLOCK_HAND_HOUR, cx, cy);
+```
+
+创建时钟指针图像。
+
+**参数**：
+
+* `obj`：父级 LVGL 对象
+* `src`：字符串，指针图像资源路径（相对于应用/表盘的 assets 目录）
+* `type`：指针类型，使用 `eos.CLOCK_HAND_*` 常量
+* `cx`：旋转中心 X 坐标（相对于图像左上角）
+* `cy`：旋转中心 Y 坐标（相对于图像左上角）
+
+**返回值**：`lv_obj_t` 类型的指针对象
+
+### eos.clockHand.center(obj)
+
+```javascript
+eos.clockHand.center(hand);
+```
+
+将指针对象的中心对齐到其父对象的中心。
+
+**参数**：
+
+* `obj`：指针 LVGL 对象
+
+**返回值**：无
+
+### eos.clockHand.placePivot(obj, x, y)
+
+```javascript
+eos.clockHand.placePivot(hand, cx, cy);
+```
+
+设置指针对象的旋转中心位置。
+
+**参数**：
+
+* `obj`：指针 LVGL 对象
+* `x`：旋转中心 X 坐标
+* `y`：旋转中心 Y 坐标
+
+**返回值**：无
+
+### 完整示例
+
+```javascript
+// 获取当前 View
+const view = eos.view.active();
+
+// 创建表盘背景
+const bg = new lv.image(view);
+bg.setSrc("A:background.png");
+bg.center();
+
+// 创建时针
+const hourHand = eos.clockHand.create(view, "hour_hand.png", eos.CLOCK_HAND_HOUR, 5, 50);
+eos.clockHand.center(hourHand);
+
+// 创建分针
+const minHand = eos.clockHand.create(view, "min_hand.png", eos.CLOCK_HAND_MINUTE, 5, 65);
+eos.clockHand.center(minHand);
+
+// 创建秒针
+const secHand = eos.clockHand.create(view, "sec_hand.png", eos.CLOCK_HAND_SECOND, 3, 70);
+eos.clockHand.center(secHand);
+```
+
+## 系统常量
+
+ElenixOS 在 `eos` 命名空间下定义了以下常量，供 JavaScript 脚本使用。
+
+### 字体大小
+
+| 常量                     | 值  | 说明   |
+| ---------------------- | -- | ---- |
+| `eos.FONT_SIZE_LARGE`  | 30 | 大号字体 |
+| `eos.FONT_SIZE_MEDIUM` | 26 | 中号字体 |
+| `eos.FONT_SIZE_SMALL`  | 22 | 小号字体 |
+
+### 显示尺寸
+
+| 常量                   | 值   | 说明       |
+| -------------------- | --- | -------- |
+| `eos.DISPLAY_WIDTH`  | 240 | 屏幕宽度（像素） |
+| `eos.DISPLAY_HEIGHT` | 240 | 屏幕高度（像素） |
+
+### 指针类型
+
+| 常量                      | 值 | 说明 |
+| ----------------------- | - | -- |
+| `eos.CLOCK_HAND_HOUR`   | 0 | 时针 |
+| `eos.CLOCK_HAND_MINUTE` | 1 | 分针 |
+| `eos.CLOCK_HAND_SECOND` | 2 | 秒针 |
+
+### Activity 类型
+
+| 常量                                 | 值 | 说明   |
+| ---------------------------------- | - | ---- |
+| `eos.ACTIVITY_TYPE_NULL`           | 0 | 空类型  |
+| `eos.ACTIVITY_TYPE_APP`            | 1 | 应用页面 |
+| `eos.ACTIVITY_TYPE_APP_LIST`       | 2 | 应用列表 |
+| `eos.ACTIVITY_TYPE_WATCHFACE`      | 3 | 表盘页面 |
+| `eos.ACTIVITY_TYPE_WATCHFACE_LIST` | 4 | 表盘列表 |
+
+## 错误处理
+
+### 错误类型
+
+当 API 调用参数不正确时，会抛出错误。常见错误原因：
+
+| 错误信息                     | 原因             |
+| ------------------------ | -------------- |
+| `Invalid argument count` | 参数数量不匹配        |
+| `Invalid argument type`  | 参数类型不正确        |
+| `Usage: xxx(key, value)` | 用法提示，说明正确的调用方式 |
+| `Can't load config`      | 配置存储加载失败       |
+| `No current activity`    | 当前无活跃 Activity |
+
+### 错误处理示例
+
+```javascript
+try {
+    const view = eos.view.active();
+    if (view) {
+        const label = new lv.label(view);
+        label.setText("Hello!");
+    }
+} catch (err) {
+    eos.console.error("Error: " + err);
+}
+```
+
+## 完整示例：计数器应用
+
+```javascript
+// 获取当前 View
+const view = eos.view.active();
+
+// 设置标题
+eos.appHeader.setTitle(null, "Counter");
+
+// 读取保存的计数
+let count = eos.config.getNumber("count");
+
+// 创建显示标签
+const countLabel = new lv.label(view);
+countLabel.setStyleTextFont(eos.FONT_SIZE_LARGE, 0);
+countLabel.setText(String(count));
+countLabel.align(lv.ALIGN_CENTER, 0, -30);
+
+// 创建增加按钮
+const incBtn = new lv.button(view);
+incBtn.setSize(80, 50);
+incBtn.align(lv.ALIGN_CENTER, -50, 30);
+incBtn.addEventCb(function() {
+    count++;
+    countLabel.setText(String(count));
+    eos.config.setNumber("count", count);
+}, lv.EVENT_CLICKED, null);
+
+const incLabel = new lv.label(incBtn);
+incLabel.setText("+1");
+
+// 创建减少按钮
+const decBtn = new lv.button(view);
+decBtn.setSize(80, 50);
+decBtn.align(lv.ALIGN_CENTER, 50, 30);
+decBtn.addEventCb(function() {
+    count--;
+    countLabel.setText(String(count));
+    eos.config.setNumber("count", count);
+}, lv.EVENT_CLICKED, null);
+
+const decLabel = new lv.label(decBtn);
+decLabel.setText("-1");
+```
+
+## 完整示例：数字表盘
+
+```javascript
+function updateWatchface() {
+    const now = eos.time.getNow();
+
+    // 格式化时间
+    const timeStr = String(now.hour).padStart(2, '0') + ":" +
+                    String(now.min).padStart(2, '0');
+
+    // 格式化日期
+    const dateStr = now.year + "-" +
+                    String(now.month).padStart(2, '0') + "-" +
+                    String(now.day).padStart(2, '0');
+
+    // 更新 UI
+    timeLabel.setText(timeStr);
+    dateLabel.setText(dateStr);
+
+    // 更新指针角度
+    const hourAngle = (now.hour % 12) * 30 + now.min * 0.5;
+    const minAngle = now.min * 6 + now.sec * 0.1;
+    const secAngle = now.sec * 6;
+}
+
+// 获取 View 并创建 UI
+const view = eos.view.active();
+eos.appHeader.hide();
+
+// 创建时间标签
+const timeLabel = new lv.label(view);
+timeLabel.setStyleTextFont(eos.FONT_SIZE_LARGE, 0);
+timeLabel.align(lv.ALIGN_CENTER, 0, -20);
+
+// 创建日期标签
+const dateLabel = new lv.label(view);
+dateLabel.setStyleTextFont(eos.FONT_SIZE_SMALL, 0);
+dateLabel.align(lv.ALIGN_CENTER, 0, 10);
+
+// 每秒更新
+const timer = new lv.timer(function() {
+    updateWatchface();
+}, 1000, null);
+updateWatchface();
+```
+
+## 相关文档
+
+* [JS API 通用使用方法](/docs/architecture/script_engine/) — 了解 JS API 的通用约定
+* [LVGL UI API](/docs/architecture/script_engine/lvgl) — LVGL UI 组件详细文档
+* [Activity 与 View](../framework/activity) — Activity 系统详细说明
