@@ -1,0 +1,149 @@
+---
+sidebar_position: 6
+title: Swipe Panel
+---
+
+# Swipe Panel
+
+## 简述
+
+滑动面板为单向滑动面板，用于将 `swipe_obj` 从屏幕外面划入屏幕，支持触摸划入以及函数控制划入，并带有滑动动画。Swipe Panel 是基于 Slide Widget 组件的功能封装，提供了更高级的接口和更完整的面板管理功能。
+
+Swipe Panel 适用于需要从屏幕边缘滑入/滑出的面板场景，如控制中心、通知面板、设置面板等。
+
+## 核心特性
+
+* **四方向支持**：支持上、下、左、右四个方向的滑动
+* **触摸控制**：支持手势触摸滑动，提供直观的交互体验
+* **函数控制**：提供 API 函数控制面板的显示和隐藏
+* **动画效果**：内置平滑的滑动动画，提升用户体验
+* **手势区域**：提供专门的手势触发区域，优化触摸体验
+* **Handle Bar**：内置小白条指示器，提供视觉引导
+
+## 使用方法
+
+使用 `eos_swipe_panel_create()` 即可创建一个新的滑动面板。创建后可以设置滑动方向、控制面板的显示和隐藏等。
+
+## 注意
+
+此代码为 `slide_widget` 的功能封装，提供了更高级的接口和更完整的面板管理功能。
+
+## 示例
+
+```c
+// 创建滑动面板
+eos_swipe_panel_t *sp = eos_swipe_panel_create(parent);
+
+// 设置滑动方向为从底部向上滑入
+eos_swipe_panel_set_dir(sp, EOS_SWIPE_DIR_DOWN);
+
+// 滑入屏幕
+eos_swipe_panel_slide_down(sp);
+
+// 滑出屏幕
+eos_swipe_panel_slide_up(sp);
+
+// 隐藏 Handle Bar
+eos_swipe_panel_hide_handle_bar(sp);
+
+// 显示 Handle Bar
+eos_swipe_panel_show_handle_bar(sp);
+
+// 删除滑动面板
+eos_swipe_panel_delete(sp);
+```
+
+## API 参考
+
+### 方向定义
+
+```c
+typedef enum{
+    EOS_SWIPE_DIR_UP=0,      // 从下往上滑拉出 swipe_obj
+    EOS_SWIPE_DIR_DOWN=1,    // 从上往下滑拉出 swipe_obj
+    EOS_SWIPE_DIR_LEFT=2,    // 从右往左滑拉出 swipe_obj
+    EOS_SWIPE_DIR_RIGHT=3    // 从左往右滑拉出 swipe_obj
+} eos_swipe_dir_t;
+```
+
+### 结构体
+
+* **`eos_swipe_panel_t`**：滑动面板结构体，包含组件的所有状态和配置信息
+
+### 函数
+
+* **`eos_swipe_panel_create(lv_obj_t *parent)`**：创建滑动面板
+  * 参数：
+    * `parent`：滑动面板的父级对象
+  * 返回值：指向创建成功的 Swipe Panel
+  * 注意：不使用时需要使用 `eos_swipe_panel_delete` 删除此控件，否则可能内存泄漏
+
+* **`eos_swipe_panel_set_dir(eos_swipe_panel_t *swipe_panel, const eos_swipe_dir_t dir)`**：设置拖拽方向
+  * 参数：
+    * `swipe_panel`：滑动面板
+    * `dir`：拖拽方向，例如 `EOS_SWIPE_DIR_DOWN` 就是向下拖拽拉出 `swipe_obj`
+
+* **`eos_swipe_panel_slide_down(eos_swipe_panel_t *sp)`**：滑动面板拉入屏幕
+  * 参数：
+    * `sp`：目标滑动面板
+
+* **`eos_swipe_panel_slide_up(eos_swipe_panel_t *sp)`**：滑动面板拉出屏幕
+  * 参数：
+    * `sp`：目标滑动面板
+
+* **`eos_swipe_panel_hide_handle_bar(eos_swipe_panel_t *swipe_panel)`**：隐藏 Handle Bar (小白条)
+  * 参数：
+    * `swipe_panel`：滑动面板
+
+* **`eos_swipe_panel_show_handle_bar(eos_swipe_panel_t *swipe_panel)`**：显示 Handle Bar (小白条)
+  * 参数：
+    * `swipe_panel`：滑动面板
+
+* **`eos_swipe_panel_pull_back(eos_swipe_panel_t *swipe_panel)`**：外部触发拉回动画，自动拉回屏幕外面
+  * 参数：
+    * `swipe_panel`：滑动面板
+
+* **`eos_swipe_panel_move(eos_swipe_panel_t *swipe_panel, int32_t target, bool anim)`**：触发拉动动画，将滑动面板拉到指定像素位置（绝对坐标）
+  * 参数：
+    * `swipe_panel`：滑动面板
+    * `target`：目标位置，单位像素
+    * `anim`：是否启用动画
+  * 注意：滑动面板为水平方向时，target 控制的是 x 轴坐标；滑动面板为垂直方向时，target 控制的是 y 轴坐标
+
+* **`eos_swipe_panel_show(eos_swipe_panel_t *sp)`**：显示滑动面板
+  * 参数：
+    * `sp`：滑动面板
+
+* **`eos_swipe_panel_hide(eos_swipe_panel_t *sp)`**：隐藏滑动面板
+  * 参数：
+    * `sp`：滑动面板
+
+* **`eos_swipe_panel_delete(eos_swipe_panel_t *swipe_panel)`**：删除 Swipe Panel
+  * 参数：
+    * `swipe_panel`：滑动面板
+
+## 工作原理
+
+1. **初始化**：创建滑动面板对象，包括 swipe_obj、touch_obj 和 handle_bar
+2. **方向设置**：根据设置的方向调整面板和触摸区域的位置和尺寸
+3. **手势检测**：监听触摸区域的手势操作，计算滑动距离
+4. **动画执行**：根据手势或函数调用执行相应的滑动动画
+5. **状态管理**：管理面板的显示/隐藏状态，更新触摸区域位置
+
+## 使用场景
+
+* **控制中心**：从屏幕边缘滑入的控制面板
+* **通知面板**：显示通知和提醒的滑动面板
+* **设置面板**：快速访问设置的滑动面板
+* **菜单面板**：从边缘滑入的菜单系统
+* **信息面板**：显示额外信息的滑动面板
+
+## 注意事项
+
+* **内存管理**：创建的滑动面板会占用内存，不再需要时应及时删除
+* **父级对象**：确保父级对象存在且有效，否则可能导致内存泄漏或崩溃
+* **方向设置**：设置方向后，面板会自动调整位置和尺寸
+* **手势区域**：手势区域默认为 50 像素，可根据需要调整
+* **动画时长**：默认动画时长为 200ms，可根据需要调整
+* **Handle Bar**：Handle Bar 提供视觉引导，可根据需要显示或隐藏
+* **事件处理**：面板的滑动事件由底层的 Slide Widget 组件处理
