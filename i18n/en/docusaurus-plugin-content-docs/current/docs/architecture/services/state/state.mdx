@@ -1,0 +1,41 @@
+---
+sidebar_position: 12
+title: 状态服务
+---
+
+状态服务用于管理运行时持久化状态，与配置服务类似，但专门用于存储运行时状态信息（如电池容量、循环次数等）。
+
+## 状态文件路径
+
+```c
+#define EOS_STATE_FILE_PATH EOS_SYS_DIR "state.json"
+```
+
+## 服务初始化
+
+```c
+void eos_service_state_init(void);
+```
+
+## 布尔类型状态
+
+```c
+eos_result_t eos_state_set_bool(const char *key, bool value);
+bool eos_state_get_bool(const char *key, bool default_value);
+```
+
+## 字符串类型状态
+
+```c
+eos_result_t eos_state_set_string(const char *key, const char *value);
+char *eos_state_get_string(const char *key, const char *default_value);
+```
+
+返回的字符串不再使用时需要使用 `eos_free` 释放内存。
+
+## 数值类型状态
+
+```c
+eos_result_t eos_state_set_number(const char *key, double value);
+double eos_state_get_number(const char *key, double default_value);
+```
