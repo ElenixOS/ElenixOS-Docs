@@ -1,0 +1,158 @@
+---
+sidebar_position: 5
+title: 电池服务
+---
+
+电池服务负责管理系统电池状态，包括电池电量、电压、电流、充电状态等信息。服务从电池硬件设备获取原始数据，进行处理后提供给上层应用。
+
+## 电池数据结构
+
+### 原始电池数据
+
+电池硬件设备报告的原始测量数据：
+
+```c
+typedef struct {
+    int8_t percent;                   // 电池百分比 (0-100)，不可用时为 -1
+    int16_t voltage_mv;              // 电池电压（毫伏），不可用时为 -1
+    int16_t current_ma;              // 电池电流（毫安），正数为放电，负数为充电
+    bool charging;                   // true 表示正在充电
+} eos_battery_raw_t;
+```
+
+### 电池状态数据
+
+经过处理并带有时间戳的电池状态：
+
+```c
+typedef struct {
+    int8_t percent;                   // 电池百分比 (0-100)
+    int16_t voltage_mv;               // 电池电压（毫伏）
+    int16_t current_ma;               // 电池电流（毫安）
+    bool charging;                    // true 表示正在充电
+    uint32_t ts;                      // 状态记录的时间戳
+    bool valid;                       // 有效性标志
+} eos_battery_state_t;
+```
+
+## 电池模式
+
+电池服务支持多种工作模式，每种模式有不同的轮询策略：
+
+```c
+typedef enum {
+    EOS_BATTERY_MODE_NORMAL = 0,    // 正常模式
+    EOS_BATTERY_MODE_LOW_POWER,     // 低功耗模式
+    EOS_BATTERY_MODE_CHARGING,      // 充电模式
+    EOS_BATTERY_MODE_ACTIVE,        // 活动模式
+    EOS_BATTERY_MODE_COUNT,
+} eos_battery_mode_t;
+```
+
+### 电池策略
+
+每种模式有一个对应的策略：
+
+```c
+typedef struct {
+    uint32_t interval_ms;            // 轮询间隔（毫秒）
+    uint8_t threshold_percent;      // 电量阈值
+} eos_battery_policy_t;
+```
+
+## 服务初始化
+
+初始化电池服务，注册电池更新事件：
+
+```c
+eos_result_t eos_service_battery_init(void);
+```
+
+## 获取电池信息
+
+### 获取电池百分比
+
+```c
+int8_t eos_battery_get_percent(void);
+```
+
+返回电池百分比 (0-100)，不可用时返回 -1。
+
+### 获取电池电压
+
+```c
+int16_t eos_battery_get_voltage_mv(void);
+```
+
+返回电池电压（毫伏），不可用时返回 -1。
+
+### 获取充电状态
+
+```c
+bool eos_battery_is_charging(void);
+```
+
+返回 true 表示正在充电。
+
+### 获取完整电池状态
+
+```c
+bool eos_battery_get_state(eos_battery_state_t *state);
+```
+
+成功返回 true，服务未初始化或状态无效返回 false。
+
+### 获取电池容量信息
+
+```c
+uint32_t eos_battery_get_design_capacity(void);     // 设计容量（mAh）
+uint32_t eos_battery_get_current_capacity(void);     // 当前估算容量（mAh）
+uint32_t eos_battery_get_cycle_count(void);          // 电池循环次数
+```
+
+## 电池事件
+
+使用事件 ID 注册电池状态变化通知。当电池百分比或充电状态发生变化时，事件会被广播：
+
+```c
+eos_event_id_t eos_battery_get_event_id(void);
+```
+
+## 自定义电量计算
+
+默认使用线性插值算法将电压转换为百分比。如需使用自定义算法：
+
+```c
+void eos_battery_set_calc_fn(eos_battery_calc_fn_t fn);
+```
+
+回调函数类型：
+
+```c
+typedef int (*eos_battery_calc_fn_t)(int voltage_mv);
+```
+
+传入电压（毫伏），返回计算后的百分比 (0-100)，出错返回负数。传入 NULL 使用默认算法。
+
+## 策略管理
+
+### 设置模式策略
+
+```c
+eos_result_t eos_battery_set_policy(eos_battery_mode_t mode, const eos_battery_policy_t *policy);
+```
+
+### 获取模式策略
+
+```c
+eos_result_t eos_battery_get_policy(eos_battery_mode_t mode, eos_battery_policy_t *policy);
+```
+
+## 状态持久化键
+
+电池服务使用的持久化存储键：
+
+```c
+#define EOS_STATE_KEY_CAPACITY             "battery_capacity"      // 电池容量
+#define EOS_STATE_KEY_CYCLE_COUNT          "cycle_count"           // 循环次数
+```
