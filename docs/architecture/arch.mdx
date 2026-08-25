@@ -338,13 +338,13 @@ typedef enum
 ```mermaid
 stateDiagram-v2
     [*] --> ACTIVE : 创建程序
-    
+
     ACTIVE --> SUSPENDED : SuspendProgram (Activity切换)
     SUSPENDED --> ACTIVE : ResumeProgram (返回表盘)
-    
+
     ACTIVE --> STOPPING : TerminateProgram
     SUSPENDED --> STOPPING : TerminateProgram
-    
+
     STOPPING --> TERMINATED : 清理完成
 ```
 
@@ -365,3 +365,19 @@ SPM管理的是**脚本程序**的生命周期，而脚本引擎内核管理的�
 | **Kernel层** | JS执行窗口 | 字节码的解析/执行/异常 |
 
 内核状态机关注的是单次JS代码执行的状态转换（RUNNING/IDLE/SUSPENDED/EXCEPTION），而SPM关注的是脚本程序作为一个整体的生命周期管理。
+
+## 当前核心边界
+
+调用方向必须保持单向：应用/表盘 → SNI/SPM → 框架与服务 → 端口。上层可以组合公开 API，但不能访问下层私有上下文或通过 LVGL `user_data` 绕过框架所有权。
+
+| 生命周期对象 | 负责模块 | 不能做的事 |
+| --- | --- | --- |
+| 程序、Realm | SPM / Script Engine | 上层直接销毁 Realm |
+| JS/原生句柄 | SNI Context | 暴露裸指针给 JS |
+| 页面、Activity 栈 | Activity Controller | 直接删除栈内 View |
+| Widget 附加数据 | `eos_wdata` | 假设单一 `user_data` 布局 |
+| 设备能力 | Service / Port | 应用直接调用平台驱动 |
+
+输入先进入平台端口和输入层，再由 Chrome、Activity 或控件确定前景目标；传感器等设备数据先进入服务，经订阅或读取接口供表盘和应用使用。脚本回调必须回到所属 SPM 程序上下文，不能在平台回调中直接调用任意 Realm。
+
+Recent Apps 增加了一个中间状态：页面从当前栈分离但仍然存活，程序暂停但未终止。架构中的“应用关闭”不能再等同于“Activity 离开”。

@@ -192,18 +192,18 @@ typedef struct
     uint32_t backtrace_count;     /**< Number of backtrace frames */
 } script_error_t;
 
-typedef struct  
-{  
-	bool initialized; 
+typedef struct
+{
+	bool initialized;
 	eos_cqueue_t *module_queue;
 	script_engine_state_t state;
 	script_program_t *current_program;
 	jerry_value_t old_realm; // OPTIONAL 待定，需要根据 JerryScipt 判断是否需要
-	
+
 	// 脚本超时检测
 	uint32_t script_start_time;   /**< Script execution start time (tick) */
     uint32_t script_timeout_ms;   /**< Script execution timeout (ms), 0 = no timeout */
-	script_error_t error;	
+	script_error_t error;
 } script_engine_runtime_t;
 ```
 
@@ -357,13 +357,13 @@ typedef struct script_program
     // 双链表结构
 	struct script_program *next;
 	struct script_program *prev;
-	
+
 	script_pkg_type_t type;    // 脚本程序类型
 	script_program_state_t state;    // 脚本程序状态
 	sni_context_t *sni_ctx;    // SNI 上下文
 	script_pkg_t *script;    // 脚本信息
 	jerry_value_t realm;    // 持有的 Realm
-	
+
 	bool has_error;
 	script_error_t error;    // 脚本错误，从内核拷贝而来保存
 } script_program_t;
@@ -405,7 +405,7 @@ typedef struct sni_context
 
 事件回调的核心在于从 C 调用到 JS，而这一步主要是靠回调的用户数据实现，能实现 O(1) 的时间复杂度访问。
 
-事件绑定**用链表/双向链表统一管理（用于生命周期控制）**  
+事件绑定**用链表/双向链表统一管理（用于生命周期控制）**
 访问路径可以通过 **native_ptr / user_data / control block 实现 O(1) 定位**
 
 事件回调只能调用程序管理器提供的 call 入口，完整路径如下：
@@ -771,3 +771,30 @@ script_engine_set_timeout(10000); // 10秒
 // 禁用超时检测（不推荐）
 script_engine_set_timeout(0);
 ```
+
+## 当前程序状态与生命周期边界
+
+SPM 将脚本程序状态分为 `ACTIVE`、`SUSPENDED`、`STOPPING` 和 `TERMINATED`。Core 只负责引擎执行状态，不能代替 SPM 判断应用是否仍可恢复；SNI 只负责资源上下文，不能代替 Activity 决定页面导航。
+
+| 状态 | Realm | SNI 资源 | JS 回调 |
+| --- | --- | --- | --- |
+| `ACTIVE` | 存在 | 可用 | 允许 |
+| `SUSPENDED` | 保留 | 保留但暂停 | 禁止 |
+| `STOPPING` | 正在销毁 | 按 teardown 清理 | 禁止 |
+| `TERMINATED` | 已销毁 | 已释放 | 禁止 |
+
+上层只能通过 `spm_watchface_start/pause/resume/destroy` 和 `spm_app_run/suspend/resume/stop` 等接口改变程序生命周期。直接删除 View、直接调用 JerryScript 或直接销毁 SNI 上下文都不能替代这些路径。
+
+## Recent Apps 与脚本程序
+
+应用切换时，Recent Apps 将 App Activity 子栈停放，SPM 将应用置为 `SUSPENDED`，SNI 保留资源但暂停定时器、动画和回调。恢复时重新附加 Activity 子栈，再按定时器和动画策略恢复资源；恢复不会重新执行应用入口脚本。
+
+应用被卸载、LRU 驱逐或引擎复位时，必须执行完整停止。引擎复位会先保存崩溃上下文，再清理旧程序和所有 Recent Apps 条目；复位之后旧 Realm、JS 值和原生句柄都不可复用。
+
+## SNI 调用约束
+
+SNI 控制块、对象删除通知、JS 引用和异步回调都属于程序上下文。回调执行前必须经过 SPM 状态检查；原生对象删除前必须清除 JS 可见的原生地址；teardown 阶段不能重新进入脚本执行。详细的类型桥接、资源分类、导出描述表和上下文 API 见 [SNI 详细架构](./script_engine/sni)。
+
+## API 文档要求
+
+新增脚本 API 时，文档至少应说明命名空间、参数和返回值、异常/错误行为、返回对象的所有权、可调用的生命周期状态、异步回调的删除规则，以及是否受挂起恢复策略影响。仅记录“某 C 函数被导出”不足以定义脚本 API。

@@ -5,6 +5,81 @@ title: Changelog
 
 # Changelog
 
+## [v0.6.0-alpha]
+
+### Added
+
+- **Recent Apps（最近应用）系统**：完整的应用挂起/恢复机制，支持应用切换时保留状态而非销毁。包含 LRU 注册表、Activity 子栈分离/附加、Parking Lot 视图停放区、预捕获快照、缩略图显示和恢复过渡动画。
+- **应用挂起/恢复**：SPM 从仅支持表盘挂起扩展到应用程序，新增 `spm_app_suspend()`、`spm_app_resume(app_id)` 和 `spm_app_stop_by_id(app_id)` API。
+- **SNI 资源暂停/恢复策略**：定时器支持 `RUN_ONCE`/`RUN_ALL`/`SKIP` 三种恢复策略，动画支持 `CONTINUE`/`JUMP_TO_END` 两种恢复策略，可通过 Kconfig 配置。
+- **数字表冠双击检测**：从立即触发改为等待后决策（wait-then-decide）模式，双击窗口默认 250ms，双击打开 Recent Apps 页面，单击挂起当前应用。
+- **应用加载界面**：应用启动时显示进度条和状态更新，包含径向加载动画（支持确定和不确定模式）。
+- **表盘组件库**：新增 20+ 个可复用 C 表盘 UI 组件，涵盖时间/日期（数字时钟、日期、星期环、月相、日期窗口）、电池（电池状态、弧形指示器、充电）、健康（心率、心率弧、步数、血氧、温度、活动圆环、气压计、指南针）和装饰（刻度环、数字环、中心盖、进度环、背景）。
+- **eos.ww 命名空间**：表盘组件库通过 SNI 暴露为 `eos.ww.*` 命名空间，可在 JavaScript 中直接使用。
+- **开发者选项**：设置应用中新增 FPS 显示、可见对象数量（OBJS）显示和触摸追踪功能。
+- **圆形图片组件**：新增 `eos_circle_image_create` 圆形裁剪图片组件。
+- **Widget 数据注册表（eos_wdata）**：类型安全的 per-widget 数据注册表，替代各子系统对 `lv_obj_set_user_data()` 的直接使用，SNI 控制块现在作为 `EOS_WDATA_SNI_CB` 类型条目存储。
+- **Activity 显式销毁**：新增 `eos_activity_destroy()` 函数，支持显式销毁指定 Activity。
+- **独立快照**：新增 `eos_activity_take_snapshot_standalone()` 不受过渡状态限制的快照接口，用于 Recent Apps 场景。
+- **Activity 子栈机制**：新增 `eos_activity_detach_app_substack()` 和 `eos_activity_reattach_app_substack()` 用于应用挂起/恢复时的子栈管理。
+- **Parking Lot 机制**：Activity 挂起时其 View 移动到不可见停放区而非销毁，支持快速恢复。
+- **动画组（eos_anim_group）**：支持协调多个动画的同步过渡。
+- **自定义三次贝塞尔缓动**：支持自定义 cubic-bezier 缓动路径和调试拦截回调。
+- **SNI teardown 状态机**：实现资源管理状态机，形式化资源归属（Pure Managed / Tree-Dependent / Hybrid）和销毁顺序。
+- **JerryScript 端口增强**：新增完整的日期/时间和文件系统功能支持。
+- **字体回退配置**：TTF 字体加载失败时支持回退字体配置。
+- **传感器采样周期 API**：新增 `eos_sensor_set_sample_period()` 和 `eos_sensor_get_sample_period()` API。
+- **内存查询 API**：新增 `eos_mem_get_used_bytes()` 和 `eos_mem_get_free_bytes()` 用于查询 C 堆使用情况。
+- **第三方库 Git 信息**：启动时生成并记录第三方依赖库的 Git 版本信息。
+- **样式检查器增强**：新增分隔符和注释格式检查规则。
+- **ES 模块解析缓存**：引入模块缓存确保 ES 模块单例语义，同一模块的多次导入共享同一实例。
+- **SNI 特殊方法包装器**：`lv_obj_delete`、`lv_obj_remove_event` 和 `lv_obj` parent setter 移至特殊包装器处理。
+- **崩溃恢复重启对话框**：引擎崩溃后显示重启/退出对话框供用户选择。
+
+### Changed
+
+- **应用生命周期**：应用现在支持挂起/恢复，切换应用时默认挂起而非销毁。
+- **动画系统重构**：重构动画处理使用 `eos_anim_group` 协调过渡，改进 UI 组件中的动画处理。
+- **SNI 控制块检索统一**：`sni_control_block_t` 检索统一使用 `eos_wdata` 注册表。
+- **AppHeader 同步**：应用 UI 与 AppHeader 在同一帧显示，消除标题栏延迟出现的问题。
+- **配置宏重命名**：`DEBUG`/`RELEASE` 重命名为 `EOS_DEBUG`/`EOS_RELEASE` 以避免命名冲突。
+- **主题默认行为**：默认禁用所有对象的滚动和滚动条。
+- **圆形图标渲染**：圆图标改为居中图片渲染而非基线偏移标签，使用深色背景消除白色光晕。
+- **主循环优化**：移除强制最小休眠持续时间。
+- **数字环标签**：调整标签尺寸以实现垂直居中。
+- **代码注释标准化**：统一分隔符和注释格式。
+- **LVGL 9.4 适配**：模拟器构建适配 LVGL 9.4 头文件。
+
+### Fixed
+
+- **过渡期间输入保护**：在 Activity 过渡动画期间阻止输入事件，防止状态不一致。
+- **快照前动画完成**：确保所有动画完成后再捕获快照。
+- **表冠滚动条动画阻塞**：修复淡入淡出期间滚动条动画阻塞问题。
+- **列表过渡弹出效果**：修复按钮"弹出"效果，确保从屏幕外开始过渡。
+- **SNI 资源所有权**：形式化资源归属规则，修复 teardown 顺序导致的悬挂引用、use-after-free 和资源泄漏。
+- **SNI Activity/View 生命周期**：硬化 Activity/View 生命周期，锁定 View/Screen 访问权限。
+- **内存跟踪表**：添加满表警告并在移除时重置警告状态。
+- **内存跟踪表大小配置**：新增配置项并更新缓存大小。
+- **时钟隐藏标志**：定时器回调中添加隐藏标志检查。
+- **压力测试 CPU 饱和**：添加延迟防止 busy-loop 导致 CPU 饱和。
+- **EOS_WEAK 宏**：更新 GCC 定义并移除 MinGW32 检查。
+- **传感器通知性能**：移除 `eos_sensor_notify` 中的日志以提升性能。
+- **空数据占位符**：无数据时显示 0 而非 LVGL 默认文本。
+- **FIFO 日志**：重新启用 FIFO 操作日志。
+- **致命错误日志**：将 `printf` 替换为 `EOS_LOG_E` 用于致命错误日志。
+- **脚本引擎错误恢复**：在 `script_engine_call_raw` 中实现错误处理和恢复机制。
+- **JerryScript 值管理**：增强 teardown 阶段的 JerryScript 值管理。
+- **SPM teardown 阶段**：细化 SNI 上下文管理的 teardown 阶段。
+- **描述表生成**：生成右对齐指针和动态续行缩进。
+- **音频解码器**：移除 `wav_fmt_chunk_t` 结构中的未使用字段。
+- **SNI 类型桥接**：更新 `lv_event_t` 类型定义和颜色属性偏移以使用 `lv_color_t` 结构。
+- **文件系统错误信息**：修正驱动器盘符不匹配的错误信息。
+- **圆角画布缓冲区**：初始化画布缓冲区并调整背景图处理。
+- **单选按钮焦点滚动**：移除单选项按钮的滚动焦点标志。
+- **位图字体条件包含**：根据 `EOS_FONT_TYPE` 在 CMakeLists.txt 中条件包含位图字体。
+- **开关指示器样式**：同步未渲染组件的指示器样式，移除调试输出。
+- **开关创建布局更新**：移除开关创建时不必要的布局更新。
+
 ## [v0.5.1-alpha]
 
 ### Fixed
@@ -243,6 +318,7 @@ title: Changelog
 - 提供脚本与系统核心之间的隔离机制，提升系统稳定性与安全性。
 - 提供基础调试与开发支持能力，提升桌面端开发与调试效率。
 
+[v0.6.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.6.0-alpha
 [v0.5.1-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.1-alpha
 [v0.5.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.0-alpha
 [v0.4.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.4.0-alpha

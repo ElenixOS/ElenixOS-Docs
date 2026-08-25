@@ -57,6 +57,7 @@ const sidebars = {
           label: '框架层',
           items: [
             'architecture/framework/app/app',
+            'architecture/framework/app/recent_apps',
             'architecture/framework/activity/activity',
           ],
         },
