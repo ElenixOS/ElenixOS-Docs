@@ -437,3 +437,48 @@ For example:
 ```js
 lv.obj.create();
 ```
+
+## Current Resource Model and Lifecycle
+
+The SNI resource table records native addresses, JavaScript objects, resource types, destruction callbacks, and parent-child resource relationships simultaneously. The resource type determines whether it belongs to the object tree, an independent managed resource, or a hybrid resource; cleanup logic cannot determine whether a resource is valid solely based on whether the C pointer is non-null.
+
+### Type Classification
+
+| Category | Typical Objects | Ownership and Deletion |
+| --- | --- | --- |
+| Value Types | Numbers, booleans, strings, colors, event values | Copied or converted at call boundaries; not entered into the native resource table |
+| Object Tree Handles | `lv_obj_t` and its subclasses | Deleted by the LVGL object tree; SNI clears JS associations first |
+| Managed Resources | Timers, animations, and other independent objects | Registered by the SNI context; type-specific destruction logic called on deletion |
+| Hybrid Resources | LVGL resources with JS callbacks | Neutralize native pointers first, then release JS references and callback contexts |
+
+The SNI type determination interface separates handles, values, object tree nodes, pure managed resources, and hybrid resources. When adding a new type, you must simultaneously decide: whether it is allowed as a JS parameter, whether it can be reached by GC, how SNI is notified when the native object is deleted, and who ultimately releases it during teardown.
+
+### Control Blocks and Invalidation
+
+Every native object that can be held by scripts has a control block. The control block connects the JS object, native address, SNI type, and owning context; when an object becomes invalid, the native address must be cleared first, after which any JS objects that may still exist can only behave as invalid handles and must not access the old address again.
+
+Control block invalidation can be triggered by explicit JS deletion, cascading deletion of LVGL parent objects, program stop, engine reset, or resource eviction. All paths must converge to a unified deregistration logic to avoid duplicate destruction.
+
+## Interface Responsibilities of Context and Type Bridging
+
+The SNI context interface is responsible for resource registration, type-based traversal, native address invalidation, asynchronous object deletion, suspend/resume, and teardown. Implementation code must operate on resources through the lifecycle boundaries provided by the context and must not directly modify the internal resource linked lists.
+
+The type bridging interface is responsible for conversion between JS values and C values, value objects and managed handles, and maintains control blocks, parent-child resource relationships, and native object deletion notifications. The bridging layer does not decide business ownership on behalf of the caller; the caller must clearly define the validity period and release responsibility of the conversion result.
+
+Synchronous deletion is only applicable to resources that can be safely deleted within the current call stack; during LVGL callbacks or traversal, objects in use must not be directly destroyed. Asynchronous deletion requests should be used instead, waiting for a safe boundary to execute. When bridging fails, the output object must be stopped being used, and type-mismatched JS values must not be forcibly cast to native pointers. Value types such as colors, events, and LVGL structures should follow the currently generated type descriptions and must not rely on old structure offsets.
+
+## Callback and GC Safety
+
+JS callback references saved by SNI must be registered in the owning Realm and released when the resource is deleted or the context is torn down. Before native object deletion, pointers that may be scanned by GC must be cleared first; after GC, native objects must not be retrieved again through invalid control blocks.
+
+Before timer and animation callbacks execute, the context, program state, control block state, and native address must be checked. If the callback is in a pending-deletion or deleted state, JS must not be called. Callback exceptions are recorded by SPM, which decides the subsequent error path; SNI wrappers must not swallow exceptions and continue using uncertain native resources.
+
+## API Export and Generation
+
+SNI APIs are exported via description tables. The description table contains namespaces, entry names, parameters, return values, constants, and sub-entries; the export process includes obtaining the description table, validating the description, generating or parsing JS properties, mounting to the target Realm, binding wrappers for special methods, and unmounting when the Realm is destroyed.
+
+After modifying the description table, the parameter semantics in the type bridging, generated files, and documentation must be synchronized. API documentation should explain parameter types, return values, error conditions, object ownership, and lifecycle, not just list function names.
+
+## SNI Initialization and Mounting
+
+`sni_init` initializes the global type table, destruction callbacks, and special methods; `sni_mount` mounts the API to the specified Realm. Global registration is done only once, and Realm-level objects and callbacks must still belong to a specific `sni_context_t`. After an engine reset, the Realm and context must be re-established, and old control blocks must not be reused.

@@ -38,6 +38,14 @@ typedef struct eos_watchface_instance {
 } eos_watchface_instance_t;
 ```
 
+### Current Watchface Components and Script Boundary
+
+Watchface components are located in `src/ui/watchface_widgets/`, organized by time/date, battery, health/environment, and decorative categories. C components can be used directly by built-in watchfaces or from JavaScript via `eos.ww`.
+
+Documentation for component APIs should specify creation functions, input data, update methods, and deletion conditions. Components must not store raw LVGL pointers in script-visible data, nor continue accessing stopped sensor subscriptions after the watchface is paused.
+
+When the watchface is paused, the Root Activity and watchface program may still be retained; only when the watchface is destroyed are the View, script context, subscriptions, and component resources cleaned up. Switching watchfaces should use the Root Activity replacement flow, and the watchface should not be pushed onto the page stack as a normal Activity.
+
 ### Watchface Type Enum
 
 ```c

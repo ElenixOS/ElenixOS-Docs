@@ -338,13 +338,13 @@ typedef enum
 ```mermaid
 stateDiagram-v2
     [*] --> ACTIVE : Create Program
-    
+
     ACTIVE --> SUSPENDED : SuspendProgram (Activity Switch)
     SUSPENDED --> ACTIVE : ResumeProgram (Return to Watchface)
-    
+
     ACTIVE --> STOPPING : TerminateProgram
     SUSPENDED --> STOPPING : TerminateProgram
-    
+
     STOPPING --> TERMINATED : Cleanup Complete
 ```
 
@@ -365,3 +365,19 @@ SPM manages the **script program** lifecycle, while the script engine kernel man
 | **Kernel Layer** | JS Execution Window | Bytecode parsing/execution/exception |
 
 The kernel state machine focuses on state transitions for single JS code execution (RUNNING/IDLE/SUSPENDED/EXCEPTION), while SPM focuses on the lifecycle management of script programs as a whole.
+
+## Current Core Boundaries
+
+The call direction must remain unidirectional: Application/Watchface → SNI/SPM → Framework & Services → Port. Upper layers can combine public APIs, but cannot access lower-layer private contexts or bypass framework ownership through LVGL `user_data`.
+
+| Lifecycle Object | Responsible Module | What Cannot Be Done |
+| --- | --- | --- |
+| Program, Realm | SPM / Script Engine | Upper layers directly destroy Realm |
+| JS/Native Handles | SNI Context | Expose raw pointers to JS |
+| Page, Activity Stack | Activity Controller | Directly delete Views in the stack |
+| Widget Attached Data | `eos_wdata` | Assume a single `user_data` layout |
+| Device Capabilities | Service / Port | Applications directly call platform drivers |
+
+Input first enters the platform port and input layer, then Chrome, Activity, or controls determine the foreground target; sensor and other device data first enters the service, and is provided to watchfaces and applications through subscription or read interfaces. Script callbacks must return to the owning SPM program context, and cannot directly call arbitrary Realms in platform callbacks.
+
+Recent Apps adds an intermediate state: the page is detached from the current stack but still alive, and the program is suspended but not terminated. In the architecture, "application close" can no longer be equated with "Activity leave".

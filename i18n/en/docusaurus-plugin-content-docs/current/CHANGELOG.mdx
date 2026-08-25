@@ -4,6 +4,81 @@ title: Changelog
 
 # Changelog
 
+## [v0.6.0-alpha]
+
+### Added
+
+- **Recent Apps System**: Complete app suspend/resume mechanism that preserves state when switching apps instead of destroying it. Includes LRU registry, Activity substack detach/attach, Parking Lot view staging area, pre-captured snapshots, thumbnail display, and resume transition animations.
+- **App Suspend/Resume**: SPM extended from watchface-only suspension to applications, adding `spm_app_suspend()`, `spm_app_resume(app_id)`, and `spm_app_stop_by_id(app_id)` APIs.
+- **SNI Resource Suspend/Resume Policies**: Timers support `RUN_ONCE`/`RUN_ALL`/`SKIP` resume policies, animations support `CONTINUE`/`JUMP_TO_END` resume policies, configurable via Kconfig.
+- **Digital Crown Double-Tap Detection**: Changed from immediate trigger to wait-then-decide mode, with a default double-tap window of 250ms. Double-tap opens the Recent Apps page, single-tap suspends the current app.
+- **App Loading Screen**: Displays progress bar and status updates during app startup, including radial loading animation (supporting determinate and indeterminate modes).
+- **Watchface Component Library**: Added 20+ reusable C watchface UI components covering time/date (digital clock, date, weekday ring, moon phase, date window), battery (battery status, arc indicator, charging), health (heart rate, heart rate arc, steps, blood oxygen, temperature, activity ring, barometer, compass), and decorative (tick ring, digit ring, center cap, progress ring, background).
+- **eos.ww Namespace**: Watchface component library exposed as `eos.ww.*` namespace via SNI, directly usable in JavaScript.
+- **Developer Options**: Added FPS display, visible object count (OBJS) display, and touch tracking in the settings app.
+- **Circular Image Component**: Added `eos_circle_image_create` circular cropped image component.
+- **Widget Data Registry (eos_wdata)**: Type-safe per-widget data registry replacing direct use of `lv_obj_set_user_data()` by various subsystems. SNI control blocks are now stored as `EOS_WDATA_SNI_CB` type entries.
+- **Explicit Activity Destruction**: Added `eos_activity_destroy()` function to explicitly destroy a specified Activity.
+- **Standalone Snapshot**: Added `eos_activity_take_snapshot_standalone()` snapshot interface not limited by transition state, for Recent Apps scenarios.
+- **Activity Substacks**: Added `eos_activity_detach_app_substack()` and `eos_activity_reattach_app_substack()` for substack management during app suspend/resume.
+- **Parking Lot Mechanism**: When an Activity is suspended, its View moves to an invisible parking area instead of being destroyed, enabling fast recovery.
+- **Animation Groups (eos_anim_group)**: Support coordinated transitions of multiple animations.
+- **Custom Cubic Bezier Easing**: Support custom cubic-bezier easing paths and debug interception callbacks.
+- **SNI Teardown State Machine**: Implemented resource management state machine, formalizing resource ownership (Pure Managed / Tree-Dependent / Hybrid) and destruction order.
+- **JerryScript Port Enhancements**: Added full date/time and file system functionality support.
+- **Font Fallback Configuration**: Support fallback font configuration when TTF font loading fails.
+- **Sensor Sampling Period APIs**: Added `eos_sensor_set_sample_period()` and `eos_sensor_get_sample_period()` APIs.
+- **Memory Query APIs**: Added `eos_mem_get_used_bytes()` and `eos_mem_get_free_bytes()` to query C heap usage.
+- **Third-Party Library Git Info**: Generate and log Git version information of third-party dependency libraries at startup.
+- **Style Checker Enhancements**: Added separator and comment format checking rules.
+- **ES Module Resolution Cache**: Introduced module caching to ensure ES module singleton semantics; multiple imports of the same module share the same instance.
+- **SNI Special Method Wrappers**: `lv_obj_delete`, `lv_obj_remove_event`, and `lv_obj` parent setter moved to special wrappers.
+- **Crash Recovery Restart Dialog**: After engine crash, display restart/exit dialog for user choice.
+
+### Changed
+
+- **App Lifecycle**: Apps now support suspend/resume; switching apps suspends by default instead of destroying.
+- **Animation System Refactoring**: Refactored animation handling to use `eos_anim_group` for coordinated transitions, improving animation handling in UI components.
+- **SNI Control Block Retrieval Unification**: `sni_control_block_t` retrieval unified to use `eos_wdata` registry.
+- **AppHeader Synchronization**: App UI and AppHeader displayed in the same frame, eliminating delayed title bar appearance.
+- **Configuration Macro Renaming**: `DEBUG`/`RELEASE` renamed to `EOS_DEBUG`/`EOS_RELEASE` to avoid naming conflicts.
+- **Theme Default Behavior**: Scrolling and scrollbars disabled by default for all objects.
+- **Circular Icon Rendering**: Circular icons now rendered as centered images instead of baseline-offset labels, using dark background to eliminate white halo.
+- **Main Loop Optimization**: Removed forced minimum sleep duration.
+- **Digit Ring Labels**: Adjusted label size for vertical centering.
+- **Code Comment Standardization**: Unified separator and comment formats.
+- **LVGL 9.4 Adaptation**: Simulator build adapted to LVGL 9.4 headers.
+
+### Fixed
+
+- **Input Protection During Transitions**: Block input events during Activity transition animations to prevent state inconsistency.
+- **Animation Completion Before Snapshot**: Ensure all animations complete before capturing snapshots.
+- **Crown Scrollbar Animation Blocking**: Fixed scrollbar animation blocking during fade in/out.
+- **List Transition Pop Effect**: Fixed button "pop" effect, ensuring transitions start from off-screen.
+- **SNI Resource Ownership**: Formalized resource ownership rules, fixing dangling references, use-after-free, and resource leaks caused by teardown order.
+- **SNI Activity/View Lifecycle**: Hardened Activity/View lifecycle, locking View/Screen access permissions.
+- **Memory Tracking Table**: Added full-table warning and reset warning state on removal.
+- **Memory Tracking Table Size Configuration**: Added configuration item and updated cache size.
+- **Clock Hidden Flag**: Added hidden flag check in timer callback.
+- **Stress Test CPU Saturation**: Added delay to prevent busy-loop causing CPU saturation.
+- **EOS_WEAK Macro**: Updated GCC definition and removed MinGW32 check.
+- **Sensor Notification Performance**: Removed logging in `eos_sensor_notify` to improve performance.
+- **Empty Data Placeholder**: Display 0 instead of LVGL default text when no data.
+- **FIFO Logging**: Re-enabled FIFO operation logging.
+- **Fatal Error Logging**: Replaced `printf` with `EOS_LOG_E` for fatal error logging.
+- **Script Engine Error Recovery**: Implemented error handling and recovery mechanism in `script_engine_call_raw`.
+- **JerryScript Value Management**: Enhanced JerryScript value management during teardown.
+- **SPM Teardown Phase**: Refined teardown phases for SNI context management.
+- **Descriptor Table Generation**: Generate right-aligned pointers and dynamic continuation line indentation.
+- **Audio Decoder**: Removed unused fields in `wav_fmt_chunk_t` structure.
+- **SNI Type Bridging**: Updated `lv_event_t` type definition and color attribute offsets to use `lv_color_t` structure.
+- **File System Error Messages**: Fixed error messages for drive letter mismatches.
+- **Rounded Canvas Buffer**: Initialize canvas buffer and adjust background image handling.
+- **Radio Button Focus Scrolling**: Removed scroll focus flag for single-option buttons.
+- **Bitmap Font Conditional Inclusion**: Conditionally include bitmap fonts based on `EOS_FONT_TYPE` in CMakeLists.txt.
+- **Switch Indicator Style**: Synchronized indicator style for unrendered components, removed debug output.
+- **Switch Creation Layout Update**: Removed unnecessary layout update on switch creation.
+
 ## [v0.5.1-alpha]
 
 ### Fixed
@@ -242,6 +317,7 @@ title: Changelog
 - Provides isolation mechanism between scripts and system core, improving system stability and security.
 - Provides basic debugging and development support capabilities, improving desktop-side development and debugging efficiency.
 
+[v0.6.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.6.0-alpha
 [v0.5.1-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.1-alpha
 [v0.5.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.0-alpha
 [v0.4.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.4.0-alpha

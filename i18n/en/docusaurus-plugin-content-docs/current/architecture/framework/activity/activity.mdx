@@ -125,7 +125,7 @@ flowchart TB
 ### Stack Structure Diagram
 
 ```
-Top of Stack  
+Top of Stack
       ┌──────────────────┐
       │  Activity C      │  ← Currently visible Activity
       ├──────────────────┤
@@ -175,305 +175,23 @@ void eos_activity_back_cb(lv_event_t *e);
 
 Convenient wrapper for use in LVGL event callbacks.
 
-## Core API
+## Interface Responsibilities and Usage Boundaries
 
-### Creation and Initialization
+The Activity interfaces are divided into four groups: controller initialization and Root management, normal Activity creation and destruction, current page and transition state queries, and View/title/AppHeader/snapshot property management. They operate on objects owned by the Activity controller and do not change the ownership of SPM programs or SNI resources.
 
-```c
-// Normal Activity (for applications, lists, etc.)
-eos_result_t eos_activity_controller_init(eos_activity_t *initial_activity);
-void eos_activity_controller_deinit(void);
-eos_activity_t *eos_activity_create(const eos_activity_lifecycle_t *lifecycle);
+Creating a Root Activity immediately establishes its View; normal Activities typically bind their View during the enter lifecycle. Explicit destruction applies only to temporary Activities not in the stack. The current page, the fully displayed page, and the page in transition must be distinguished through different query semantics; a single "current pointer" cannot represent all states.
 
-// Root Activity (for watchfaces only)
-eos_activity_t *eos_activity_create_root(const eos_activity_lifecycle_t *lifecycle);
-eos_result_t eos_activity_replace_root(eos_activity_t *new_root);
-```
+Activity types are used to select page transitions and identify page purposes; title, AppHeader, and snapshots are page presentation properties. Snapshots can serve page transitions or Recent Apps, but snapshot buffers do not own the Activity View. Transition callbacks use animation groups to coordinate multiple objects, with completion and cleanup managed uniformly by the group.
 
-| Function | Description |
-|----------|-------------|
-| `eos_activity_controller_init` | Initialize Activity controller, requires Root Activity (watchface) as parameter |
-| `eos_activity_controller_deinit` | Deinitialize, release all Activities |
-| `eos_activity_create` | Create normal Activity, View is lazily created |
-| **`eos_activity_create_root`** | **Create Root Activity (watchface), View is created immediately** |
-| **`eos_activity_replace_root`** | **Replace current Root Activity (switch watchface)** |
+Application development only needs to rely on the interface reference generated from documentation to confirm specific signatures; this page only specifies call timing, object ownership, lifecycle restrictions, and error boundaries.
 
-#### Smart Lazy Loading Mechanism
+## View and AppHeader Usage Boundaries
 
-The Activity system adopts a **smart lazy loading** design to simplify initialization:
+View is the root of the LVGL object tree owned by the Activity. It is created and bound when the page enters, and released uniformly by the Activity lifecycle when the page is destroyed. Page code can use LVGL for layout but should not replace the View currently held by the controller, nor should it delete objects still managed by the Activity when the page leaves.
 
-```mermaid
-flowchart TD
-    A["eos_watchface_init()"] --> B["eos_activity_create_root()"]
-    B --> C{"root_screen exists?"}
-    C -->|"No"| D["Automatically create root_screen"]
-    C -->|"Yes"| E["Reuse existing root_screen"]
-    D --> F["Create View immediately"]
-    E --> F
-    F --> G["Return complete Activity"]
+AppHeader is a system-managed page header. Its visibility, title, and transitions should be coordinated with the system header manager through Activity properties; pages should not directly change the Z-order of the top-level Overlay. The title bar and page content should be updated within the same page state transition.
 
-    H["eos_activity_controller_init()"] --> I{"root_screen exists?"}
-    I -->|"No (create_root not called)"| J["Automatically create root_screen + stack"]
-    I -->|"Yes (created by create_root)"| K["Skip, only create stack"]
-    J --> L["Set Root Activity"]
-    K --> L
-```
-
-### Activity Query
-
-```c
-eos_activity_t *eos_activity_get_current(void);
-eos_activity_t *eos_activity_get_visible(void);
-eos_activity_t *eos_activity_get_previous(void);
-eos_activity_t *eos_activity_get_bottom(void);
-eos_activity_t *eos_activity_get_watchface(void);
-bool eos_activity_is_transition_in_progress(void);
-```
-
-| Function | Description |
-|----------|-------------|
-| `eos_activity_get_current` | Get current Activity (top of stack) |
-| `eos_activity_get_visible` | Get currently fully displayed Activity |
-| `eos_activity_get_previous` | Get previous Activity (used in event callbacks to get source page) |
-| `eos_activity_get_bottom` | Get bottom Activity (usually watchface) |
-| `eos_activity_get_watchface` | Get watchface Activity |
-| `eos_activity_is_transition_in_progress` | Check if transition animation is in progress |
-
-### View Management
-
-```c
-lv_obj_t *eos_activity_get_view(eos_activity_t *activity);
-void eos_activity_set_view(eos_activity_t *activity, lv_obj_t *view);
-lv_obj_t *eos_activity_get_root_screen(void);
-lv_obj_t *eos_view_active(void);
-```
-
-| Function | Description |
-|----------|-------------|
-| `eos_activity_get_view` | Get View object associated with Activity |
-| `eos_activity_set_view` | Set View object for Activity |
-| `eos_activity_get_root_screen` | Get root screen object |
-| `eos_view_active` | Get View of current Activity (convenient method) |
-
-### Title Management
-
-```c
-const char *eos_activity_get_title(eos_activity_t *activity);
-void eos_activity_set_title(eos_activity_t *activity, const char *title);
-void eos_activity_set_title_id(eos_activity_t *activity, lang_string_id_t id);
-lv_color_t eos_activity_get_title_color(eos_activity_t *activity);
-void eos_activity_set_title_color(eos_activity_t *activity, lv_color_t color);
-```
-
-| Function | Description |
-|----------|-------------|
-| `eos_activity_get_title` | Get Activity title |
-| `eos_activity_set_title` | Set Activity title (string) |
-| `eos_activity_set_title_id` | Set title via internationalization string ID |
-| `eos_activity_get_title_color` | Get title color |
-| `eos_activity_set_title_color` | Set title color |
-
-### Type Management
-
-```c
-void eos_activity_set_type(eos_activity_t *activity, eos_activity_type_t type);
-eos_activity_type_t eos_activity_get_type(eos_activity_t *activity);
-```
-
-### AppHeader Visibility Control
-
-```c
-void eos_activity_set_app_header_visible(eos_activity_t *activity, bool visible);
-void eos_activity_set_app_header_visible_animated(eos_activity_t *activity, bool visible, uint32_t duration_ms);
-bool eos_activity_is_app_header_visible(eos_activity_t *activity);
-void eos_activity_set_app_header_time_only(eos_activity_t *activity, bool time_only);
-bool eos_activity_is_app_header_time_only(eos_activity_t *activity);
-void eos_activity_set_app_header_time_only_text_color(eos_activity_t *activity, lv_color_t color);
-lv_color_t eos_activity_get_app_header_time_only_text_color(eos_activity_t *activity);
-```
-
-| Function | Description |
-|----------|-------------|
-| `eos_activity_set_app_header_visible` | Set AppHeader visibility |
-| `eos_activity_set_app_header_visible_animated` | Set AppHeader visibility with animation, `duration_ms` of 0 switches immediately |
-| `eos_activity_is_app_header_visible` | Check if AppHeader is visible |
-| `eos_activity_set_app_header_time_only` | Set AppHeader to show only time |
-| `eos_activity_is_app_header_time_only` | Check if AppHeader shows only time |
-| `eos_activity_set_app_header_time_only_text_color` | Set font color for time-only mode |
-| `eos_activity_get_app_header_time_only_text_color` | Get font color for time-only mode |
-
-### User Data
-
-```c
-void *eos_activity_get_user_data(eos_activity_t *activity);
-void eos_activity_set_user_data(eos_activity_t *activity, void *user_data);
-```
-
-### Snapshot
-
-```c
-lv_obj_t *eos_activity_take_snapshot(eos_activity_t *activity, bool include_header);
-```
-
-Get snapshot image of Activity view. `include_header` controls whether to include AppHeader.
-
-**Note**: Snapshot image resources are automatically released when the object is deleted.
-
-### Transition Animation
-
-```c
-eos_result_t eos_activity_register_anim_route(
-    eos_activity_type_t from_type,
-    eos_activity_type_t to_type,
-    eos_activity_anim_cb_t cb);
-
-eos_activity_anim_cb_t eos_activity_get_anim_route(
-    eos_activity_type_t from_type,
-    eos_activity_type_t to_type);
-```
-
-Register and query transition animation routes between pages.
-
-## View Details
-
-View is the LVGL object associated with Activity, serving as the root container for the Activity page's UI content. Each Activity should set a View after creation.
-
-### Create View
-
-```c
-// Create Activity
-eos_activity_t *activity = eos_activity_create(&lifecycle);
-
-// Create View (based on root screen)
-lv_obj_t *view = lv_obj_create(eos_activity_get_root_screen());
-lv_obj_remove_style_all(view);
-lv_obj_set_size(view, EOS_DISPLAY_WIDTH, EOS_DISPLAY_HEIGHT);
-
-// Associate View with Activity
-eos_activity_set_view(activity, view);
-```
-
-### Get Current View
-
-```c
-// Method 1: Via Activity
-lv_obj_t *view = eos_activity_get_view(activity);
-
-// Method 2: Convenient method (get current Activity's View)
-lv_obj_t *active_view = eos_view_active();
-```
-
-### View Layout Recommendations
-
-Since ElenixOS targets small-screen devices like smartwatches (typically 390x450), View layout should follow these principles:
-
-- Use `lv_obj_remove_style_all(view)` to clear default styles
-- Set View size to screen dimensions: `lv_obj_set_size(view, EOS_DISPLAY_WIDTH, EOS_DISPLAY_HEIGHT)`
-- Use LVGL's Flex layout or manual positioning to arrange child components
-
-## AppHeader
-
-AppHeader is ElenixOS's unified top navigation bar component, displayed in the `lv_layer_top()` layer, above all Views.
-
-### AppHeader API
-
-```c
-void eos_app_header_init(void);
-void eos_app_header_hide(void);
-void eos_app_header_show(eos_activity_t *a);
-void eos_app_header_set_visible_animated(eos_activity_t *a, bool visible, uint32_t duration_ms);
-bool eos_app_header_is_visible(void);
-```
-
-| Function | Description |
-|----------|-------------|
-| `eos_app_header_init` | Initialize AppHeader (can only be called once) |
-| `eos_app_header_hide` | Hide AppHeader |
-| `eos_app_header_show` | Show AppHeader, refresh title of current Activity |
-| `eos_app_header_set_visible_animated` | Show/hide AppHeader with animation |
-| `eos_app_header_is_visible` | Check if AppHeader is visible |
-
-## Usage Examples
-
-### Create Standard Application Activity
-
-```c
-// Define lifecycle callbacks
-static void on_enter(eos_activity_t *activity) {
-    lv_obj_t *view = lv_obj_create(eos_activity_get_root_screen());
-    lv_obj_remove_style_all(view);
-    lv_obj_set_size(view, EOS_DISPLAY_WIDTH, EOS_DISPLAY_HEIGHT);
-    eos_activity_set_view(activity, view);
-
-    // Set title
-    eos_activity_set_title(activity, "My App");
-
-    // Add UI components
-    lv_obj_t *label = lv_label_create(view);
-    lv_label_set_text(label, "Hello, ElenixOS!");
-    lv_obj_center(label);
-}
-
-static void on_destroy(eos_activity_t *activity) {
-    // Clean up resources
-}
-
-// Create Activity
-const eos_activity_lifecycle_t lifecycle = {
-    .on_enter = on_enter,
-    .on_destroy = on_destroy,
-    .on_pause = NULL,
-    .on_resume = NULL,
-};
-
-eos_activity_t *activity = eos_activity_create(&lifecycle);
-eos_activity_set_type(activity, EOS_ACTIVITY_TYPE_APP);
-```
-
-### Page Navigation
-
-```c
-// Enter new page from current page
-eos_activity_enter(new_activity);
-
-// Return to previous page
-eos_activity_back();
-
-// Return directly to watchface
-eos_activity_back_to_watchface();
-```
-
-### Control AppHeader
-
-```c
-// Hide AppHeader
-eos_activity_set_app_header_visible(activity, false);
-
-// Hide with animation
-eos_activity_set_app_header_visible_animated(activity, false, 300);
-
-// Show only time
-eos_activity_set_app_header_time_only(activity, true);
-```
-
-### Register Transition Animation
-
-```c
-static void my_anim_cb(lv_anim_timeline_t *at, eos_activity_t *from, eos_activity_t *to) {
-    // Custom transition animation
-    lv_obj_t *from_view = eos_activity_get_view(from);
-    lv_obj_t *to_view = eos_activity_get_view(to);
-
-    // Create animation timeline
-    // ...
-}
-
-// Register transition animation from application to application
-eos_activity_register_anim_route(
-    EOS_ACTIVITY_TYPE_APP,
-    EOS_ACTIVITY_TYPE_APP,
-    my_anim_cb);
-```
+Specific function signatures, parameters, and return values for application development are provided by the auto-generated API reference. This page only documents View ownership, AppHeader hierarchy, enter/leave timing, and restrictions during page transitions.
 
 ## Activity and Event System
 
@@ -521,9 +239,25 @@ System Running
 | Activity stack is empty | `eos_activity_get_current` returns NULL |
 | Transition animation in progress | `eos_activity_is_transition_in_progress` returns true |
 
-## Performance Recommendations
+## Current Activity Interface Boundaries
 
-1. **Lazy Initialization**: Create UI in `on_enter` callback, avoid time-consuming operations in constructor
-2. **Resource Release**: Release all dynamically allocated resources in `on_destroy` callback
-3. **Snapshot Management**: Snapshots consume additional memory, avoid holding snapshots for multiple Activities simultaneously
-4. **Transition Animation**: Animation duration should be controlled between 200-500ms to avoid affecting user experience
+### Creation and Destruction
+
+- `eos_activity_create` creates a normal Activity; the View is typically bound in `on_enter`.
+- `eos_activity_create_root` creates a Root Activity and immediately establishes its View, suitable for watchfaces.
+- `eos_activity_destroy` is only for Activities not in the Activity stack; it cannot be used for currently visible, in-stack, or parked Activities.
+- Controller initialization accepts a Root Activity; the Root Activity is not destroyed by normal back operations.
+
+### Query Interfaces
+
+Page query interfaces are used to distinguish navigation contexts. During transitions, do not treat the current navigation object as a fully displayed page; use dedicated transition state queries when animation status needs to be determined.
+
+### View, Title, and Animation
+
+View reading and binding should only be performed during lifecycle-allowed phases. Title, title color, page type, and AppHeader visibility are all Activity properties. Page transition callbacks receive an animation group; multiple related animations should be added to the same group, with completion and cleanup managed uniformly by the group.
+
+## Activity Sub-stack in Recent Apps
+
+When suspended, the app's Root Activity and its child Activities are detached from the current stack, and Views are moved to an invisible Parking Lot; Activity objects and Views remain valid. On resume, the saved sub-stack is reattached, the visible Activity is updated, and then a snapshot transition is performed.
+
+Therefore, `on_pause` indicates temporary invisibility, not that resources are invalid; `on_destroy` indicates that the Activity will not be resumed. The package ID of an App Activity must be stable so that Recent Apps, uninstallation, and engine reset cleanup can find the corresponding objects.

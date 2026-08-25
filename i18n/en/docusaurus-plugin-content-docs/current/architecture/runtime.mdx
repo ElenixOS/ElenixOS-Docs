@@ -148,6 +148,28 @@ ElenixOS values runtime security and has taken the following measures:
 3. **Resource Limitation**: Limit script resource usage
 4. **Input Validation**: Validate user input to prevent malicious input
 
+## Collaboration between SPM and SNI
+
+SPM stores program records, program types, current state, script packages, and SNI contexts. When a program enters suspension, it calls SNI's resource pause interface; when a program enters stop, it first sets `STOPPING`, then cleans up the context according to the teardown phase. Upper layers must not directly call the script engine core to bypass SPM.
+
+## Timers, Animations, and Suspension
+
+During suspension, script callbacks are not executed, but native resource records still exist. Upon resume, timers can execute a one-time compensation, execute a limited number of missed callbacks, or skip missed cycles; animations can continue from the paused position, or jump to the end state and trigger the completion callback. Scripts that depend on real-time cycles should calculate state based on system time and should not treat the number of timer callbacks as actual elapsed time.
+
+## Teardown Phase
+
+The stop path must distinguish between "disabling callbacks" and "releasing resources":
+
+1. Set the program to `STOPPING`;
+2. Disable new SPM callbacks and save error context;
+3. Unlink JS objects from native addresses;
+4. Clean up JS references, event callbacks, timers, and animations;
+5. Clean up Activity/View and their LVGL events;
+6. Stop the engine and destroy the SNI context;
+7. Mark the program as `TERMINATED`.
+
+Failure at any stage must not return to `ACTIVE`, otherwise it will cause dangling callbacks or double release.
+
 ## Summary
 
 ElenixOS's runtime system is a complex and efficient system that ensures system stability and responsiveness through reasonable scheduling mechanisms, resource management strategies, and error handling mechanisms. At the same time, it provides a safe and efficient runtime environment for application development.

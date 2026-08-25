@@ -1,0 +1,33 @@
+---
+title: Recent Apps
+sidebar_position: 5
+---
+
+
+# Recent Apps
+
+Recent Apps is the app switcher and suspended app registry. It uses an LRU linked list to hold resumable script apps, with each entry associated with a package ID, App Activity, saved substack, page snapshot, and estimated memory.
+
+## Entry and Behavior
+
+A short press of the digital crown maintains system click semantics, while a long press opens the Recent Apps page. After selecting a card, the original Activity substack and script context are restored. App switching is not equivalent to app exit.
+
+## Suspension Flow
+
+1. Confirm that the current Activity belongs to a suspendable script app.
+2. Detach the App Activity substack and place the View into an invisible Parking Lot.
+3. Generate a resume animation snapshot and a page display thumbnail.
+4. Set the program to`SUSPENDED`via SPM, pausing SNI timers, animations, and script callbacks.
+5. Place the entry at the MRU end, updating its position when used again.
+
+On resume, reattach the substack, restore resources according to policy, and finally allow the program to continue receiving callbacks.
+
+## Resume Policy
+
+Timers can be replayed at most once on resume, replay missed callbacks (up to ten times), or skip missed callbacks and restart timing. Animations can continue from the paused position or jump to the end state and trigger the completion callback. Logic that depends on real-time cycles should use system time and not assume timers are still running during suspension.
+
+## Eviction and Failure Boundaries
+
+Recent Apps is limited by the number of entries and the estimated memory high-water mark; when either limit is exceeded, entries are evicted from the LRU tail. Eviction goes through a full stop and teardown, not just discarding the card. Engine reset and app uninstall also clean up related entries.
+
+If the package ID is not found or the entry has been evicted, resume fails without creating a half-resumed program; old entries are not recoverable after an engine reset. Suspended apps still occupy memory for Realm, View, snapshots, module cache, and script objects.

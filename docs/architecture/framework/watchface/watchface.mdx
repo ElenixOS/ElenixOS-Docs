@@ -38,6 +38,14 @@ typedef struct eos_watchface_instance {
 } eos_watchface_instance_t;
 ```
 
+## 当前表盘组件与脚本边界
+
+表盘组件位于 `src/ui/watchface_widgets/`，按时间日期、电池、健康环境和装饰类组织。C 组件可以被内建表盘直接使用，也可以通过 `eos.ww` 从 JavaScript 使用。
+
+组件 API 的文档应说明创建函数、输入数据、更新方式和删除条件。组件不能把 LVGL 原生指针存入脚本可见数据，也不能在表盘暂停后继续访问已经停止的传感器订阅。
+
+表盘暂停时，Root Activity 和表盘程序可能仍然保留；表盘销毁时才清理 View、脚本上下文、订阅和组件资源。切换表盘应使用 Root Activity 替换流程，不应将表盘当作普通 Activity 压入页面栈。
+
 ### 表盘类型枚举
 
 ```c

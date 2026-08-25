@@ -21,51 +21,6 @@ The application list management function allows operations such as getting the n
 
 Through the `eos_app_order_move` function, the position of applications in the list can be adjusted to implement application sorting functionality. Sorting results are saved to the configuration file to ensure sorting status is maintained during the next startup.
 
-## Key Interfaces
-
-### Application Installation Interface
-
-```c
-eos_result_t eos_app_install(const char *eapk_path);
-```
-
-- **Parameters**: `eapk_path` - Application package path
-- **Return value**: Installation result, returns `EOS_OK` on success, error code on failure
-
-### Application Uninstallation Interface
-
-```c
-eos_result_t eos_app_uninstall(const char *app_id);
-```
-
-- **Parameters**: `app_id` - Application ID
-- **Return value**: Uninstallation result, returns `EOS_OK` on success, error code on failure
-
-### Application List Operation Interfaces
-
-```c
-uint32_t eos_app_get_installed(void);
-const char* eos_app_list_get_id(size_t index);
-bool eos_app_list_contains(const char* app_id);
-const char *eos_app_list_get_existing_id(const char *id);
-```
-
-- `eos_app_get_installed`: Get the number of installed applications
-- `eos_app_list_get_id`: Get application ID by index
-- `eos_app_list_contains`: Check if application exists
-- `eos_app_list_get_existing_id`: Get existing application ID in the list
-
-### Application Sorting Interface
-
-```c
-eos_result_t eos_app_order_move(const char *app_id, size_t new_index);
-```
-
-- **Parameters**:
-  - `app_id` - Target application ID
-  - `new_index` - New index position
-- **Return value**: Operation result, returns `EOS_OK` on success, error code on failure
-
 ## Application Package Structure
 
 ElenixOS application packages (.eapk files) contain the following key files:
@@ -81,40 +36,6 @@ ElenixOS application packages (.eapk files) contain the following key files:
 3. **Running**: Run application through script engine
 4. **Uninstallation**: Uninstall application through `eos_app_uninstall`
 
-## Usage Examples
-
-### Install Application
-
-```c
-eos_result_t result = eos_app_install("/path/to/app.eapk");
-if (result == EOS_OK) {
-    // Installation successful
-} else {
-    // Installation failed
-}
-```
-
-### Uninstall Application
-
-```c
-eos_result_t result = eos_app_uninstall("com.example.app");
-if (result == EOS_OK) {
-    // Uninstallation successful
-} else {
-    // Uninstallation failed
-}
-```
-
-### Get Application List
-
-```c
-uint32_t app_count = eos_app_get_installed();
-for (size_t i = 0; i < app_count; i++) {
-    const char* app_id = eos_app_list_get_id(i);
-    // Process application ID
-}
-```
-
 ## Implementation Details
 
 The core implementation of the application management module includes:
@@ -125,3 +46,26 @@ The core implementation of the application management module includes:
 4. **Application sorting**: Support application list sorting and persistence
 
 This module works closely with the file system module and script engine module to provide complete application management functionality for ElenixOS.
+
+## Current Runtime Lifecycle
+
+Application management does not directly own JavaScript Realms. When starting an application, the application framework creates an App Activity, and then the SPM starts the script program and binds the View to the Activity. When stopping an application, the application directory, program records, Activity substack, and Recent Apps entries must be handled together.
+
+| Operation | Activity | SPM Program | SNI Resources |
+| --- | --- | --- | --- |
+| Start | Create and enter | `ACTIVE` | Established and callable |
+| Pause | Keep and park | `SUSPENDED` | Retained but paused |
+| Resume | Reattach | `ACTIVE` | Callable per policy |
+| Close/Evict | Destroy | `STOPPING` → `TERMINATED` | Released per teardown |
+
+Application ID is the stable key for all runtime lookups. Titles, list positions, and card addresses may change and cannot be used for recovery or uninstall matching.
+
+## Application Installation and Runtime Boundaries
+
+Application installation, uninstallation, list query, and sorting interfaces only target application packages and the application list; they do not create Activities or execute scripts. Callers should check operation results; on installation failure, directories or lists must not be treated as updated. Specific interfaces are provided by the auto-generated API reference.
+
+## Recent Apps
+
+Recent Apps maintains pending entries using package IDs. Entries include App Activity, saved substack depth, last used time, estimated memory, recovery snapshot, and display thumbnail. Long-press the digital crown to enter the switcher; app switching defaults to the suspend path; only when the user closes, the app is uninstalled, or quantity or memory limits are triggered does the stop and evict path execute.
+
+Suspended apps still occupy memory, and apps must not release state required for recovery in `on_pause`. When hardware or external subscriptions need to be released, repeatable pause/resume logic should be provided.

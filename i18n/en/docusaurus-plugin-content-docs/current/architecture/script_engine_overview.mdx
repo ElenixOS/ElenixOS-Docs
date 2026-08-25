@@ -192,18 +192,18 @@ typedef struct
     uint32_t backtrace_count;     /**< Number of backtrace frames */
 } script_error_t;
 
-typedef struct  
-{  
-	bool initialized; 
+typedef struct
+{
+	bool initialized;
 	eos_cqueue_t *module_queue;
 	script_engine_state_t state;
 	script_program_t *current_program;
 	jerry_value_t old_realm; // OPTIONAL pending, need to determine based on JerryScript
-	
+
 	// Script timeout detection
 	uint32_t script_start_time;   /**< Script execution start time (tick) */
     uint32_t script_timeout_ms;   /**< Script execution timeout (ms), 0 = no timeout */
-	script_error_t error;	
+	script_error_t error;
 } script_engine_runtime_t;
 ```
 
@@ -357,13 +357,13 @@ typedef struct script_program
     // Doubly linked list structure
 	struct script_program *next;
 	struct script_program *prev;
-	
+
 	script_pkg_type_t type;    // Script program type
 	script_program_state_t state;    // Script program state
 	sni_context_t *sni_ctx;    // SNI context
 	script_pkg_t *script;    // Script information
 	jerry_value_t realm;    // Held Realm
-	
+
 	bool has_error;
 	script_error_t error;    // Script error, copied from kernel and saved
 } script_program_t;
@@ -771,3 +771,30 @@ script_engine_set_timeout(10000); // 10 seconds
 // Disable timeout detection (not recommended)
 script_engine_set_timeout(0);
 ```
+
+## Current Program State and Lifecycle Boundaries
+
+SPM divides script program states into `ACTIVE`, `SUSPENDED`, `STOPPING`, and `TERMINATED`. Core is only responsible for engine execution state and cannot replace SPM in determining whether an application can still be resumed; SNI is only responsible for resource context and cannot replace Activity in deciding page navigation.
+
+| State | Realm | SNI Resources | JS Callbacks |
+| --- | --- | --- | --- |
+| `ACTIVE` | Exists | Available | Allowed |
+| `SUSPENDED` | Preserved | Preserved but paused | Prohibited |
+| `STOPPING` | Being destroyed | Cleaned up per teardown | Prohibited |
+| `TERMINATED` | Destroyed | Released | Prohibited |
+
+Upper layers can only change program lifecycle through interfaces such as `spm_watchface_start/pause/resume/destroy` and `spm_app_run/suspend/resume/stop`. Directly deleting Views, directly calling JerryScript, or directly destroying SNI contexts cannot replace these paths.
+
+## Recent Apps and Script Programs
+
+When switching applications, Recent Apps parks the App Activity sub-stack, SPM sets the application to `SUSPENDED`, and SNI retains resources but pauses timers, animations, and callbacks. On resume, the Activity sub-stack is re-attached, and resources are restored according to timer and animation policies; resumption does not re-execute the application entry script.
+
+When an application is uninstalled, LRU-evicted, or the engine is reset, a full stop must be performed. Engine reset first saves the crash context, then cleans up old programs and all Recent Apps entries; after reset, old Realms, JS values, and native handles are no longer reusable.
+
+## SNI Call Constraints
+
+SNI control blocks, object deletion notifications, JS references, and asynchronous callbacks all belong to the program context. Before callback execution, SPM state checks must be performed; before native object deletion, JS-visible native addresses must be cleared; during teardown, script execution must not be re-entered. For detailed type bridging, resource categorization, export descriptor tables, and context APIs, see [SNI Detailed Architecture](./script_engine/sni).
+
+## API Documentation Requirements
+
+When adding new script APIs, the documentation should at least specify the namespace, parameters and return values, exception/error behavior, ownership of returned objects, callable lifecycle states, deletion rules for asynchronous callbacks, and whether it is affected by suspend/resume policies. Merely recording that "a certain C function is exported" is insufficient to define a script API.

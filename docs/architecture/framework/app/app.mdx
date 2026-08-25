@@ -21,51 +21,6 @@ title: 应用管理模块
 
 通过 `eos_app_order_move` 函数，可以调整应用在列表中的位置，实现应用排序功能。排序结果会保存到配置文件中，确保下次启动时保持排序状态。
 
-## 关键接口
-
-### 应用安装接口
-
-```c
-eos_result_t eos_app_install(const char *eapk_path);
-```
-
-- **参数**：`eapk_path` - 应用包路径
-- **返回值**：安装结果，成功返回 `EOS_OK`，失败返回错误码
-
-### 应用卸载接口
-
-```c
-eos_result_t eos_app_uninstall(const char *app_id);
-```
-
-- **参数**：`app_id` - 应用ID
-- **返回值**：卸载结果，成功返回 `EOS_OK`，失败返回错误码
-
-### 应用列表操作接口
-
-```c
-uint32_t eos_app_get_installed(void);
-const char* eos_app_list_get_id(size_t index);
-bool eos_app_list_contains(const char* app_id);
-const char *eos_app_list_get_existing_id(const char *id);
-```
-
-- `eos_app_get_installed`：获取已安装应用数量
-- `eos_app_list_get_id`：根据索引获取应用ID
-- `eos_app_list_contains`：判断应用是否存在
-- `eos_app_list_get_existing_id`：获取列表中已存在的应用ID
-
-### 应用排序接口
-
-```c
-eos_result_t eos_app_order_move(const char *app_id, size_t new_index);
-```
-
-- **参数**：
-  - `app_id` - 目标应用ID
-  - `new_index` - 新的索引位置
-- **返回值**：操作结果，成功返回 `EOS_OK`，失败返回错误码
-
 ## 应用包结构
 
 ElenixOS 的应用包（.eapk文件）包含以下关键文件：
@@ -81,40 +36,6 @@ ElenixOS 的应用包（.eapk文件）包含以下关键文件：
 3. **运行**：通过脚本引擎运行应用
 4. **卸载**：通过 `eos_app_uninstall` 卸载应用
 
-## 使用示例
-
-### 安装应用
-
-```c
-eos_result_t result = eos_app_install("/path/to/app.eapk");
-if (result == EOS_OK) {
-    // 安装成功
-} else {
-    // 安装失败
-}
-```
-
-### 卸载应用
-
-```c
-eos_result_t result = eos_app_uninstall("com.example.app");
-if (result == EOS_OK) {
-    // 卸载成功
-} else {
-    // 卸载失败
-}
-```
-
-### 获取应用列表
-
-```c
-uint32_t app_count = eos_app_get_installed();
-for (size_t i = 0; i < app_count; i++) {
-    const char* app_id = eos_app_list_get_id(i);
-    // 处理应用ID
-}
-```
-
 ## 实现细节
 
 应用管理模块的核心实现包括：
@@ -125,3 +46,26 @@ for (size_t i = 0; i < app_count; i++) {
 4. **应用排序**：支持应用列表的排序和持久化
 
 该模块与文件系统模块、脚本引擎模块紧密配合，为 ElenixOS 提供完整的应用管理功能。
+
+## 当前运行时生命周期
+
+应用管理不直接拥有 JavaScript Realm。启动应用时，应用框架创建 App Activity，再由 SPM 启动脚本程序并将 View 绑定到 Activity。停止应用时，必须同时处理应用目录、程序记录、Activity 子栈和 Recent Apps 条目。
+
+| 操作 | Activity | SPM 程序 | SNI 资源 |
+| --- | --- | --- | --- |
+| 启动 | 创建并进入 | `ACTIVE` | 建立并可回调 |
+| 暂停 | 保留并停放 | `SUSPENDED` | 保留但暂停 |
+| 恢复 | 重新附加 | `ACTIVE` | 按策略后可回调 |
+| 关闭/驱逐 | 销毁 | `STOPPING` → `TERMINATED` | 按 teardown 释放 |
+
+应用 ID 是所有运行时查找的稳定键。标题、列表位置和卡片地址都可能变化，不能用于恢复或卸载匹配。
+
+## 应用安装与运行边界
+
+应用安装、卸载、列表查询和排序接口只面向应用包与应用列表，不负责创建 Activity 或执行脚本。调用方应检查操作结果；安装失败时不能把目录或列表当作已更新。具体接口由自动生成的 API 参考提供。
+
+## Recent Apps
+
+Recent Apps 使用包 ID 维护挂起条目。条目包含 App Activity、保存的子栈深度、最近使用时间、估算内存、恢复快照和展示缩略图。长按数字表冠进入切换器，应用切换时默认走挂起路径；用户关闭、应用卸载、数量或内存限制触发时才走停止和驱逐路径。
+
+挂起应用仍占用内存，应用不能在 `on_pause` 中释放恢复必需的状态。需要释放硬件或外部订阅时，应提供可重复执行的暂停/恢复逻辑。

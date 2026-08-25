@@ -92,3 +92,23 @@ The UI components module adopts a layered architecture:
 3. **Application component layer**：Components for specific application scenarios
 
 This architectural design allows UI components to maintain consistent style and interaction methods across different application scenarios, while providing sufficient flexibility and scalability.
+
+## UI Ownership and Extension Boundaries
+
+### Animations
+
+`eos_anim_t` represents an animation instance, and `eos_anim_group_t` coordinates the start, completion, and destruction of multiple instances. Activity transitions select animation groups through animation routing; custom cubic Bézier paths and debug interception callbacks belong to animation path capabilities and do not change the resource ownership of Activities or SNIs.
+
+### Widget Data
+
+`eos_wdata_set(obj, type, data, dtor)` registers typed data for LVGL objects; `eos_wdata_get` reads it; `eos_wdata_remove` deletes the specified item and calls the destructor; `eos_wdata_clear` deletes all typed data on the object. Replacing an item of the same type does not call the destructor of the old value; the caller must handle the ownership of the old value before replacement.
+
+`EOS_WDATA_SNI_CB` specifically stores SNI control blocks, while other framework data uses their respective types, so Activity, list, message, and SNI data can coexist.
+
+### Object Deletion Rules
+
+LVGL parent object deletion may cascade to delete child objects. Object deletion callbacks must first notify the SNI, clear native addresses, and then allow resources that depend on the object tree to be released. Page code must not access object pointers after the deletion callback, nor use `lv_obj_set_user_data` as a framework data registry.
+
+### Watchface and Recent Apps
+
+The watchface component provides a unified entry point through the C API and `eos.ww`; the component is only responsible for display and data binding and does not own script programs. Recent Apps uses page snapshots and thumbnails, but cards do not own Activity Views; when evicted, they must be handed over to Activity, SPM, and SNI to complete destruction.
