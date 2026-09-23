@@ -2,90 +2,40 @@
 title: Panel
 ---
 
-## Panel（面板组件）
+# Panel
 
-Panel 是系统提供的通用对话框组件，用于展示消息提示、确认操作等交互场景。
+Panel 是一个可放在 Activity View 或任意 LVGL 父对象上的通用内容面板。它可以显示图标、标题、消息、扩展内容槽和确认/取消按钮。
 
-### 核心功能
-
-Panel 组件提供以下核心能力：
-
-- **灵活的内容展示**：支持图标、标题、消息文本的组合展示
-- **国际化支持**：支持通过字符串 ID 或直接文本两种方式设置内容
-- **自定义扩展**：提供额外内容槽位，可添加自定义 UI 组件
-- **按钮交互**：支持确认和取消两个操作按钮，可自定义回调行为
-
-### 布局结构
-
-Panel 采用垂直居中布局，从上到下依次为：
-
-1. **图标区域**：可选的圆形图标，支持符号（如警告、信息）或图片两种类型
-2. **标题区域**：大字体居中显示的标题文本
-3. **消息区域**：正文内容，支持自动换行
-4. **扩展槽位**：预留的自定义内容区域
-5. **操作按钮区域**：水平排列的确认和取消按钮
-
-### 创建方式
-
-#### 在 Activity 上创建
-
-此方式会自动清理 Activity 的视图内容并隐藏应用头部：
-
-```c
-eos_panel_t *panel = eos_panel_create_on_activity(activity, &cfg);
-```
-
-#### 在任意父对象上创建
-
-提供更灵活的创建方式，可将 Panel 添加到任意 UI 容器中：
+## 创建
 
 ```c
 eos_panel_t *panel = eos_panel_create(parent, &cfg);
+eos_panel_t *overlay = eos_panel_create_on_activity(activity, &cfg);
 ```
 
-### 配置说明
+`eos_panel_create_on_activity` 会在 Activity 的现有 View 上创建前景面板，并隐藏该 Activity 的应用头部；删除面板后原 View 仍在下方。普通 `eos_panel_create` 只使用调用者给出的父对象。
 
-Panel 的配置主要包括以下方面：
-
-- **图标配置**：设置图标类型（符号或图片）、图标源和背景颜色
-- **文本配置**：设置标题和消息内容，支持国际化字符串 ID
-- **按钮配置**：设置确认和取消按钮的文本及回调函数
-
-### 使用示例
+## 配置
 
 ```c
 eos_panel_cfg_t cfg = {
     .icon_type = EOS_PANEL_ICON_TYPE_SYMBOL,
     .icon_src = LV_SYMBOL_WARNING,
     .title_text = "警告",
-    .message_text = "确定要执行此操作吗？",
+    .message_text = "确定要继续吗？",
     .confirm_btn_text = "确定",
     .confirm_cb = on_confirm,
     .cancel_btn_text = "取消",
 };
-
-eos_panel_t *panel = eos_panel_create_on_activity(activity, &cfg);
 ```
 
-### 自定义内容
+标题和消息可使用文本或语言字符串 ID。按钮 ID 为 0 时隐藏对应按钮；确认回调为空时默认不操作，取消回调为空时默认执行 `eos_activity_back()`。
 
-通过 `eos_panel_get_extra_slot()` 方法可以获取扩展槽位，在其中添加自定义 UI 组件：
+## 扩展内容与释放
 
 ```c
-lv_obj_t *extra_slot = eos_panel_get_extra_slot(panel);
-// 在 extra_slot 中添加自定义组件
+lv_obj_t *slot = eos_panel_get_extra_slot(panel);
+eos_panel_delete(panel);
 ```
 
-### 默认行为
-
-| 按钮 | 默认行为 |
-|------|----------|
-| 确认按钮 | 无操作（需自定义回调） |
-| 取消按钮 | 返回上一级 Activity |
-
-### 生命周期管理
-
-Panel 支持两种释放方式：
-
-- **自动释放**：当 Panel 的容器被删除时，会自动释放相关资源
-- **手动释放**：调用 `eos_panel_delete(panel)` 手动释放
+扩展内容应添加到返回的 slot。面板容器被删除时，组件会自动释放其管理结构；也可以显式调用 `eos_panel_delete`。显式删除后不要再次删除同一面板。

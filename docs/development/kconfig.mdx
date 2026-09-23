@@ -34,7 +34,7 @@ ElenixOS 采用 Kconfig 管理内核编译期配置。最终生效的取值由�
 
 | 目标 | 操作 |
 |------|------|
-| `make` / `make build` | `cmake --build build`（CMake 按需自动重配置） |
+| `make` / `make build` | 构建已经配置好的 `build/` 目录 |
 | `make menuconfig` | 编辑 `build/.config`（`cmake -B build && cmake --build build --target menuconfig`） |
 | `make run` | 构建并运行 |
 
@@ -64,7 +64,7 @@ cmake --build build-wasm --target menuconfig    # 编辑 build-wasm/.config
 
 ## 与 CMake 选项的边界
 
-CMake 选项（`-DUSE_FREERTOS=ON` 等）控制构建行为——编译单元、链接目标、编译标志。Kconfig 选项控制内核运行时行为——内存策略、文件系统类型、字体引擎、日志策略等。二者作用于不同阶段，不存在功能重叠。
+CMake 选项（如 `EOS_PLATFORM`、`USE_FREERTOS` 和可选 LVGL 后端）控制平台、依赖、编译单元和链接行为。Kconfig 生成编译期配置宏，控制内存策略、文件系统类型、字体、日志和 Recent Apps 等内核配置。使用同一构建目录时，应在 CMake 重新配置后再重新生成 Kconfig 头文件。
 
 ## CI 行为
 

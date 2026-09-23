@@ -1,8 +1,62 @@
 ---
-sidebar_position: 2
-title: 事件系统
+sidebar_position: 1
+title: 事件总线
 ---
 
-# 事件系统
+# 事件总线
 
-<todo />
+事件总线是一个按事件 ID 分发的全局广播机制。订阅者注册回调，发布者通过 `eos_event_post()` 提交事件参数；事件没有单一目标，发布时可以同时附带一个参数指针和一个 LVGL 对象指针。
+
+## 内置事件
+
+当前公开的事件包括：
+
+| 事件 | 含义 |
+|---|---|
+| `EOS_EVENT_APP_UNINSTALLED` | 应用已卸载 |
+| `EOS_EVENT_APP_INSTALLED` | 应用已安装 |
+| `EOS_EVENT_SYSTEM_SLEEP` | 系统进入休眠 |
+| `EOS_EVENT_SYSTEM_DISPLAY_ON` | 显示器唤醒 |
+| `EOS_EVENT_SYSTEM_DISPLAY_AOD` | 显示器进入 AOD |
+| `EOS_EVENT_SYSTEM_CONFIG_UPDATE` | 系统配置更新 |
+| `EOS_EVENT_SCRIPT_STARTED` | 脚本启动 |
+| `EOS_EVENT_SCRIPT_EXITED` | 脚本退出 |
+| `EOS_EVENT_SCRIPT_FATAL` | JS 引擎发生致命错误并被重置 |
+| `EOS_EVENT_ACTIVITY_SCREEN_SWITCHED` | 页面切换完成，param 为当前 Activity View |
+| `EOS_EVENT_LANGUAGE_CHANGED` | 语言已改变 |
+
+## 订阅与发布
+
+```c
+void eos_event_subscribe(eos_event_code_t id, eos_event_cb_t cb, void *user_data);
+void eos_event_subscribe_ex(eos_event_code_t id, eos_event_cb_t cb,
+                            void *user_data, lv_obj_t *obj);
+void eos_event_post(eos_event_code_t id, void *param, lv_obj_t *obj);
+```
+
+回调通过以下函数读取事件内容：
+
+```c
+void *eos_event_get_user_data(eos_event_t *e);
+void *eos_event_get_param(eos_event_t *e);
+lv_obj_t *eos_event_get_obj(eos_event_t *e);
+```
+
+`subscribe_ex` 中的 `obj` 是该订阅的关联对象，可用于按对象取消订阅，并会作为回调可读取的关联对象；它不表示事件只会派发给该对象。`post` 的 `param` 不会被事件总线复制，回调需要在发布者保证的生命周期内使用它。
+
+回调在 `eos_event_post()` 的派发过程中同步执行，因此应快速返回，不应阻塞或依赖另一个线程稍后处理。回调中取消订阅是允许的，实际清理可能延后到广播安全后；也可调用 `eos_event_cleanup_now()` 主动触发清理。
+
+## 取消订阅
+
+```c
+void eos_event_unsubscribe(eos_event_code_t id, eos_event_cb_t cb);
+void eos_event_unsubscribe_with_user_data(eos_event_code_t id,
+                                           eos_event_cb_t cb,
+                                           void *user_data);
+void eos_event_unsubscribe_with_obj(eos_event_code_t id,
+                                    eos_event_cb_t cb,
+                                    lv_obj_t *obj);
+void eos_event_unsubscribe_all(eos_event_cb_t cb);
+```
+
+用户事件 ID 可通过 `eos_event_register_id()` 从 `EOS_EVENT_LAST` 之后分配。分配结果只在当前进程/运行实例中有效，不应持久化为协议编号。

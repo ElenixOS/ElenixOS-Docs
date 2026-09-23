@@ -1,134 +1,45 @@
 ---
-sidebar_position: 9
+sidebar_position: 6
 title: 日志服务
 ---
 
-日志服务采用基于监听器的设计模式，支持多个监听器接收日志消息。
+# 日志服务
 
-## 日志级别
+日志服务提供四个级别：`DEBUG`、`INFO`、`WARN` 和 `ERROR`。宏 `EOS_LOG_D`、`EOS_LOG_I`、`EOS_LOG_W`、`EOS_LOG_E` 会格式化消息并交给日志服务；定义 `EOS_LOG_DISABLE` 时，这些宏不产生输出。
 
-```c
-typedef enum {
-    EOS_LOG_LEVEL_DEBUG = 0,  // 调试级别
-    EOS_LOG_LEVEL_INFO,       // 信息级别
-    EOS_LOG_LEVEL_WARN,       // 警告级别
-    EOS_LOG_LEVEL_ERROR       // 错误级别
-} eos_log_level_t;
-```
-
-## 日志监听器
-
-### 监听器回调函数
+## 级别过滤
 
 ```c
-typedef void (*eos_log_listener_cb_t)(
-    eos_log_level_t level,
-    const char *buf,
-    size_t len,
-    void *user
-);
+eos_log_level_t eos_log_get_level(void);
+eos_result_t eos_log_set_level(eos_log_level_t level);
 ```
 
-### 监听器标志
+这是日志服务的全局最低派发级别。低于该级别的消息不会派发给监听器。
+
+## 监听器
+
+日志监听器收到级别、消息缓冲区、消息长度和注册时的用户数据：
 
 ```c
-#define EOS_LOG_FLAG_SYSTEM   (1 << 0)  // 系统监听器，无法删除
+typedef void (*eos_log_listener_cb_t)(eos_log_level_t level,
+                                      const char *buf,
+                                      size_t len,
+                                      void *user);
+
+eos_log_listener_id_t eos_log_register_listener(const char *name,
+                                                eos_log_listener_cb_t cb,
+                                                void *user_data,
+                                                uint8_t flags);
+eos_result_t eos_log_unregister_listener(eos_log_listener_id_t id);
+eos_result_t eos_log_set_listener_enabled(eos_log_listener_id_t id,
+                                          bool enabled);
+eos_log_listener_id_t eos_log_find_listener(const char *name);
+eos_result_t eos_log_get_listener(eos_log_listener_id_t id,
+                                  eos_log_listener_t *listener);
 ```
 
-### 添加日志监听器
+注册成功返回非负 ID，失败返回 `-1`。监听器名称必须在其生命周期内保持有效，通常应使用静态字符串。`EOS_LOG_FLAG_SYSTEM` 用于系统监听器；带该标志的监听器不能被注销。禁用监听器不会删除它，之后可重新启用。
 
-```c
-eos_log_listener_id_t eos_log_add_listener(
-    eos_log_listener_cb_t cb,
-    eos_log_level_t min_level,
-    uint32_t flags,
-    void *user
-);
-```
+系统启动时调用 `eos_service_log_init()`；标准输出监听器可通过 `eos_service_log_std_register()` 注册。日志宏中的 `EOS_LOG_TAG` 会作为消息前缀使用，彩色输出是否启用由 `EOS_LOG_USE_COLOR` 决定。
 
-### 移除日志监听器
-
-```c
-eos_result_t eos_log_remove_listener(eos_log_listener_id_t id);
-```
-
-### 设置监听器级别
-
-```c
-eos_result_t eos_log_set_level(eos_log_listener_id_t id, eos_log_level_t level);
-```
-
-## 日志输出
-
-### 输出日志
-
-```c
-void eos_log(eos_log_level_t level, const char *fmt, ...);
-```
-
-## 日志宏
-
-便捷的日志输出宏（当 `EOS_LOG_DISABLE` 未定义时）：
-
-```c
-#define EOS_LOG_D(fmt, ...)  // 调试级别
-#define EOS_LOG_I(fmt, ...)  // 信息级别
-#define EOS_LOG_W(fmt, ...)  // 警告级别
-#define EOS_LOG_E(fmt, ...)  // 错误级别
-```
-
-如果定义了 `EOS_LOG_TAG`，日志消息会包含标签前缀。
-
-## 彩色日志
-
-当 `EOS_LOG_USE_COLOR` 启用时，支持彩色输出：
-
-```c
-#define EOS_LOG_COLOR_RESET   "\033[0m"
-#define EOS_LOG_COLOR_RED     "\033[31m"
-#define EOS_LOG_COLOR_GREEN   "\033[32m"
-#define EOS_LOG_COLOR_YELLOW  "\033[33m"
-#define EOS_LOG_COLOR_BLUE    "\033[34m"
-#define EOS_LOG_COLOR_CYAN    "\033[36m"
-```
-
-## 指针检查宏
-
-### 检查指针并返回
-
-```c
-#define EOS_CHECK_PTR_RETURN(ptr)
-```
-
-如果指针为 NULL，记录错误并返回。
-
-### 检查指针并返回指定值
-
-```c
-#define EOS_CHECK_PTR_RETURN_VAL(ptr, ret_val)
-```
-
-### 检查指针并释放后返回
-
-```c
-#define EOS_CHECK_PTR_RETURN_FREE(ptr, free_var)
-#define EOS_CHECK_PTR_RETURN_VAL_FREE(ptr, ret_val, free_var)
-```
-
-## 断言宏
-
-当 `EOS_USE_ASSERT` 启用时：
-
-```c
-#define EOS_ASSERT(expr)
-```
-
-如果表达式为 false，记录错误并执行断言处理程序。
-
-## 调试辅助
-
-打印 LVGL 对象的坐标信息：
-
-```c
-#define EOS_DEBUG_PRINT_POS(obj)
-```
+日志监听器回调应尽快返回，也不应假定消息缓冲区在回调返回后仍然有效。

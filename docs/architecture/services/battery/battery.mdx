@@ -110,17 +110,19 @@ uint32_t eos_battery_get_current_capacity(void);     // 当前估算容量（mAh
 uint32_t eos_battery_get_cycle_count(void);          // 电池循环次数
 ```
 
+设计容量优先取已注册电池设备提供的值；设备未提供正值时回退为 500 mAh。当前容量按当前百分比乘以 500 mAh 计算，未初始化时为 0；它不会根据设计容量或电压动态换算。当前实现的循环次数从 0 开始，尚未从状态文件恢复。
+
 ## 电池事件
 
 使用事件 ID 注册电池状态变化通知。当电池百分比或充电状态发生变化时，事件会被广播：
 
 ```c
-eos_event_id_t eos_battery_get_event_id(void);
+eos_event_code_t eos_battery_get_event_id(void);
 ```
 
 ## 自定义电量计算
 
-默认使用线性插值算法将电压转换为百分比。如需使用自定义算法：
+当前服务直接使用设备上报的 `percent` 字段。虽然保留了自定义计算函数的声明：
 
 ```c
 void eos_battery_set_calc_fn(eos_battery_calc_fn_t fn);
@@ -132,7 +134,7 @@ void eos_battery_set_calc_fn(eos_battery_calc_fn_t fn);
 typedef int (*eos_battery_calc_fn_t)(int voltage_mv);
 ```
 
-传入电压（毫伏），返回计算后的百分比 (0-100)，出错返回负数。传入 NULL 使用默认算法。
+但当前实现不会调用该函数；`eos_battery_set_calc_fn` 目前没有效果。不要根据电压推导服务百分比。
 
 ## 策略管理
 
@@ -150,9 +152,18 @@ eos_result_t eos_battery_get_policy(eos_battery_mode_t mode, eos_battery_policy_
 
 ## 状态持久化键
 
-电池服务使用的持久化存储键：
+电池服务头文件定义了以下状态键名：
 
 ```c
 #define EOS_STATE_KEY_CAPACITY             "battery_capacity"      // 电池容量
 #define EOS_STATE_KEY_CYCLE_COUNT          "cycle_count"           // 循环次数
 ```
+
+当前电池服务实现不会自动读写这两个键。电池历史也只保存在内存中，最多记录 128 个百分比/充电状态变化：
+
+```c
+uint32_t eos_battery_get_history_count(void);
+bool eos_battery_get_history_entry(uint32_t index, eos_battery_state_t *entry);
+```
+
+历史索引从 0 开始，按最旧到最新的顺序读取当前保留的条目；服务重启后历史清空。

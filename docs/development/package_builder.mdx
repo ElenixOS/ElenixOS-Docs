@@ -5,137 +5,51 @@ title: 构建脚本包
 
 # 构建脚本包
 
-ElenixOS 使用构建脚本工具将应用或表盘的源代码、资源和配置文件构建成一个统一的安装包（.eapk 或 .ewpk 文件）。本文档将详细介绍构建脚本包的格式、资源组织和输出规范。
+模拟器仓库中的 `ElenixOS/scripts/eos_pkg_builder.py` 可以把一个应用或表盘目录打包为 ElenixOS 使用的 `.epk` 文件。
 
-## 构建脚本包概念
+## 输入目录
 
-构建脚本包是将应用的所有组件（脚本、资源、配置）组合成一个可安装的包文件的过程。在 ElenixOS 中，构建产物是 .eapk 或 .ewpk 文件，类似于其他平台的安装包格式。
-
-:::note
-构建脚本包是为了便于应用的分发和安装，确保应用的所有组件在目标平台上能够正常运行。构建过程不会压缩应用的资源文件，而是直接将它们复制到构建产物中。
-:::
-
-### 构建脚本包的作用
-
-1. **统一分发**：将应用的所有组件构建成一个文件，便于分发和安装
-2. **资源管理**：管理应用的资源文件，确保资源的正确加载
-3. **版本控制**：包含应用的版本信息，便于版本管理
-4. **权限管理**：包含应用的权限信息，确保应用只能访问授权的资源
-
-## 输入目录结构
-
-构建脚本工具使用特定的目录结构作为输入，确保构建过程的一致性和可靠性。
-
-### 标准目录结构
-
-```
-app/
-├── manifest.json      # 应用配置文件
-├── main.js            # 应用主脚本
-├── icon.bin           # 应用图标
-├── assets/            # 资源目录
-│   ├── images/        # 图片资源
-│   ├── fonts/         # 字体资源
-│   └── sounds/        # 音频资源
-└── lib/               # 依赖库
-```
-
-### 目录说明
-
-- **manifest.json**：应用的配置文件，包含应用 ID、名称、版本、类型等信息
-- **main.js**：应用的主脚本文件，包含应用的界面和逻辑
-- **icon.bin**：应用的图标文件，用于在应用列表中显示
-- **assets/**：应用的资源目录，包含图片、字体、音频等资源
-- **lib/**：应用的依赖库目录，包含第三方库和模块
-
-## 构建产物格式
-
-ElenixOS 的构建产物是 .eapk 或 .ewpk 文件，它们是压缩文件，包含了应用的所有组件。
-
-### .eapk 和 .ewpk 文件结构
-
-```
-app.eapk/ 或 app.ewpk/
-├── manifest.json      # 应用配置文件
-├── main.js            # 应用主脚本
-├── icon.bin           # 应用图标
-├── assets/            # 资源目录
-└── lib/               # 依赖库
-```
-
-### 构建脚本工具
-
-ElenixOS 使用 Python 脚本 `scripts/eos_pkg_builder.py` 进行构建：
-
-```bash
-# 构建为应用（.eapk）
-python3 scripts/eos_pkg_builder.py --input app/ --type app --output app.eapk
-# 构建为表盘（.ewpk）
-python3 scripts/eos_pkg_builder.py --input watchface/ --type watchface --output watchface.ewpk
-```
-
-## 资源合并规则
-
-在构建过程中，所有资源文件（图片、字体、音频等）都会直接复制到构建产物中。
-
-### 配置文件处理
-
-1. **manifest.json**：会被验证和处理，确保格式正确
-2. **其他配置文件**：会被复制到构建产物中
-
-## 发布与部署方式
-
-### 发布流程
-
-1. **开发应用**：开发应用或表盘的源代码和资源
-2. **构建应用**：使用构建脚本工具生成 .eapk 或 .ewpk 文件
-3. **测试应用**：在测试设备上测试应用
-4. **发布应用**：将应用或表盘发布到应用商店或其他分发渠道
-
-### 部署方式
-
-1. **本地安装**：通过文件系统将 .eapk 或 .ewpk 文件复制到设备上，然后使用应用管理 API 安装
-2. **远程安装（TODO）**：通过网络将 .eapk 或 .ewpk 文件下载到设备上，然后使用应用管理 API 安装
-3. **OTA 更新（TODO）**：通过 OTA（Over-The-Air）方式更新应用
-
-### 部署命令
-
-```bash
-# 本地安装应用
-eas_app_install("/path/to/app.eapk");
-# 本地安装表盘
-eas_app_install("/path/to/watchface.ewpk");
-```
-
-## 构建脚本工具使用
-
-### 构建脚本工具参数
-
-| 参数 | 描述 | 示例 |
-|------|------|------|
-| `--input` | 输入目录路径 | `--input app/` |
-| `--output` | 输出文件路径 | `--output app.eapk` |
-| `--type` | 应用类型 | `--type app` 或 `--type watchface` |
-
-### 构建脚本工具运行示例
-
-```bash
-# 构建为应用（.eapk）
-python3 scripts/eos_pkg_builder.py --input app/ --type app --output app.eapk
-# 构建为表盘（.ewpk）
-python3 scripts/eos_pkg_builder.py --input watchface/ --type watchface --output watchface.ewpk
-```
-
-## 应用配置文件
-
-### manifest.json 格式
+输入目录必须包含 `manifest.json`。构建器当前检查以下字段：
 
 ```json
 {
   "id": "com.example.app",
   "name": "示例应用",
   "version": "1.0.0",
-  "author": "Example Developer",
-  "description": "这是一个示例应用",
+  "minApiLevel": 1,
+  "targetApiLevel": 1
 }
 ```
+
+`minApiLevel` 和 `targetApiLevel` 必须是整数。构建器不会替应用补充 `author` 或 `description`；不过运行时加载脚本包时，这两个字段也是 manifest 的必需字段，因此可安装包应同时提供它们。`permissions` 等其他字段会原样保留在 `manifest.json` 中，由运行时负责解释。
+
+目录中的文件和子目录都会被收集，常见布局如下：
+
+```
+app/
+├── manifest.json
+├── main.js
+├── icon.bin
+└── assets/
+    └── ...
+```
+
+`main.js` 和 `assets/` 不是打包器额外创建的固定项目；它们是否存在、以及其他文件如何组织，取决于运行时对相应包类型的要求。资源文件不会压缩，包内保留文件表和文件数据。
+
+## 命令
+
+命令使用两个位置参数：输入目录和输出文件。`--type` 可选，默认为 `app`。
+
+```bash
+# 应用，输出魔数为 EAPK
+python3 ElenixOS/scripts/eos_pkg_builder.py app/ app.epk
+
+# 表盘，输出魔数为 EWPK
+python3 ElenixOS/scripts/eos_pkg_builder.py watchface/ watchface.epk --type watchface
+```
+
+脚本会拒绝不存在的 manifest、无文件目录、无效 JSON、缺失必需字段或非整数 API level。固定长度的名称、ID 和版本字段以 UTF-8 写入，过长内容会被截断；因此应使用较短的 manifest 字段值。
+
+## 包类型与安装
+
+`.epk` 是统一的二进制安装包容器，不是目录压缩文件。包头中的现有 magic `EAPK` 或 `EWPK` 是 Package Type 的唯一事实来源：分别表示 Application 和 Watch Face。`--type` 只决定包头类型，不会向 manifest 写入重复字段。包构建器只负责生成包，安装应通过目标系统的统一包安装入口完成。

@@ -3,78 +3,47 @@ sidebar_position: 6
 title: 配置服务
 ---
 
-配置服务负责管理系统配置信息，包括设备名称、语言、显示设置、背光亮度等系统级配置。所有配置都存储在系统配置文件中（config.json）。
+# 配置服务
+
+配置服务管理系统级配置，并将其保存为 JSON。服务初始化函数为 `eos_service_config_init()`。
 
 ## 配置键
 
-### 系统配置键
+当前公开键包括：
 
-```c
-#define EOS_CONFIG_KEY_DEVICE_NAME_STR "device_name"                  // 设备名称
-#define EOS_CONFIG_KEY_LANGUAGE_STR "language"                       // 语言
-#define EOS_CONFIG_KEY_WATCHFACE_ID_STR "wf_id"                       // 表盘 ID
-#define EOS_CONFIG_KEY_BLUETOOTH_BOOL "bluetooth"                     // 蓝牙开关
-#define EOS_CONFIG_KEY_DISPLAY_BRIGHTNESS_NUMBER "display_brightness" // 显示亮度
-#define EOS_CONFIG_KEY_SPEAKER_VOLUME_NUMBER "speaker_volume"         // 扬声器音量
-#define EOS_CONFIG_KEY_MUTE_BOOL "mute"                               // 静音开关
-#define EOS_CONFIG_KEY_SLEEP_TIMEOUT_SEC_NUMBER "sleep_timeout_sec"   // 休眠超时时间
-#define EOS_CONFIG_KEY_AOD_MODE_BOOL "aod_mode"                       // AOD 模式开关
-#define EOS_CONFIG_KEY_WAKE_ON_RAISE_BOOL "wake_on_raise"             // 抬腕唤醒开关
-#define EOS_CONFIG_KEY_VIBRATOR_STRENGTH_NUMBER "vibrator_strength"   // 振动强度
-#define EOS_CONFIG_KEY_APP_ORDER_ARRAY "app_order"                     // 应用排序
+```text
+device_name              language                 wf_id
+bluetooth                display_brightness      speaker_volume
+mute                     sleep_timeout_sec       aod_mode
+wake_on_raise            vibrator_strength       app_order
+password_hash            password_enabled        password_simple
+dev_fps                  dev_objs                 dev_touch
 ```
 
-## 默认值
+对应的 C 宏名分别以 `EOS_CONFIG_KEY_` 开头。开发者选项键 `dev_fps`、`dev_objs`、`dev_touch` 也属于配置文件内容，并不是编译期 Kconfig 选项。
 
-```c
-#define EOS_CONFIG_DEFAULT_DEVICE_NAME "Elenix Watch"                  // 默认设备名称
-#define EOS_CONFIG_DEFAULT_WATCHFACE_ID_STR "cn.sab1e.clock"           // 默认表盘 ID
-```
+默认设备名称为 `Elenix Watch`，默认表盘 ID 为 `cn.sab1e.clock`；默认语言由 `EOS_CONFIG_DEFAULT_LANGUAGE` 决定，当前宏映射为 `简体中文` 或 `English`。
 
-## 服务初始化
-
-首次系统运行时初始化配置服务：
-
-```c
-void eos_service_config_init(void);
-```
-
-## 布尔类型配置
+## 类型化访问
 
 ```c
 eos_result_t eos_config_set_bool(const char *key, bool value);
-bool eos_config_get_bool(const char *key, bool default_value);
-```
-
-## 字符串类型配置
-
-```c
 eos_result_t eos_config_set_string(const char *key, const char *value);
-char *eos_config_get_string(const char *key, const char *default_value);
-```
-
-返回的字符串不再使用时需要使用 `eos_malloc(str)` 释放内存。
-
-## 数值类型配置
-
-```c
 eos_result_t eos_config_set_number(const char *key, double value);
+
+bool eos_config_get_bool(const char *key, bool default_value);
+char *eos_config_get_string(const char *key, const char *default_value);
 double eos_config_get_number(const char *key, double default_value);
 ```
 
-## JSON 类型配置
+读取时如果键不存在或 JSON 类型不匹配，返回调用者提供的默认值。`eos_config_get_string` 返回动态分配的字符串，包括使用默认值时；使用完必须用 `eos_free` 释放，不能用 `eos_malloc` 释放。
+
+## JSON 值
 
 ```c
 cJSON *eos_config_get_json(const char *key);
 eos_result_t eos_config_set_json(const char *key, cJSON *json_value);
-```
-
-获取的 cJSON 对象使用完后需要调用 `cJSON_Delete()` 释放。
-
-## 添加配置项
-
-向系统配置文件添加新的配置项：
-
-```c
 eos_result_t eos_config_add_item(const char *key, const char *value);
 ```
+
+`eos_config_get_json` 返回的 cJSON 树由调用者负责用 `cJSON_Delete` 释放。系统配置路径由存储路径配置统一定义，应用脚本不应直接修改系统配置文件；脚本请使用 `eos.config`，它把数据隔离在当前应用或表盘的数据目录中。

@@ -39,7 +39,7 @@ void eos_pm_request_sleep(void);
 
 ### 重置定时器
 
-重置休眠定时器：
+如果当前构建启用了休眠定时器，则重置它：
 
 ```c
 void eos_pm_reset_timer(void);
@@ -47,11 +47,13 @@ void eos_pm_reset_timer(void);
 
 ### 设置休眠超时
 
-设置多长时间无操作后进入休眠（单位：秒）：
+设置休眠定时器的周期（单位：秒）：
 
 ```c
 void eos_pm_set_sleep_timeout(uint32_t sec);
 ```
+
+当前模拟器实现默认关闭了自动休眠定时器，因此仅调用此函数不会自动触发状态切换；显式调用 `eos_pm_request_sleep()` 仍会按 AOD 设置进入 AOD 或休眠。
 
 ## AOD 模式
 
