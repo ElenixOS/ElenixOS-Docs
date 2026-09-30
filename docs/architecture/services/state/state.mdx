@@ -1,41 +1,14 @@
 ---
-sidebar_position: 12
+sidebar_position: 13
 title: 状态服务
 ---
 
-状态服务用于管理运行时持久化状态，与配置服务类似，但专门用于存储运行时状态信息（如电池容量、循环次数等）。
+# 状态服务
 
-## 状态文件路径
+状态服务保存跨运行实例需要保留的系统状态，并与配置服务区分：配置描述可调设置，状态记录运行过程中形成的数据，例如电池容量信息。
 
-```c
-#define EOS_STATE_FILE_PATH EOS_SYS_DIR "state.json"
-```
+服务按键保存布尔、字符串和数值等类型，并将状态写入系统状态文件。读取缺失值时由调用方提供回退值；动态字符串和解析后的 JSON 数据由接收方按其资源规则释放。
 
-## 服务初始化
+持久化路径由系统存储配置管理。应用脚本使用隔离的应用配置；系统状态文件不属于应用脚本的配置边界。
 
-```c
-void eos_service_state_init(void);
-```
-
-## 布尔类型状态
-
-```c
-eos_result_t eos_state_set_bool(const char *key, bool value);
-bool eos_state_get_bool(const char *key, bool default_value);
-```
-
-## 字符串类型状态
-
-```c
-eos_result_t eos_state_set_string(const char *key, const char *value);
-char *eos_state_get_string(const char *key, const char *default_value);
-```
-
-返回的字符串不再使用时需要使用 `eos_free` 释放内存。
-
-## 数值类型状态
-
-```c
-eos_result_t eos_state_set_number(const char *key, double value);
-double eos_state_get_number(const char *key, double default_value);
-```
+状态服务拥有系统持久状态键和值；消费者 Pull 当前值并处理缺省值，不直接写状态文件。落盘能力依赖 Storage/平台文件系统端口；状态不是事件日志或应用私有配置空间。见[Application 契约](../../application_contract)和[存储服务](../storage)。

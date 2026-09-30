@@ -2,7 +2,7 @@
 title: Panel
 ---
 
-# Panel
+# 面板（Panel）
 
 Panel 是一个可放在 Activity View 或任意 LVGL 父对象上的通用内容面板。它可以显示图标、标题、消息、扩展内容槽和确认/取消按钮。
 
@@ -38,4 +38,4 @@ lv_obj_t *slot = eos_panel_get_extra_slot(panel);
 eos_panel_delete(panel);
 ```
 
-扩展内容应添加到返回的 slot。面板容器被删除时，组件会自动释放其管理结构；也可以显式调用 `eos_panel_delete`。显式删除后不要再次删除同一面板。
+扩展内容添加到返回的 slot。面板容器被删除时，组件自动释放其管理结构；调用方也可显式调用 `eos_panel_delete`。面板删除后句柄失效，重复删除不属于有效操作。

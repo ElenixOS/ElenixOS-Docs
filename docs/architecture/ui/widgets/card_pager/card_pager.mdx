@@ -3,7 +3,7 @@ title: CardPager
 sidebar_position: 4
 ---
 
-# CardPager
+# 卡片分页器（CardPager）
 
 CardPager 管理一组可水平或垂直滑动的页面，并提供页码指示器。页面由组件创建并归属于 CardPager。
 
@@ -19,4 +19,4 @@ eos_card_pager_set_page_changed_cb(cp, on_page_changed, user_data);
 
 `EOS_CARD_PAGER_DIR_VER` 和 `EOS_CARD_PAGER_DIR_HOR` 分别表示垂直和水平滑动。页面索引从 0 开始；可通过 `eos_card_pager_get_page`、`eos_card_pager_get_indicator`、`eos_card_pager_remove_page` 和 `eos_card_pager_move_node` 管理页面。
 
-启用循环后，从首尾继续滑动会回到另一端；关闭循环时会停留在边界。页变化回调收到 CardPager、当前页索引和注册时的用户数据。删除 CardPager 的父对象会同时删除其页面，不要在删除后继续使用页面指针。
+启用循环后，从首尾继续滑动会回到另一端；关闭循环时会停留在边界。页变化回调收到 CardPager、当前页索引和注册时的用户数据。删除 CardPager 的父对象会同时删除其页面，页面指针随对象树销毁而失效。

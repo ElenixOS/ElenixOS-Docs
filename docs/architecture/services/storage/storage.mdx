@@ -5,83 +5,47 @@ title: 文件系统模块
 
 # 文件系统模块
 
-存储服务提供 POSIX 风格路径、JSON 便捷接口、文件句柄和目录访问。所有返回动态字符串的接口都要求调用者使用 `eos_free` 释放；返回的 cJSON 树使用 `cJSON_Delete` 释放。
+存储服务在平台文件系统端口之上提供统一的 JSON、文件与目录操作，并管理延迟写入等可选机制。平台端口负责当前目标的文件系统实现；服务 API 接收路径和句柄，不隐含应用身份或脚本沙箱。
 
-## JSON 文件
-
-```c
-cJSON *eos_storage_json_load(const char *path);
-eos_result_t eos_storage_json_save(const char *path, cJSON *root);
-
-bool eos_storage_json_get_bool(const char *path, const char *key, bool default_value);
-eos_result_t eos_storage_json_set_bool(const char *path, const char *key, bool value);
-char *eos_storage_json_get_string(const char *path, const char *key,
-                                   const char *default_value);
-eos_result_t eos_storage_json_set_string(const char *path, const char *key,
-                                         const char *value);
-double eos_storage_json_get_number(const char *path, const char *key,
-                                   double default_value);
-eos_result_t eos_storage_json_set_number(const char *path, const char *key,
-                                         double value);
-cJSON *eos_storage_json_get_json(const char *path, const char *key);
-eos_result_t eos_storage_json_set_json(const char *path, const char *key,
-                                       cJSON *json_value);
-eos_result_t eos_storage_json_create_if_not_exist(const char *path,
-                                                   const char *default_json);
+```mermaid
+flowchart LR
+    Consumer[Framework / App] -->|sync path operation| Storage[Storage Service]
+    Storage -->|FS operation| Port[File-system Port]
+    Port -->|data / error| Storage
+    Storage -->|result / owned value| Consumer
 ```
 
-类型化读取在键不存在或类型不匹配时返回传入的默认值。`default_json == NULL` 时，创建接口使用空对象作为默认内容。
+## JSON 与文件数据
 
-## 文件和目录
+JSON 数据支持按类型读取和更新。键缺失或类型不匹配时，读取使用调用方给定的回退值。动态字符串和解析后的 JSON 树由调用方按其分配来源释放。
 
-```c
-bool eos_storage_is_valid_filename(const char *name);
-bool eos_storage_is_dir(const char *path);
-bool eos_storage_is_file(const char *path);
-eos_result_t eos_storage_mkdir_if_not_exist(const char *path);
-eos_result_t eos_storage_mkdir_recursive(const char *path);
-eos_result_t eos_storage_rm_recursive(const char *path);
-eos_result_t eos_storage_create_file_if_not_exist(const char *path,
-                                                   const char *default_content);
-char *eos_storage_read_file(const char *path);
-eos_result_t eos_storage_write_file(const char *path,
-                                    const void *data, size_t data_size);
-eos_result_t eos_storage_write_file_immediate(const char *path,
-                                              const void *data, size_t data_size);
-char *eos_storage_read_file_immediate(const char *path);
-eos_result_t eos_storage_file_remove(const char *path);
-eos_result_t eos_storage_file_move(const char *old_path, const char *new_path);
-```
+文件写入可以经过延迟写入器；需要立即完成写入时应选择同步落盘语义。递归删除会影响整个目标目录树，调用前必须确认路径边界。
 
-写入接口返回 `eos_result_t`。普通写入可能经过延迟写入器；需要立即落盘时使用带 `_immediate` 后缀的接口。`eos_storage_rm_recursive` 会删除指定目录及其内容，使用前必须确认路径范围。
+## 文件与目录资源
 
-## 文件句柄
+文件和目录通过显式句柄访问。打开失败会返回无效句柄；句柄关闭后立即失效，后续读写均不再有效。目录读取逐项写入调用方提供的缓冲区。空间查询和其他设备能力可能因平台而不受支持，调用方通过返回结果识别失败。
 
-```c
-eos_file_t eos_storage_file_open_read(const char *path);
-eos_file_t eos_storage_file_open_write(const char *path);
-void eos_storage_file_close(eos_file_t fp);
-eos_result_t eos_storage_file_seek(eos_file_t fp, uint32_t offset);
-ssize_t eos_storage_file_read(eos_file_t fp, void *buf, size_t size);
-ssize_t eos_storage_file_write(eos_file_t fp, const void *buf, size_t size);
-eos_result_t eos_storage_file_size(eos_file_t fp, uint32_t *size);
-eos_result_t eos_storage_file_tell(eos_file_t fp, uint32_t *pos);
-```
+文件句柄的读写在当前调用路径完成；大文件 I/O 可能占用调用上下文。整文件便捷 API 的语义随构建配置变化：关闭 Deferred File Writer 时普通读写直接访问 port；启用后普通写入只表示数据已进入缓存队列，普通读取先看缓存，持久化要等显式 sync/系统同步点。需要绕过缓存并取得即时结果时使用 immediate 路径并检查结果码。
 
-打开失败返回 `EOS_FILE_INVALID`。关闭句柄后不能继续读写。`eos_storage_puts` 会把字符串写入已打开的句柄并自动追加换行。
+## 路径与隔离
 
-## 目录句柄与空间
+脚本接口根据当前程序身份构造包 `assets/` 和应用/表盘配置目录；这些路径规则属于 SNI 层。通用 Storage API 不根据当前脚本身份重写或限制路径，因此不提供自动隔离的应用沙箱。新增的 JS 文件能力在其接口边界定义路径约束，再调用通用存储操作。
 
-```c
-eos_dir_t eos_storage_dir_open(const char *path);
-eos_result_t eos_storage_dir_read(eos_dir_t dir, char *name_buf, size_t buf_size);
-eos_result_t eos_storage_get_space(const char *path, eos_storage_space_t *space);
-```
+系统使用以 `/` 开头的逻辑路径。`EOS_SYS_ROOT_DIR` 决定逻辑根到平台文件系统的映射：Simulator Native 将它设为仓库 `fs/` 目录，WASM 使用 `/` 虚拟根，MCU 平台通常使用已挂载文件系统的根目录 `/`。因而应用包和系统目录名在各平台一致，但它们在主机上的实际绝对路径不同。
 
-目录读取按条目填充调用者提供的缓冲区。空间查询在当前端口不支持时返回 `EOS_ERR_DEV_OPS_NOT_SUPPORTED`。
+| 逻辑路径 | 内容 |
+|---|---|
+| `/.sys/config/cfg.json` | 系统配置文件。 |
+| `/.sys/app/apps/<app-id>/` | 已安装 Application，根目录含 `manifest.json` 与运行入口 `main.js`。 |
+| `/.sys/app/app_data/<app-id>/` | Application 持久数据目录，例如 `eos.config` 使用的应用配置。 |
+| `/.sys/wf/faces/<watchface-id>/` | 已安装 Watch Face，根目录含 `manifest.json` 与运行入口 `main.js`。 |
+| `/.sys/wf/wf_data/<watchface-id>/` | Watch Face 持久数据目录。 |
+| `/.sys/res/font/` | 系统字体资源；默认 TTF 相对文件名为 `font.ttf`。 |
 
-## 路径边界
+Simulator Native 下，例如 `/.sys/app/apps/demo/main.js` 对应仓库中的 `fs/.sys/app/apps/demo/main.js`。Core 多处组合路径时使用 `EOS_FS_PATH_MAX` 字节的固定缓冲区；Simulator 项目默认 256 字节，缓冲区还要为结尾 NUL 留空间。它不是跨 API 统一的拒绝规则：超长路径的返回值或截断处理由具体 API 决定。可通过 Kconfig 的 File system 配置组调整缓冲区大小。平台映射和构建默认值见[内核配置系统](../../../development/kconfig)。
 
-存储服务会对需要验证的路径执行路径检查。应用脚本使用的资源路径相对于当前包的 `assets/`，应用配置则位于当前应用自己的数据目录；不要让脚本通过拼接路径访问其他应用或系统管理目录。Native 模拟器把系统根目录映射到模拟器运行环境，WASM 则使用浏览器内的虚拟文件系统。
+平台 port 负责把逻辑路径映射到目标文件系统，并给出 open/read/write/seek 等操作的结果；它不决定某个脚本是否有权访问该路径。脚本资源封装、应用配置命名空间和任何路径规范化/拒绝越界逻辑必须由调用它的上层 API 承担。
 
-如果构建启用了 Deferred File Writer，还可使用 `eos_dfw_write`、`eos_dfw_read`、`eos_dfw_sync` 和 `eos_dfw_init`；这些接口只在 `EOS_DFW_ENABLE` 时声明。
+Deferred File Writer 是可选构建能力，仅在启用相应配置时提供。
+
+应用路径与调用方责任见[Application 契约](../../application_contract)；文件系统注册和虚拟根由[Platform/Vendor 契约](../../platform_contract)定义。

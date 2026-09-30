@@ -3,7 +3,7 @@ sidebar_position: 2
 title: ElenixOS JS API
 ---
 
-# ElenixOS JS API
+# ElenixOS 脚本接口
 
 脚本通过全局对象 `eos` 使用 ElenixOS 提供的系统 API。下面的名称来自当前运行时实际挂载的接口；未列出的 C API 不会因为存在对应的原生函数而自动出现在 JS 中。
 
@@ -88,7 +88,7 @@ const ok = eos.activity.back();
 | `back()` | 返回上一页面，返回布尔值表示调用结果 |
 | `isTransitionInProgress()` | 查询页面过渡是否进行中 |
 
-`setView` 应在 Activity 进入流程允许的时机使用；不要把系统管理的 View 随意替换或删除。`rootScreen()` 虽然出现在 `eos.activity` 名称表中，但在 JS 中调用会抛出“不可用”异常，不能作为脚本获取根屏幕的 API。
+`setView` 仅在 Activity 进入流程允许的时机生效，系统管理的 View 由 Activity 生命周期控制。`rootScreen()` 虽出现在 `eos.activity` 名称表中，但在 JS 中调用会抛出“不可用”异常，因此不构成脚本获取根屏幕的 API。
 
 脚本可见的 Activity 类型常量为 `ACTIVITY_TYPE_NULL`、`ACTIVITY_TYPE_APP`、`ACTIVITY_TYPE_APP_LIST`、`ACTIVITY_TYPE_WATCHFACE` 和 `ACTIVITY_TYPE_WATCHFACE_LIST`。`INPUT_PAGE`、`LOCK_SCREEN`、`RECENT_APPS` 等 C 层类型当前未导出为 JS 根常量。
 
@@ -112,7 +112,19 @@ const changed = eos.sensor.setSamplePeriod(eos.SENSOR_ACCE, 100);
 const period = eos.sensor.getSamplePeriod(eos.SENSOR_ACCE);
 ```
 
-对于已初始化且有效的类型，`readLatest` 返回缓存对象；驱动尚未上报数据时，`timestamp` 和数据字段仍为零，不能把返回对象本身当作“已有样本”的标志。无效类型或底层调用失败时才返回 `null`。返回对象总有 `timestamp`；加速度、陀螺仪和磁力计使用 `x/y/z`，其他类型使用对应字段：`heart_rate`、`spo2`、`lux`、`temp`、`pressure`、`steps`、`distance_mm`、`ecg` 或 `cap`。JS API 当前没有传感器订阅方法。
+对于已初始化且有效的类型，`readLatest` 返回缓存对象；驱动尚未上报数据时，`timestamp` 和数据字段仍为零，因此返回对象本身不表示已有样本。无效类型或底层调用失败时才返回 `null`。返回对象总有 `timestamp`；加速度、陀螺仪和磁力计使用 `x/y/z`，其他类型使用对应字段：`heart_rate`、`spo2`、`lux`、`temp`、`pressure`、`steps`、`distance_mm`、`ecg` 或 `cap`。JS API 没有原始 Sensor 订阅接口；语义化订阅见下方 `eos.metric`。
+
+## `eos.metric`
+
+```js
+const sample = eos.metric.get("battery.percent");
+const handle = eos.metric.subscribe("health.heart_rate", sample => {
+  // sample contains metric, value, unit, timestamp, valid, stale
+});
+eos.metric.unsubscribe(handle);
+```
+
+Metric 是面向脚本的语义数据接口，不等同于原始传感器 API。读取会返回标准样本；订阅按间隔回调，句柄归属当前脚本上下文，并随退订或上下文清理而失效。样本可能无效或过期，调用方结合 `valid`、`stale` 和 `value` 判断样本状态。
 
 ## `eos.clockHand`
 
@@ -128,14 +140,14 @@ eos.clockHand.center(hand);
 
 ## `eos.ww`
 
-`eos.ww` 提供当前实现的表盘专用组件工厂，包括 `digitalClock`、`date`、`weekdayRing`、`moonPhase`、`dateWindow`、`battery`、`batteryArc`、`charging`、`heartRate`、`heartRateArc`、`steps`、`spo2`、`temperature`、`activityRings`、`barometer`、`compass`、`tickRing`、`numeralRing`、`centerCap`、`progressRing` 和 `background`。`progressRingSetValue` 与 `progressRingSetRange` 用于更新已有进度环；其他这些方法都是将父 View 作为第一个参数并返回 LVGL 对象句柄的工厂。
+`eos.ww` 提供表盘专用的原生 LVGL 组件工厂。当前暴露的主要组件包括模拟表盘、指南针表盘、径向仪表、Metric 环、趋势图和日历网格；部分组件可绑定 `eos.metric` 的语义名，也可由脚本直接设置值或数据。组件句柄归属于传入的父 View。具体方法与选项以 SNI 当前导出为准；该命名空间不是运行时动态插件注册表。
 
 ## 常量
 
 根对象当前导出：
 
 - 字体：`FONT_SIZE_LARGE`、`FONT_SIZE_MEDIUM`、`FONT_SIZE_SMALL`
-- 显示：`DISPLAY_WIDTH`、`DISPLAY_HEIGHT`（模拟器当前为 390×450）
+- 显示：`DISPLAY_WIDTH`、`DISPLAY_HEIGHT`（取决于平台显示配置）
 - 表冠指针：`CLOCK_HAND_HOUR`、`CLOCK_HAND_MINUTE`、`CLOCK_HAND_SECOND`
 - Activity：上文列出的五个 `ACTIVITY_TYPE_*`
 - 传感器：`SENSOR_ACCE`、`SENSOR_GYRO`、`SENSOR_MAG`、`SENSOR_HR`、`SENSOR_SPO2`、`SENSOR_LIGHT`、`SENSOR_TEMP`、`SENSOR_BARO`、`SENSOR_STEP`、`SENSOR_PROXIMITY`、`SENSOR_ECG`、`SENSOR_CAP`

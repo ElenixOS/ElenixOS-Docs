@@ -20,10 +20,14 @@ Recent Apps 是应用切换器，也是挂起脚本应用的保留注册表。�
 | Timer | 可执行一次遗漏回调、执行所有遗漏回调（最多补发 10 次），或跳过遗漏回调并重新计时 |
 | Animation | 从暂停位置继续，或跳到结束状态 |
 
-挂起期间不应假设 timer 持续运行。需要准确时间的逻辑应在恢复时重新读取系统时间。
+Simulator 默认对暂停期间已到期的 Timer 至多补发一次，并让 Animation 从暂停位置继续。可在[内核配置系统](../../../development/kconfig)的 Recent Apps 组调整 `EOS_RECENT_APPS_TIMER_STRATEGY` 和 `EOS_RECENT_APPS_ANIM_STRATEGY`。
+
+挂起期间，Timer 是否继续运行取决于其恢复策略。需要准确时间的逻辑可在恢复时重新读取系统时间。
 
 ## 数量与驱逐
 
-默认最多保留 3 个条目，估算内存高水位为 2.5 MiB；两项都可通过 Kconfig 调整。超出数量或水位时，从最久未使用的一端驱逐。驱逐会完整停止应用并清理其脚本资源、Activity 和快照，不能只删除卡片。
+默认最多保留 3 个条目，估算内存高水位为 2.5 MiB；两项均可通过 Kconfig 调整。超过数量或内存水位后，系统按最近最少使用顺序驱逐条目。条目被驱逐时，对应应用将完整停止，其卡片、脚本资源、Activity 和快照等关联状态一并清理。
 
 应用卸载、脚本引擎复位和应用停止也会移除对应 Recent Apps 条目。已经驱逐的条目不能恢复。
+
+停放只描述程序/页面保留策略，不自动释放某个 native Service consumer 的 user_data 或订阅。应用侧的显式清理责任见[Application 契约](../../application_contract)。

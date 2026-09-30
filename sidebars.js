@@ -48,6 +48,16 @@ const sidebars = {
       label: '系统架构',
       items: [
         'architecture/arch',
+        'architecture/package_format',
+        {
+          type: 'category',
+          label: '开发者契约',
+          items: [
+            'architecture/application_contract',
+            'architecture/platform_contract',
+            'architecture/core_development_contract',
+          ],
+        },
         'architecture/runtime',
         'architecture/device_architecture_design',
         'architecture/hardware',
@@ -81,6 +91,7 @@ const sidebars = {
             'architecture/services/log/log',
             'architecture/services/pm/pm',
             'architecture/services/sensor/sensor',
+            'architecture/services/metric/metric',
             'architecture/services/state/state',
             'architecture/services/time/time',
             'architecture/services/audio/audio',
@@ -129,7 +140,7 @@ const sidebars = {
       items: [
         'development/kconfig',
         'development/dev_tools',
-        'development/package_builder',
+        'development/toolkit',
         {
           type: 'category',
           label: '测试',

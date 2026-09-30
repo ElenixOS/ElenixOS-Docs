@@ -4,26 +4,45 @@ title: UI 组件模块
 
 # UI 组件模块
 
-ElenixOS 的 UI 建立在 LVGL 上。系统框架提供 Activity/View、应用头部、动画和若干可复用控件；脚本则通过 `lv` 访问已经注册的 LVGL 类。
+ElenixOS UI 建立在 LVGL 上，但 UI 的所有权和层级由 Activity、顶层图层注册表和系统 UI 管理器共同约束。组件不是任意 LVGL 对象的集合。
 
-## 使用边界
+## UI 模型
 
-Activity 拥有页面 View。父对象删除可能级联删除子对象，页面和组件在删除后不能继续使用原 LVGL 指针或脚本句柄。由 Activity、Recent Apps 或系统 overlay 管理的对象，应通过所属管理器的生命周期接口处理，而不是直接删除其根对象。
+Activity 拥有应用页面 View；系统级组件使用语义化 top-layer slot。slot 对应永久容器并表达应用内容、页面快照、应用头部、全局交互、系统 UI、模态 UI、安全 UI 和调试 UI 的层级关系。slot 编号是排序语义，不是 LVGL child index，也不能持久化。
 
-动画和事件回调运行在 LVGL 主循环上下文中，回调不应阻塞。需要延迟或重复执行的工作可使用 LVGL timer。
+消息列表、控制中心和其他同级 overlay 共享 interaction slot。slot 内部的前景对象和触摸对象通过统一 focus 机制调整顺序，避免各组件分别抢占 top layer。模态、锁屏、错误和权限 UI 位于规定的更高层级。
 
-## 当前 C 组件
+## 职责
 
-当前 UI 目录中的可复用组件包括基础控件、Activity 应用头部、Panel、Toast、消息列表、CardPager、Slide Widget、Swipe Panel、Bubble Grid、Numpad、加载指示器和表盘专用组件。每个组件的公开创建、配置、回调和删除接口以其页面及当前头文件为准；组件名称不意味着所有组件都可从 JS 使用。
+- Activity 管理页面 View、页面过渡和页面销毁。
+- Overlay layer 管理系统级容器和稳定的视觉层级。
+- Interaction slot 管理同级可交互 overlay 的当前焦点和输入对象。
+- 组件负责自己的内部对象和回调，但不负责删除共享 slot、Activity View 或其他组件的根对象。
+- 脚本通过已注册的 `lv`/`eos` API 创建对象；脚本句柄仍受所属 View 和程序生命周期限制。
 
-## 脚本 UI
+## 输入与渲染流程
 
-脚本使用 `new lv.<class>(parent)` 创建可构造控件，使用 `eos.view.active()` 取得当前 View；部分静态类和表盘组件通过 `eos` 提供。当前实际导出的类以 [LV API](../script_engine/lvgl) 和 [ElenixOS JS API](../script_engine/elenix_os) 为准。
+输入设备没有共用一个能替所有输入作决定的事件队列。平台触摸通过 LVGL pointer indev 交给触摸输入层，再由 LVGL 对象树进行命中和控件事件分发。表冠旋钮绑定当前可滚动对象；表冠键和侧键先被转换为系统动作，再经主循环调度到 Chrome 或电源管理。页面和 overlay 的前景关系由 Activity/Chrome 管理，不由驱动推断。
+
+因此平台移植应报告标准化的触摸、旋钮或按键状态；页面导航、唤醒、打开控制中心和控件交互仍由系统层处理。UI 回调在 LVGL/运行时主循环中执行；渲染输出由平台显示端口承载。
+
+## 消息列表与通知边界
+
+消息列表是放在共享 interaction slot 中的 UI 组件，负责列表项和详情的显示。当前实现没有通用通知 broker、通知持久化服务或面向 JS 的通知投递 API。`notification` 权限类别及设置入口本身不构成通知发送/存储契约；该列表 UI 不应被视为通知服务的 owner。
+
+## 架构约束
+
+- 系统组件必须使用语义 top-layer slot，不得依赖当前 child index 或私自重排共享 top layer。
+- 同级 overlay 必须通过 interaction slot 获得焦点；系统模态层、锁屏和错误层不能被普通应用 overlay 覆盖。
+- 父对象删除导致的级联失效必须被组件和脚本句柄视为正常生命周期结果。
+- Activity/Recent Apps/系统 overlay 管理的对象只能由对应 owner 释放；组件不得跨 owner 删除根对象。
+- UI 和 SNI 回调必须快速返回，不得阻塞或从非 UI 线程直接操作 LVGL。
 
 ## 相关页面
 
 - [Activity](../framework/activity)
+- [脚本资源生命周期](../script_engine/sni)
+- [Panel](./page)
 - [CardPager](./widgets/card_pager)
 - [Slide Widget](./widgets/slide_widget)
 - [Swipe Panel](./widgets/swipe_panel)
-- [脚本资源生命周期](../script_engine/sni)

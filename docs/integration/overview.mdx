@@ -28,4 +28,6 @@ Native 使用主机 SDL2 构建为 `bin/main`；WASM 使用激活的 Emscripten 
 
 ## 应用集成边界
 
-应用和表盘通过统一的 `.epk` 包、EPK Header Package Type、manifest、`main.js`、`eos` 和 `lv` API 集成。Application/Watch Face 类型不应依赖文件名或 manifest 重复字段。它们不应依赖模拟器的内部源文件路径、裸设备接口或未挂载的 JS 类。需要平台设备能力时，应通过服务 API 并处理设备不可用/接口返回错误的情况。
+应用和表盘通过统一的 EPKG v1 `.epk` 包、包头 `package_type`、manifest、`main.js`、`eos` 和 `lv` API 集成。Application/Watch Face 类型不应依赖文件名或 manifest 重复字段。它们不应依赖模拟器的内部源文件路径、裸设备接口或未挂载的 JS 类。需要平台设备能力时，应通过服务 API 并处理设备不可用/接口返回错误的情况。安装包逻辑区域见[EPKG v1 安装包格式](../architecture/package_format)，项目创建与打包分析工作流见 [ElenixOS-Toolkit](../development/toolkit)。
+
+新 SoC、BSP 或 Vendor 移植从[Platform / Vendor 契约](../architecture/platform_contract)开始；应用如何消费能力见[Application / Framework 契约](../architecture/application_contract)。

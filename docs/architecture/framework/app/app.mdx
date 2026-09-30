@@ -5,26 +5,38 @@ title: 应用管理模块
 
 # 应用管理模块
 
-应用管理模块负责已安装应用的发现、安装、卸载、排序和启动。脚本应用通过统一的 `.epk` 容器分发，运行时从包的 manifest 读取 ID、名称、版本、API level 和权限声明；Application/Watch Face 的安装分派由 EPK Header 的 Package Type 决定。
+应用管理模块负责已安装应用的身份、发现、安装、卸载、排序和启动协调。它不拥有脚本 Realm，也不直接驱动 Activity 页面；这些职责分别属于 SPM 和 Activity 控制器。
+
+## 应用模型
+
+应用和表盘使用同一 EPKG v1 容器。包头的 `package_type` 决定安装分派，`manifest.json` 的 `id` 是运行时身份、安装目录和 Recent Apps 的稳定键。应用管理通过统一的包上下文完成预览、manifest 读取、完整校验和解包。安装包内部区域及字段语义见[EPKG v1 安装包格式](../../package_format)；官方项目与打包工作流见 [ElenixOS-Toolkit](../../../development/toolkit)。
+
+安装流程依次读取元数据、检查 API level 和包类型、完整校验 EPKG、解包到按 ID 命名的安装目录，并更新发现结果和排序状态。预览只提供元数据，不构成完整校验。安装成功或失败通过结果码和系统事件表达，目录是否出现不作为安装结果的判据。
 
 ## 安装与卸载
 
-应用安装会校验包和 manifest，并把应用文件部署到应用安装目录。安装一个已经存在的应用 ID 时，当前实现会替换原安装内容；应用 ID 是运行时识别应用的稳定键。
+安装相同 ID 的应用时，现有安装内容按替换语义处理；应用 ID 不能因为包文件名变化而改变。卸载必须同时处理安装内容、应用数据和权限记录，并发布卸载事件；安装成功后发布安装事件。
 
-卸载会删除应用安装内容、应用数据和该应用的权限记录，并发布 `EOS_EVENT_APP_UNINSTALLED`。安装成功后发布 `EOS_EVENT_APP_INSTALLED`。调用方应检查 `eos_result_t`，不能在失败时假定目录或列表已经更新。
+包解析、解压缓冲区、manifest 临时信息和安装目标路径都有独立的释放责任。关闭 EPKG 上下文后不得继续读取它的 header、文件表或文件句柄。
 
-## 列表与排序
+## 列表、排序与启动
 
-应用列表按已安装目录重新发现；已安装应用的存在不会依赖一个单独持久化的应用清单。应用排序顺序通过 `app_order` 配置保存，因此卸载或重新安装后，已不存在的 ID 不应继续作为有效排序项。
+应用列表按安装目录重新发现，排序顺序由 `app_order` 配置保存；已卸载 ID 不再作为有效排序项。应用管理负责稳定身份和排序，不负责创建 Activity 或决定页面退出策略。
 
-应用管理提供数量、按索引读取 ID、存在性判断和移动排序项等接口。应用管理本身不负责创建 Activity；启动时由 Activity、脚本程序管理器和应用列表协作完成。
+打开新脚本应用时，应用管理器先建立并进入承载 loading UI 的 App Activity，再请求 SPM 同步运行脚本；`main.js` 在启动调用栈中建立页面内容。返回成功后 Activity 绑定程序实例 ID 和引擎 generation。Recent Apps 恢复则重新附加同一实例，不创建并行 Realm。**禁止直接调用 `script_engine` 启动应用**。
 
-## 运行生命周期
+## 程序与最近应用
 
-应用进入前台时创建或恢复 App Activity 和脚本程序。切换到其他可挂起应用时，当前应用进入 `SUSPENDED`，页面和脚本上下文可由 Recent Apps 保留；恢复时重新附加页面并继续运行。应用被用户关闭、卸载、Recent Apps 驱逐或引擎复位时，才进入完整停止状态并释放脚本资源。
+应用离开前台时，Activity 控制器先分离应用 Activity 子栈；Recent Apps 随后将程序和页面停放为 `SUSPENDED`，或执行完整销毁。Recent Apps 条目绑定程序 instance ID，并可保存快照用于返回动画。达到数量或内存水位后，系统通过按实例停止路径驱逐条目，同时清理对应程序及关联状态。
 
-应用不能把挂起当作退出：需要暂停的传感器、音频、timer 或动画工作应在相应生命周期中暂停，并在恢复时重新建立或校验状态。
+挂起保留程序实例，不等同于退出。传感器需求、音频、timer、动画和脚本回调按程序挂起/恢复策略处理；继续保留的资源具有明确的 owner 和恢复路径。
 
-## 包约束
+## 架构约束
 
-运行时 manifest 需要 `id`、`name`、`version`、`author`、`description`、`minApiLevel` 和 `targetApiLevel`。`minApiLevel` 不兼容时应用不会启动。当前可声明的权限名见[脚本包与 JS API](../../script_engine)。
+- 应用 ID 是稳定键；不得用包路径、显示名称或包文件名替代它。
+- SPM 是脚本程序生命周期的唯一所有者；应用管理器不得直接操作 Script Engine Core，也不得直接调用 `script_engine` 启动应用。
+- 同一应用 ID 不得同时存在两个未终止脚本程序。
+- Activity、Recent Apps 和 SPM 的清理必须成套完成，不能产生“无程序的 Recent Apps 条目”或“仍引用旧 View 的脚本程序”。
+- 当前格式只接受 EPKG v1；旧的 EAPK/EWPK 兼容路径和按 magic 区分的安装流程已废弃。
+
+应用视角的 Pull/Push、同步/异步和生命周期合同见[Application 与 Framework 契约](../../application_contract)；平台侧的注册与上报方式见[Platform/Vendor 契约](../../platform_contract)。

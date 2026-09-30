@@ -3,29 +3,39 @@ title: Watchface 表盘系统
 sidebar_position: 7
 ---
 
-# Watchface 表盘系统
+# 表盘系统（Watchface）
 
-表盘是系统的根页面。当前实现支持内建表盘和 JavaScript 表盘两类：内建表盘由系统直接实现，JS 表盘由脚本包驱动。两类表盘都作为根 Activity 运行，不会作为普通页面压入 Activity 栈。
+表盘是系统的根页面。内建表盘和 JavaScript 表盘都通过根 Activity 展示，不作为普通页面压入 Activity 栈；它们的脚本程序和 View 仍由各自的运行时生命周期管理。
 
-## 表盘列表与回退表盘
+## 表盘模型
 
-表盘列表始终包含内建回退表盘，其 ID 为 `builtin.fallback`。它不是可安装包，不能按普通表盘卸载。已安装 JS 表盘来自表盘安装目录，默认表盘 ID 由系统配置决定，当前默认值为 `cn.sab1e.clock`。
+当前表盘安装和应用安装共用 EPKG v1。包头的 `package_type` 必须是 Watch Face，manifest 的 `id`、API level 和权限声明决定运行时身份与兼容性。表盘管理器不应维护第二套包解析或解包逻辑。包内结构见[EPKG v1 安装包格式](../../package_format)；Toolkit 可构建已有表盘项目，但当前不提供 Watchface 项目初始化，详见 [ElenixOS-Toolkit](../../../development/toolkit)。
+
+表盘列表包含内建回退表盘。回退表盘是系统资源，不是可按普通包卸载的安装项；已安装 JS 表盘才来自表盘安装目录。默认表盘 ID 由系统配置决定。
 
 ## 切换与生命周期
 
-```c
-void eos_watchface_switch_to(const char *watchface_id);
-void eos_watchface_check_and_reload(void);
-```
+表盘管理器通过 SPM 的启动、恢复和停止流程协调表盘切换，并替换根 Activity；其与 `script_engine` 的调用边界由 SPM 管理。旧表盘的 Activity、View、脚本 Realm、SNI 回调和表盘组件均在替换流程中失效。切换完成后，调用方从根 Activity 接口重新获取当前根对象；旧根指针随替换失效。
 
-切换表盘会替换根 Activity，并销毁旧表盘及其 View/脚本资源。打开应用时当前 JS 表盘暂停，返回表盘时可以恢复；切换表盘、卸载表盘或脚本引擎复位时旧表盘会被完整销毁。
+打开应用时，当前 JS 表盘可以进入挂起状态；返回表盘时恢复同一程序实例。切换表盘、卸载表盘、Recent Apps 驱逐或引擎复位均执行完整销毁，旧表盘不再作为可恢复页面存在。
 
-`eos_watchface_check_and_reload()` 用于系统检查当前表盘配置是否变化并重新加载，属于系统返回根页面等流程使用的检查接口。调用 `eos_watchface_switch_to` 后应以实际当前根 Activity 为准，不要继续使用被替换的旧对象。
+## 数据、组件与页面所有权
 
-## JS 表盘
+JS 表盘使用 `main.js` 作为入口，通过 SNI 暴露的系统接口创建页面。Activity/View 决定页面及 LVGL 对象树的生命周期；表盘脚本不拥有根 Activity。
 
-JS 表盘包需要符合脚本包 manifest 和 API level 约束，并使用 `main.js` 作为入口。脚本可以使用 `eos.ww` 表盘组件，以及通用 `eos` 和 `lv` API。资源路径相对于该表盘包的 `assets/` 目录。
+数据和绘制组件是两个不同的扩展边界。`eos.metric` 将已有服务状态映射为语义值；`eos.ww` 把可复用的原生 LVGL 表盘控件暴露给脚本。组件可以绑定一个已有 Metric，也可以由脚本把读取结果传入组件。这样组件关注呈现，数据服务关注单位、有效性、过期状态和来源。
 
-## 表盘组件
+Metric 目前使用静态语义映射，没有可动态注册的 Provider 插件模型。新增表盘组件消费现有 Metric 时，不需要改变传感器或 Metric 服务；新增语义数据则需扩展 Metric 映射与 SNI 暴露。若数据来自新硬件，应先经过相应设备/服务边界，不应让表盘组件直接访问驱动。
 
-当前 `eos.ww` 提供时间日期、电池、充电、健康、环境、指南针、环形指示器和背景等组件工厂。组件返回 LVGL 对象句柄，生命周期受其父 View 和表盘 Activity 管理；表盘切换后不能继续使用旧句柄。
+表盘组件返回的 LVGL 句柄归属于其父 View 和根 Activity；对象树销毁时，组件的 timer、回调和内部资源也必须同步失效。脚本可访问的资源仍只限于注册到 SNI 的接口，根 Activity 替换后旧句柄全部过期。
+
+## 架构约束
+
+- 表盘是根 Activity，不得通过普通页面栈 API 伪造第二个根页面。
+- 表盘启动、恢复和停止均由 SPM 管理；表盘管理器不直接调用 `script_engine` 创建或启动脚本上下文。
+- 表盘切换必须同时处理根 Activity、View、脚本程序和表盘专用组件的所有权。
+- 内建回退表盘不能按普通可安装包删除，也不能让配置指向已经不存在的表盘 ID。
+- 表盘包必须先通过 EPKG v1 完整校验，再解包和加载脚本；预览成功不等于可运行。
+- 新代码应使用根 Activity 语义访问当前表盘，不应依赖已废弃的专用 getter。
+
+表盘消费者和 SPM 生命周期见[Application 契约](../../application_contract)；平台数据源见[Platform/Vendor 契约](../../platform_contract)；数据映射、SNI 生命周期和 UI 层级分别见[Metric](../../services/metric)、[SNI](../../script_engine/sni)和[UI](../../ui)。

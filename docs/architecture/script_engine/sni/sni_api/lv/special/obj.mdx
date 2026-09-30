@@ -16,4 +16,4 @@ obj.addFlag(lv.OBJ_FLAG_CLICKABLE);
 
 通用接口覆盖位置和尺寸（`setPos`、`setSize`、`setX`、`setY`）、布局（`align`、`alignTo`、flex/grid）、父子关系、标志、样式、事件和删除。对象树删除可能级联删除子对象，因此删除父对象后所有子句柄都必须视为失效。
 
-事件通过 `addEventCb(callback, code, userData)` 注册，可使用 `removeEventCb`、`removeEventCbWithUserData` 取消，或用 `sendEvent` 发送事件。回调中不要阻塞，也不要访问已经被删除的对象。
+事件通过 `addEventCb(callback, code, userData)` 注册，可使用 `removeEventCb`、`removeEventCbWithUserData` 取消，或用 `sendEvent` 发送事件。回调在 LVGL 上下文同步执行；阻塞会延迟该上下文的其他工作，已删除对象的句柄则已失效。

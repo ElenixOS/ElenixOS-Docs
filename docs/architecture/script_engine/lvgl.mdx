@@ -3,7 +3,7 @@ title: LVGL UI API
 sidebar_position: 2
 ---
 
-# LVGL UI API
+# LVGL 界面接口
 
 脚本通过 `lv` 使用当前运行时注册的 LVGL 类。对象构造函数接收父对象；页面根对象通常来自 `eos.view.active()`。
 
@@ -22,7 +22,7 @@ label.center();
 
 当前运行时注册的类为：`obj`、`button`、`label`、`arc`、`bar`、`screen`、`color`、`timer`、`anim`、`buttonmatrix`、`calendar`、`chart`、`canvas`、`checkbox`、`dropdown`、`image` 和 `imagebutton`。其中 `screen`、`color` 是静态工具类，`obj`、控件类、`timer` 和 `anim` 按各自构造函数使用。
 
-不要把完整 LVGL 文档中的类名直接当作 ElenixOS JS API；只有上述已注册类可用。具体方法和属性也以当前页面/绑定为准。
+完整 LVGL 文档中的类名不自动构成 ElenixOS JS API；脚本仅可使用已注册的类。具体方法和属性以当前页面及绑定为准。
 
 ## 对象、布局和样式
 
@@ -45,13 +45,13 @@ button.addEventCb((event) => {
 }, lv.EVENT_CLICKED, null);
 ```
 
-对象还提供 `removeEventCb`、`removeEventCbWithUserData` 和 `sendEvent`。事件回调在 LVGL 运行时上下文同步执行，不能阻塞。控件或父对象删除后，相关回调和脚本句柄都不能继续使用。
+对象还提供 `removeEventCb`、`removeEventCbWithUserData` 和 `sendEvent`。事件回调在 LVGL 运行时上下文同步执行，阻塞会延迟该上下文中的其他工作。控件或父对象删除后，相关回调和脚本句柄随之失效。
 
 ## 资源生命周期
 
 脚本创建的对象通常随父对象树管理；`timer` 和 `anim` 是独立脚本资源。Activity/View 销毁、程序停止或引擎复位时，相关资源会被运行时清理。脚本应在不再需要时使用对象提供的删除接口，并始终避免保存已经删除的句柄。
 
-## 相关 API
+## 相关接口
 
 - [ElenixOS JS API](./elenix_os)
 - [特殊 LVGL API](./special)

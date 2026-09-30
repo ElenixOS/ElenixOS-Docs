@@ -5,7 +5,7 @@ title: 开发工具
 
 # 开发工具
 
-当前模拟器仓库中与日常开发直接相关的工具主要是 CMake/Makefile、Kconfig 配置工具和脚本包构建器。
+模拟器仓库中的日常系统开发工具包括 CMake / Makefile 和 Kconfig 配置工具；ElenixOS-Toolkit 则面向应用、表盘、模拟器调试和设备交互等开发工作流。
 
 ## 构建与配置
 
@@ -17,16 +17,11 @@ cmake --build build --target menuconfig
 
 `menuconfig` 使用 `kconfiglib` 生成构建目录中的 `.config` 和生成配置头文件。配置的覆盖顺序和可用选项见[内核配置系统](./kconfig)。
 
-## 脚本包构建器
+## Application / Watchface 开发
 
-`ElenixOS/scripts/eos_pkg_builder.py` 接受输入目录、输出文件两个位置参数，`--type` 可选：
+项目初始化、EPKG 安装包构建和现有包分析由官方 VS Code 插件 [ElenixOS-Toolkit](./toolkit) 提供。安装包格式本身由[EPKG v1 安装包格式](../architecture/package_format)定义。
 
-```bash
-python3 ElenixOS/scripts/eos_pkg_builder.py app/ app.epk
-python3 ElenixOS/scripts/eos_pkg_builder.py watchface/ watchface.epk --type watchface
-```
-
-它读取输入目录的 `manifest.json`，收集目录中的文件并生成 `.epk` 二进制包；`--type` 决定包头中的 Application/Watch Face 类型。当前不压缩资源，也没有 `--input`、`--output`、`--compress` 或 `--verbose` 参数。详见[构建脚本包](./package_builder)。
+模拟器仓库中的 `ElenixOS/scripts/eos_pkg_builder.py` 是旧版独立打包工具，当前已处于 deprecated / legacy 状态，不再作为新 Application 或 Watchface 项目的推荐构建入口。
 
 ## 运行与日志
 

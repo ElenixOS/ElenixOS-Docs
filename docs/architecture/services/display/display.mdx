@@ -3,50 +3,10 @@ sidebar_position: 7
 title: 显示服务
 ---
 
-显示服务负责管理屏幕亮度、电源开关等显示相关功能。
+# 显示服务
 
-## 亮度设置
+显示服务协调亮度和屏幕电源状态。平台显示端口执行具体操作，服务管理系统请求及其效果。
 
-设置屏幕亮度：
+亮度取值为 0–100。亮度变化可以立即生效或使用预设过渡时长；临时亮度会保留先前值，供系统恢复。显示电源控制用于唤醒或关闭屏幕，不应由应用绕过电源管理策略直接操作平台端口。
 
-```c
-void eos_display_set_brightness(uint8_t brightness, eos_display_duration_t duration_ms, bool is_temporary);
-```
-
-参数说明：
-- `brightness`：亮度值 (0-100)
-- `duration_ms`：动画持续时间（毫秒），使用 `eos_display_duration_t` 预设或 `EOS_DISPLAY_DURATION_OFF` 表示立即改变
-- `is_temporary`：如果为 true，则保存当前亮度并临时设置新亮度，调用 `eos_display_restore()` 可恢复保存的亮度
-
-### 动画时长预设
-
-```c
-typedef enum {
-    EOS_DISPLAY_DURATION_OFF = 0,      // 立即改变
-    EOS_DISPLAY_DURATION_FAST = 100,   // 快速（100ms）
-    EOS_DISPLAY_DURATION_MEDIUM = 300, // 中速（300ms）
-    EOS_DISPLAY_DURATION_SLOW = 500,   // 慢速（500ms）
-} eos_display_duration_t;
-```
-
-## 屏幕电源控制
-
-### 打开屏幕
-
-```c
-void eos_display_power_on(void);
-```
-
-### 关闭屏幕
-
-```c
-void eos_display_power_off(void);
-```
-
-## 恢复亮度
-
-恢复为调用 `eos_display_set_brightness()` 时保存的亮度值：
-
-```c
-void eos_display_restore(eos_display_duration_t duration_ms);
-```
+Display Service 同步调用设备亮度操作并维护请求值；设备表的 brightness 操作为必需项，power on/off 是可选项且当前没有物理完成回调。LVGL framebuffer、刷新和输入设备由平台图形 HAL 提供，不属于亮度/电源操作表。应用观察亮度状态不等于设备确认。见[Application 契约](../../application_contract)和[Platform/Vendor 契约](../../platform_contract)。

@@ -5,49 +5,61 @@ title: 脚本引擎概述
 
 # 脚本引擎概述
 
-脚本引擎为 ElenixOS 应用和表盘提供 JavaScript 执行环境。它处理脚本包兼容性检查、模块加载、脚本程序生命周期和脚本可见 API 的资源管理。
+脚本运行时让 Application 和 Watchface 共享一套 JavaScript 执行、Realm、模块加载和 Native API 边界。它由三种不同的 owner 协作：应用/表盘管理器选择要打开的安装身份和 Activity；SPM 管脚本程序实例及其生命周期；Script Engine Core 执行 JS；SNI 把已注册能力和 Native 资源安全地接到每个程序 Realm。上层不得跳过 SPM 直接调用 Script Engine 启动或恢复应用/表盘。
 
-## 引擎状态
+## Core 状态与 Program 生命周期
 
-当前引擎状态为：
+Script Engine Core 是一个全局 JavaScript 执行器，负责引擎初始化、Realm、模块解析、执行、垃圾回收和引擎级错误恢复。SPM 创建带独立 Realm 与 SNI context 的 Program，并保存安装身份、类型、权限及 `ACTIVE`、`SUSPENDED`、`STOPPING`、`TERMINATED` 生命周期状态。Core 的执行状态描述当前引擎调用窗口，不等于某个 Program 的生命周期：`main.js` 执行结束后 Core 可以回到 `IDLE`，而 Program 仍为 `ACTIVE`，其 Realm 仍可通过 timer/event 回调重新进入。
 
-| 状态 | 含义 |
-|---|---|
-| `UNINITIALIZED` | 尚未初始化 |
-| `IDLE` | 已初始化但没有运行脚本 |
-| `RUNNING` | 正在运行脚本 |
-| `EXCEPTION` | 最近一次脚本执行进入异常状态 |
+| 层 | 拥有的状态 | 不拥有的状态 |
+|---|---|---|
+| App / Watchface Manager | 已安装 ID、入口选择、对应 Activity 的启动/切换流程 | JerryScript Realm 与 SNI Native 资源 |
+| SPM | Program 实例、Realm 关联、程序状态、程序级错误和回调 gate | Activity 页面栈策略、设备服务策略 |
+| Script Engine Core | 全局引擎状态、JS 调用、Realm 执行、模块解析和引擎 generation | 应用导航、Recent Apps 卡片和硬件能力 |
+| SNI | 每个 Program 的 JS/Native API 映射、句柄和 callback owner | Activity 栈、服务缓存与 Vendor 设备 |
 
-脚本程序管理器另外使用 `TERMINATED`、`STOPPING`、`ACTIVE` 和 `SUSPENDED` 表示程序生命周期。应用挂起时程序可以保持上下文，不能把 `SUSPENDED` 等同于 `TERMINATED`。
+当一个应用被 Recent Apps 保留时，SPM 可以让它的 Program/Realm 保持 `SUSPENDED`；恢复是恢复同一实例，不会重新执行 `main.js`。新应用入口通过 SPM 同步运行 `main.js`，该调用会占用发起启动的执行上下文，不会因为先显示 loading Activity 就并行运行 JS。不同程序不能并行执行 JavaScript；调度与暂停策略由 SPM/调用者决定。
 
-## 脚本包
-
-应用和表盘统一使用 `.epk` 容器。运行时通过 EPK Header 的 Package Type 区分 Application 和 Watch Face，不从文件名或 manifest 推断类型。解析 manifest 时要求以下字段：
-
-```text
-id, name, version, author, description,
-minApiLevel, targetApiLevel
+```mermaid
+flowchart LR
+    Manager[App / Watchface Manager] -->|open / resume / suspend / stop| SPM
+    SPM -->|select program and Realm| Core[Singleton Script Engine Core]
+    Core -->|mount registered APIs| SNI[SNI]
+    SPM -->|owns| Program[Program instance + Realm + SNI context]
+    SNI -->|typed Native calls| Framework[Activity / UI / Services]
+    Framework -->|callback/result| SNI
+    SNI -->|active owner Realm| Core
 ```
 
-`minApiLevel` 高于当前系统 API level 的应用会被拒绝启动。`permissions` 是可选数组，当前实现认识 `location`、`sensor`、`notification`、`storage`、`bluetooth`、`audio`、`health`、`contacts` 和 `calendar`；未知名字不会获得能力。
+## 包身份与模块加载
 
-## 模块与上下文
+应用和表盘使用同一种 EPKG v1 `.epk` 容器；`package_type` 区分 Application 与 Watch Face，`manifest.json` 中的 `id` 是运行身份，API level 用于兼容性检查，权限声明用于启动前的授权流程。包格式、完整性校验与安装属于 Package/App 边界；Script Engine 接收已准备好的程序包，不负责传输、安装或卸载 UI。安装包结构见[EPKG v1 安装包格式](./package_format)，项目与构建工具见 [ElenixOS-Toolkit](../development/toolkit)。
 
-每个运行中的脚本程序拥有自己的脚本上下文。相对或绝对模块路径会被规范化后加载并缓存；停止引擎时模块缓存被清除。脚本只能使用运行时挂载的 `eos` 与 `lv` 命名空间，不能把内部 C 类型或模块表当作公开 API。
+`main.js` 是程序入口。模块解析以程序包路径为基础，规范化模块标识并缓存解析结果以维持同一程序中的模块实例语义；程序/引擎释放时清理对应模块状态。脚本可通过当前包的模块解析机制导入文件，但这不等于通用 Storage API 自动形成应用沙箱；文件访问边界必须由调用它的公开 API 单独定义，见[存储契约](./services/storage)。
 
-## 资源和程序切换
+## API 与 Native 扩展边界
 
-LVGL 对象、timer、动画以及 ElenixOS Activity/View 句柄由运行时跟踪。应用挂起时，相关脚本回调资源会暂停，程序上下文和页面可被 Recent Apps 保留；应用恢复时再按系统策略恢复。完整停止或脚本致命错误会释放上下文及其资源。
+每个 Realm 在创建时挂载注册过的 `lv` 与 `eos` API。SNI 描述/绑定决定脚本能够调用什么、Native 值如何转换、对象由谁持有，以及 callback 返回哪个 Realm。任意 C 函数或 Vendor driver 不会因链接进系统就自动成为脚本能力；新增能力应先确定稳定的 Framework/Service 接口，再显式通过 SNI 注册必要的部分。
 
-Recent Apps 当前默认最多保留 3 个应用，并使用 2.5 MiB 内存水位作为驱逐条件；这些值可由 Kconfig 修改。被驱逐的应用会完整停止，而不是仅从 Recent Apps 列表删除。
+句柄分配、失效、显式删除与程序 stop 的兜底清理属于 SNI 合同。脚本只依赖公开 API；内部 handle 编号、Realm 切换方法、资源链表、生成器产物和 Native 地址映射都不属于稳定脚本接口。具体所有权、暂停与异步 callback 规则见[SNI 与资源生命周期](./script_engine/sni)。
 
-## 执行超时
+## 异常、fatal reset 与失效
 
-引擎默认使用 3000 ms 的执行超时。超时检测用于发现长时间无响应的脚本；应用不应通过设置一个很大的超时来替代拆分阻塞工作。超时、脚本异常和引擎崩溃属于不同的运行时故障类别。
+语法/模块错误、脚本执行异常和 JerryScript fatal reset 是不同的失败边界。一般启动或调用错误由当前请求路径返回给 SPM，再由应用/表盘管理器决定展示或回退；异步 callback 的异常由对应 callback path 处理，不能作为原始 API 调用的同步结果。
 
-## 使用入口
+Fatal reset 会重建 JerryScript heap 并增加 engine generation。旧 Realm、JS 值、SPM Program、SNI context 和旧 callback 参数全部失效；SPM 的 reset 路径销毁所有受影响程序及 Recent Apps 状态，再由管理器按正常入口重新启动。callback 在 JS 返回后若发现 generation 已改变，必须立即退出，不能访问旧 heap 中的任何临时 JS 值或 Program/context 指针。应用只能在新启动路径中重建 UI 和订阅。
 
-- [JavaScript 脚本](./script_engine)
-- [ElenixOS JS API](./script_engine/elenix_os)
-- [LV API](./script_engine/lvgl)
-- [SNI 与资源生命周期](./script_engine/sni)
+普通的 `SUSPENDED`、引擎 `IDLE` 或可捕获脚本异常不应被解释为 fatal reset；它们是否保留 Realm、Activity 和服务需求取决于相应 owner 的生命周期合同。
+
+## 执行时间与线程边界
+
+Script Engine Core 不提供并行 JS 线程。`main.js`、普通同步 SNI API 和 `spm_call` 中的 callback 都在当前调用栈运行；timer、LVGL event 或 Native async request 只决定 JS 何时再次进入，不使 callback 变成后台线程。Native callback 必须回到适合操作 JerryScript 的运行上下文，并进入注册 owner 的 Realm。
+
+执行超时用于限制同步 JS 调用长时间占用系统执行路径，不能替代拆分阻塞工作。文件 I/O、解码、Native API 或同步 callback 若在该调用栈中耗时，仍会延迟 UI/Core 主循环；是否有 Dispatcher 或设备专属队列取决于对应服务合同。
+
+## 按生命周期问题继续阅读
+
+- [Application / Framework 契约](./application_contract)：安装身份、启动、挂起、恢复和程序停止。
+- [运行时](./runtime)：Activity、View、事件、线程上下文和平台初始化的系统级关系。
+- [SNI 与资源生命周期](./script_engine/sni)：JS 句柄、callback、异步请求与 teardown 顺序。
+- [Platform / Vendor 契约](./platform_contract)：脚本 API 下面的设备和服务边界。

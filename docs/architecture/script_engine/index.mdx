@@ -11,15 +11,16 @@ ElenixOS 的应用和表盘可以由 JavaScript 脚本实现。脚本运行在�
 
 脚本包至少应包含运行时要求的 `manifest.json` 和入口脚本。应用和表盘的入口文件名为 `main.js`。包的 API 兼容性由 `minApiLevel` 与 `targetApiLevel` 声明；当 `minApiLevel` 高于当前系统 API level 时，应用不会启动。
 
-脚本包的 manifest 必须包含 `id`、`name`、`version`、`author`、`description`、`minApiLevel` 和 `targetApiLevel`。`permissions` 可声明当前实现认识的权限名：`location`、`sensor`、`notification`、`storage`、`bluetooth`、`audio`、`health`、`contacts`、`calendar`。未知权限会被忽略并记录警告。
+Manifest 提供脚本身份、展示信息、API 兼容范围和可选权限声明。系统检查兼容范围；未识别的权限不会授予能力。
 
 ## 运行约束
 
-- 脚本在系统事件循环中执行；不要在回调中执行长时间同步工作或阻塞等待。
+- **禁止直接调用 `script_engine` 启动应用或表盘。** 应用/表盘启动、恢复、挂起和停止必须通过 SPM 管理；脚本引擎只是由 SPM 使用的执行层。
+- 脚本在系统事件循环中执行；长时间同步工作或阻塞等待会占用事件循环并延迟其他工作。
 - 当前脚本上下文只提供 `eos` 和 `lv` 两个系统 API 命名空间。
 - JS 可见的 LVGL/ElenixOS 对象是受运行时管理的句柄。所属 Activity、View 或原生对象销毁后，原句柄不能继续使用。
-- 脚本异常、解析失败、模块链接失败、无响应和引擎崩溃会由运行时归类处理；不要依赖某个旧版内部错误常量作为应用接口。
-- `eos.console.*` 和 LVGL 回调应尽快返回。需要延后处理时，使用 LVGL timer 或其他已提供的事件机制。
+- 脚本异常、解析失败、模块链接失败、无响应和引擎崩溃由运行时归类处理；旧版内部错误常量不构成应用接口。
+- 脚本回调应尽快返回。需要延后处理时，应使用运行时提供的定时或事件机制。
 
 ## 生命周期
 

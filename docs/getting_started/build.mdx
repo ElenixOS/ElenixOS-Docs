@@ -81,6 +81,8 @@ cmake --build build --target menuconfig
 
 配置保存在对应构建目录的 `.config` 中，生成头文件位于 `build/generated/`。详见[内核配置系统](../development/kconfig)。
 
+`menuconfig` 在保存配置时会同时刷新该构建目录的 `generated/eos_config_gen.h`。如果直接编辑 `.config`，运行 `cmake -B build` 重新生成配置头文件后再构建。
+
 ## 日志与故障排查
 
 Native 运行时会把当前日志写入模拟器仓库的 `tmp/latest.log`，旧日志按时间归档。遇到 SDL2 找不到、子模块缺失或链接错误时，先确认依赖和 `git submodule update --init --recursive`，再使用一个新的构建目录重新配置。

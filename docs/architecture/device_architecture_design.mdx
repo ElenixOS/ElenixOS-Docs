@@ -1,29 +1,43 @@
 ---
-title: 设备架构设计
+sidebar_position: 6
+title: 设备契约
 ---
 
-# 设备架构设计
+# 设备契约
 
-设备层把平台硬件操作包装成服务可以使用的设备对象。它的职责是提供设备操作入口、保存设备状态，并让平台实现能够在初始化时注册操作。
+Device Layer 是 Service/Core 与平台实现之间的类型化边界。它提供可注册的实现入口、状态和该设备类型专有的操作；它不拥有应用语义、采样/功耗策略、页面生命周期或 JS 回调。
 
-## 当前设备类型
+## 两个方向
 
-当前设备抽象包含显示器、电源、电池、时间、传感器、扬声器、麦克风和振动器。显示器、电源、电池、时间、扬声器、麦克风和振动器通过各自的 `get_instance()` 访问单例；传感器可以按名称或类型查找，并为每种类型记录默认实例。
+```mermaid
+flowchart LR
+    Service[OS Service] -->|同步控制请求| Device[Device Contract]
+    Device -->|调用注册的 ops| Port[Platform Implementation]
+    Port -->|样本 / 状态 / 同步结果| Device
+    Device -->|能力和结果| Service
+    Service -->|读取 / 订阅 / 事件| Consumer[Framework / Application]
+```
 
-所有设备都使用 `DEV_STATE_NONE`、`DEV_STATE_READY`、`DEV_STATE_BUSY` 和 `DEV_STATE_ERROR` 表示设备层状态。状态值描述设备抽象是否可用，不等同于业务服务状态。
+控制与数据流向不同方向。Service 请求操作，Device 通过注册的操作表调用平台；对于数据型设备，平台按各自协议 Push 数据或提供 Pull 值；Service 再负责缓存、仲裁、规范化、有效性和面向消费者的通知。设备层不会自动把硬件回调转成主循环任务，也不会自动重试。
 
-## 注册与状态
+## 注册和可用性
 
-平台实现需要在服务使用前注册对应的操作表。例如显示设备注册 `set_brightness`、`power_on` 和 `power_off`，时间设备注册 `get_datetime`，传感器注册名称、类型和传感器操作。注册函数会检查必要操作；重复注册通常返回 `EOS_ERR_ALREADY_EXISTS`。
+目标平台在依赖 Service 初始化前注册该类型的实现。注册成功只表示操作入口已登记，不代表设备当前可用、每个可选能力都存在或未来操作都成功。设备状态用于表示该类型契约定义的 ready/busy/error；操作返回码则描述一次请求结果，两者不能互相代替。
 
-设备驱动可以通过对应的 `report_state` 接口更新设备状态。设备层不会为所有设备提供完全相同的注册/注销 API，也没有统一的“设备管理器业务接口”；具体操作以该设备公开头文件为准。当前实现没有通用设备注销流程。
+设备类型自行定义操作表、必需项、可选项和返回语义。显示、电源、音频、振动、时间、电池和传感器没有统一的 `init/read/notify/deinit` 接口。缺失能力只能在该类型明确允许可选时用 NULL 表示；Service/调用者需要检查不支持或设备缺失结果。
 
-## 服务边界
+当前 Sensor Device 支持按名称注册多个实例，但 Sensor Service 初始化时为每种 Sensor Type 绑定一个默认设备；注册顺序决定默认实例，Service 没有动态选择、优先级和故障切换。大多数其他 Device 是 singleton。该模型不是通用多 Provider 框架，平台不能假定设备可以在线替换或注销。
 
-应用和脚本不应直接使用设备层。服务负责采样周期、缓存、配置持久化、播放状态、休眠策略等业务行为，再调用设备操作。这样可以让设备实现只关心平台操作，同时让服务在 Native、WASM 或其他移植中保持相同的上层语义。
+## 数据、内存和生命周期
 
-传感器服务尤其区分设备上报和应用读取：驱动把数据提交给服务，服务维护每种类型的 FIFO、最新值和订阅通知；应用通过 `eos_sensor_read*` 或订阅接口获取数据。
+- Device Operation 表由平台实现提供，Core 保存其引用；实现和操作表必须在注册有效期间持续存活。
+- Sensor 数据由平台上报到 Service；Service 复制样本并自行管理 FIFO/latest。订阅回调指针借用到本次同步回调结束。
+- Battery 原始测量由平台报告，Service 复制到服务状态；变更 Event 同步派发，`param` 仅作为借用状态传递。
+- Microphone 的共享 DMA buffer 由 Audio Service 分配并传给设备；Core 在设备停止后才可回收。Speaker 的 borrow/enqueue buffer 所有权目前未被公共操作表完整规定，应视作未闭合合同。
+- Core 当前没有统一的 device hotplug、注册撤销或所有设备的 shutdown/deinit 流程。各 Service 所有的 request、subscriber 和缓存必须由其所属 Service 生命周期管理。
 
-## 面向移植的要求
+## 扩展规则
 
-移植平台时应为所支持的设备实现必需操作，并在系统服务初始化前完成注册。无法提供的硬件能力应通过设备状态、能力查询或服务返回码体现，不能在服务层假定所有设备都存在。WASM/Native 模拟器的设备实现是平台模拟，不代表实际硬件的性能或可用传感器集合。
+新增硬件接入既有 Device Type 时，在消费它的 Service 初始化前注册，并遵循单位、上下文、状态和缓冲合同。若需要新的应用语义或状态策略，应扩展/新增 Service，而不是把业务规则塞进 Device 操作表。若新增的是全新 Sensor Type，还必须同时定义公共数据类型、单位、坐标/时间语义、缓存和采样需求行为。
+
+具体的 Vendor 启动顺序、数据上报与 ISR 边界见[Platform/Vendor 契约](./platform_contract)；应用如何消费 Service 见[Application 契约](./application_contract)。

@@ -1,22 +1,12 @@
 ---
-sidebar_position: 13
+sidebar_position: 14
 title: 时间服务
 ---
 
-时间服务提供获取系统时间的功能。
+# 时间服务
 
-## 服务初始化
+时间服务向系统和应用提供统一的日期时间视图。平台时间端口负责读取当前时间，服务将其转换为公共日期时间表示并报告初始化或读取错误。
 
-```c
-eos_result_t eos_service_time_init(void);
-```
+消费者应通过时间服务获取系统时间，不应自行访问平台时钟或假定所有平台具有相同的时区与校时来源。
 
-成功返回 `EOS_OK`，失败返回错误码。
-
-## 获取系统时间
-
-```c
-eos_datetime_t eos_time_get(void);
-```
-
-返回带有毫秒精度的当前日期时间。
+时间读取是同步 Pull：Core 调用已注册的 time device，获得按公共日期时间类型返回的值；时间设备不存在时调用者不能据此假定有有效时间。Platform 负责时钟源、RTC/校时和转换，Core 不提供异步更新时间流。上下层责任见[Application 契约](../../application_contract)和[Platform/Vendor 契约](../../platform_contract)。

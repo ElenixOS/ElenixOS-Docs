@@ -1,20 +1,45 @@
 ---
-sidebar_position: 3
-title: 驱动层
+sidebar_position: 7
+title: Platform Port 与 Driver
 ---
 
-# 驱动层
+# Platform Port 与 Driver
 
-驱动层是平台与 ElenixOS 设备抽象之间的适配边界。驱动实现设备公开的操作表，在系统初始化阶段注册，并在设备状态或传感器数据变化时向设备/服务层报告。
+Platform Port 是消费 ElenixOS Core 的集成层；它实现 Core 声明的 port/device contract，并把 BSP、Vendor SDK、中断、DMA、时钟、文件系统和 GUI/HAL 接到 OS。Core 仓库中的 port 头文件描述接口；芯片相关实现属于实际平台工程。
 
-## 操作边界
+## 平台向 Core 提供什么
 
-驱动只实现当前平台能提供的设备操作；业务策略由服务处理。例如显示驱动提供亮度和电源操作，传感器驱动提供采样/启停并提交原始数据，音频驱动提供播放端口和麦克风捕获端口。
+集成工程先准备 OS 必需的执行环境（时钟、临界区/调度、内存、文件系统和 LVGL display/input），再注册该目标实际拥有的设备操作，并在相关服务启用前初始化服务。Core 不会替平台猜测哪个 Vendor 驱动存在，也没有覆盖所有设备的统一发现、热插拔或 shutdown 调度器。
 
-设备类型的操作表并不完全相同，不能假设存在一个适用于所有驱动的通用 `register`、`read` 或 `deinit` 函数。注册失败、设备不可用和操作失败应按各接口的返回值处理。
+操作方向有两类：
 
-## 输入与异步数据
+- Core/Service 同步调用 Device ops 请求 enable、采样率、显示/电源设置、音频打开/提交等动作。平台操作应有界并快速返回；若工作较慢则排到平台 task，再通过该设备合同回报结果。
+- 平台向 Core Push 样本/状态，或在 Core 调用时 Pull 实时值。Vendor 需要在上报前把硬件单位和板级坐标转换成 OS 公共数据语义，并按规定传播无效/错误状态。
 
-触摸、表冠和侧边按钮由平台输入适配层提交给系统输入模块。传感器驱动使用 `eos_sensor_notify()` 向传感器服务提交数据；应用回调不应由驱动直接调用。
+## 驱动不得拥有的职责
 
-Native 和 WASM 模拟器分别使用 SDL2 与浏览器/Emscripten 平台实现。驱动文档描述的是适配边界，不承诺某个模拟平台具备真实硬件能力。
+- 不替 Service 决定跨消费者采样率、音量/电源业务策略或应用权限。
+- 不直接执行应用/JS callback，不创建或销毁 Activity/View，不触碰 LVGL/JerryScript。
+- 不假定另一个平台实现具备本板同样的能力；可选操作缺失必须可识别，调用失败必须按设备合同返回/报告。
+- 不保存越过所有者生命周期的借用 buffer；异步 DMA/task 要在 Core 回收内存或关闭设备前停止并确认不再访问。
+
+## 中断、任务与回调
+
+Vendor 回调不会自动切换到统一线程。Device op 通常在发起服务的同步调用上下文执行；Event Bus callback 在发布者上下文同步执行；Dispatcher 将短任务排到 Core 主循环。传感器上报会在 `eos_sensor_notify` 的调用栈同步进入 Native consumers；电池报告变化时也会同步发布事件。因此，ISR 可负责采集或排队；若下游链未整体确认为 ISR-safe，平台需先 defer，再调用会派发消费者的入口。
+
+各类操作具有不同的执行上下文：Time 的 pull、Platform 控制操作、Battery 采集和 Sensor 样本发布分别遵循各自约定。函数名称中的 `callback` 不表示操作必然异步或线程安全；平台移植按对应文档处理上下文和 buffer 要求。
+
+## 数据/错误传播
+
+```mermaid
+flowchart LR
+    HW[SoC / Sensor / Codec / Display] -->|原始值、状态| Adapt[Vendor Driver / Adapter]
+    Adapt -->|规范化后的契约数据| Device[Device / Port API]
+    Device --> Service[Core Service]
+    Service -->|值、有效性、错误、事件| App[Framework / Application]
+    Service -->|同步操作请求| Device
+```
+
+同步操作错误沿调用结果返回；异步设备在报告路径里更新状态或提交数据。样本零值不是故障标志；需要区分尚无样本、过期样本、设备错误和合法零值。某个功能在软件模拟器可用也不代表目标硬件实现了它。
+
+Sensor 的坐标/时间/采样要求、Audio 缓冲、Display/Power 状态以及设备注册顺序由[平台移植契约](./platform_contract)定义；Device 操作表和能力生命周期见[设备契约](./device_architecture_design)。

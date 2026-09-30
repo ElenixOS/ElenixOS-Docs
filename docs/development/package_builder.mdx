@@ -1,55 +1,9 @@
 ---
-sidebar_position: 2
-title: 构建脚本包
+title: 旧版脚本打包说明
 ---
 
-# 构建脚本包
+# 旧版脚本打包说明
 
-模拟器仓库中的 `ElenixOS/scripts/eos_pkg_builder.py` 可以把一个应用或表盘目录打包为 ElenixOS 使用的 `.epk` 文件。
+本页保留旧版文档路径，供已有链接查阅迁移方向。`eos_pkg_builder.py` 属于旧版独立打包工具，当前已标记为 deprecated / legacy，不再作为新应用或表盘项目的推荐构建方式。
 
-## 输入目录
-
-输入目录必须包含 `manifest.json`。构建器当前检查以下字段：
-
-```json
-{
-  "id": "com.example.app",
-  "name": "示例应用",
-  "version": "1.0.0",
-  "minApiLevel": 1,
-  "targetApiLevel": 1
-}
-```
-
-`minApiLevel` 和 `targetApiLevel` 必须是整数。构建器不会替应用补充 `author` 或 `description`；不过运行时加载脚本包时，这两个字段也是 manifest 的必需字段，因此可安装包应同时提供它们。`permissions` 等其他字段会原样保留在 `manifest.json` 中，由运行时负责解释。
-
-目录中的文件和子目录都会被收集，常见布局如下：
-
-```
-app/
-├── manifest.json
-├── main.js
-├── icon.bin
-└── assets/
-    └── ...
-```
-
-`main.js` 和 `assets/` 不是打包器额外创建的固定项目；它们是否存在、以及其他文件如何组织，取决于运行时对相应包类型的要求。资源文件不会压缩，包内保留文件表和文件数据。
-
-## 命令
-
-命令使用两个位置参数：输入目录和输出文件。`--type` 可选，默认为 `app`。
-
-```bash
-# 应用，输出魔数为 EAPK
-python3 ElenixOS/scripts/eos_pkg_builder.py app/ app.epk
-
-# 表盘，输出魔数为 EWPK
-python3 ElenixOS/scripts/eos_pkg_builder.py watchface/ watchface.epk --type watchface
-```
-
-脚本会拒绝不存在的 manifest、无文件目录、无效 JSON、缺失必需字段或非整数 API level。固定长度的名称、ID 和版本字段以 UTF-8 写入，过长内容会被截断；因此应使用较短的 manifest 字段值。
-
-## 包类型与安装
-
-`.epk` 是统一的二进制安装包容器，不是目录压缩文件。包头中的现有 magic `EAPK` 或 `EWPK` 是 Package Type 的唯一事实来源：分别表示 Application 和 Watch Face。`--type` 只决定包头类型，不会向 manifest 写入重复字段。包构建器只负责生成包，安装应通过目标系统的统一包安装入口完成。
+当前 EPKG v1 包的区域语义和系统解释规则见[EPKG v1 安装包格式](../architecture/package_format)；项目初始化、构建、分析与其他开发工作流见 [ElenixOS-Toolkit](./toolkit)。

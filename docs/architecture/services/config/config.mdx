@@ -5,45 +5,10 @@ title: 配置服务
 
 # 配置服务
 
-配置服务管理系统级配置，并将其保存为 JSON。服务初始化函数为 `eos_service_config_init()`。
+配置服务管理系统级设置并将其保存为 JSON。配置项覆盖设备与语言、显示和电源、音频与触觉、表盘和应用排序，以及安全选项。系统模块通过类型化配置访问，不应自行解析或改写系统配置文件。
 
-## 配置键
+读取缺失值或类型不匹配的配置项时使用调用方提供的默认值。动态字符串和 JSON 树由调用方按各自的资源规则释放。开发调试选项也可能作为普通配置数据保存，并不因此成为编译期配置。
 
-当前公开键包括：
+脚本配置与系统配置相互隔离，并按应用或表盘的数据目录保存；系统级配置不属于脚本配置边界。
 
-```text
-device_name              language                 wf_id
-bluetooth                display_brightness      speaker_volume
-mute                     sleep_timeout_sec       aod_mode
-wake_on_raise            vibrator_strength       app_order
-password_hash            password_enabled        password_simple
-dev_fps                  dev_objs                 dev_touch
-```
-
-对应的 C 宏名分别以 `EOS_CONFIG_KEY_` 开头。开发者选项键 `dev_fps`、`dev_objs`、`dev_touch` 也属于配置文件内容，并不是编译期 Kconfig 选项。
-
-默认设备名称为 `Elenix Watch`，默认表盘 ID 为 `cn.sab1e.clock`；默认语言由 `EOS_CONFIG_DEFAULT_LANGUAGE` 决定，当前宏映射为 `简体中文` 或 `English`。
-
-## 类型化访问
-
-```c
-eos_result_t eos_config_set_bool(const char *key, bool value);
-eos_result_t eos_config_set_string(const char *key, const char *value);
-eos_result_t eos_config_set_number(const char *key, double value);
-
-bool eos_config_get_bool(const char *key, bool default_value);
-char *eos_config_get_string(const char *key, const char *default_value);
-double eos_config_get_number(const char *key, double default_value);
-```
-
-读取时如果键不存在或 JSON 类型不匹配，返回调用者提供的默认值。`eos_config_get_string` 返回动态分配的字符串，包括使用默认值时；使用完必须用 `eos_free` 释放，不能用 `eos_malloc` 释放。
-
-## JSON 值
-
-```c
-cJSON *eos_config_get_json(const char *key);
-eos_result_t eos_config_set_json(const char *key, cJSON *json_value);
-eos_result_t eos_config_add_item(const char *key, const char *value);
-```
-
-`eos_config_get_json` 返回的 cJSON 树由调用者负责用 `cJSON_Delete` 释放。系统配置路径由存储路径配置统一定义，应用脚本不应直接修改系统配置文件；脚本请使用 `eos.config`，它把数据隔离在当前应用或表盘的数据目录中。
+配置服务是同步的 Core-owned 设置快照，缺键时由读取方提供默认语义；它不是实时设备数据订阅。JS `eos.config` 根据当前脚本身份写到对应应用/表盘配置位置，而通用 Storage API 不会自动施加此身份隔离。调用层见[Application 契约](../../application_contract)。

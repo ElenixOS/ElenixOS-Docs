@@ -5,41 +5,12 @@ title: 日志服务
 
 # 日志服务
 
-日志服务提供四个级别：`DEBUG`、`INFO`、`WARN` 和 `ERROR`。宏 `EOS_LOG_D`、`EOS_LOG_I`、`EOS_LOG_W`、`EOS_LOG_E` 会格式化消息并交给日志服务；定义 `EOS_LOG_DISABLE` 时，这些宏不产生输出。
+日志服务按严重级别过滤并向已注册的监听器派发格式化消息。系统提供调试、信息、警告和错误四个级别；全局最低级别决定哪些消息会被派发。
 
-## 级别过滤
+监听器由注册方负责生命周期。系统监听器不可按普通监听器注销；停用监听器不会删除注册关系。监听器回调应尽快返回，消息缓冲区只在派发期间有效，需长期保存时由接收方复制。
 
-```c
-eos_log_level_t eos_log_get_level(void);
-eos_result_t eos_log_set_level(eos_log_level_t level);
-```
+日志标签用于标识消息来源。平台可以提供标准输出等监听器；是否启用颜色输出由构建配置决定。
 
-这是日志服务的全局最低派发级别。低于该级别的消息不会派发给监听器。
+Core 日志级别启动时默认是 `DEBUG`，因此 DEBUG、INFO、WARN、ERROR 均可通过级别过滤。Simulator 项目默认启用 stdout listener，Native 启动日志也写入 Simulator 的 `tmp/latest.log`；目标平台若未注册输出 listener，日志仍会被级别过滤，但不会自动写入串口或文件。Simulator 最多接受 8 个 listener；槽位用尽时 `eos_log_register_listener()` 返回 `-1`。`EOS_LOG_ENABLE_STD`、`EOS_LOG_MAX_LISTENERS` 与 `EOS_LOG_USE_COLOR` 可通过 Kconfig 的 Logging 组调整；运行时也可用日志 API 更改最低级别。
 
-## 监听器
-
-日志监听器收到级别、消息缓冲区、消息长度和注册时的用户数据：
-
-```c
-typedef void (*eos_log_listener_cb_t)(eos_log_level_t level,
-                                      const char *buf,
-                                      size_t len,
-                                      void *user);
-
-eos_log_listener_id_t eos_log_register_listener(const char *name,
-                                                eos_log_listener_cb_t cb,
-                                                void *user_data,
-                                                uint8_t flags);
-eos_result_t eos_log_unregister_listener(eos_log_listener_id_t id);
-eos_result_t eos_log_set_listener_enabled(eos_log_listener_id_t id,
-                                          bool enabled);
-eos_log_listener_id_t eos_log_find_listener(const char *name);
-eos_result_t eos_log_get_listener(eos_log_listener_id_t id,
-                                  eos_log_listener_t *listener);
-```
-
-注册成功返回非负 ID，失败返回 `-1`。监听器名称必须在其生命周期内保持有效，通常应使用静态字符串。`EOS_LOG_FLAG_SYSTEM` 用于系统监听器；带该标志的监听器不能被注销。禁用监听器不会删除它，之后可重新启用。
-
-系统启动时调用 `eos_service_log_init()`；标准输出监听器可通过 `eos_service_log_std_register()` 注册。日志宏中的 `EOS_LOG_TAG` 会作为消息前缀使用，彩色输出是否启用由 `EOS_LOG_USE_COLOR` 决定。
-
-日志监听器回调应尽快返回，也不应假定消息缓冲区在回调返回后仍然有效。
+Core 先按全局级别过滤，再同步调用监听器；listener 接收的消息内存仅在 callback 期间有效。平台输出 backend 是日志 listener，不是应用存储或通知服务。若 sink 需要耗时 I/O，应在 listener 中复制所需内容并自行排队；见[事件总线的上下文区别](../../kernel/event/events)。
