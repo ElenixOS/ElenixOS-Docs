@@ -17,6 +17,39 @@ SPM（Script Program Manager）拥有 Application、Watchface 等脚本程序的
 
 一个 C 函数或类型不会仅因存在于 Native 构建中就自动成为 JS API。API 描述和手写包装共同确定对 JS 可见的调用面；SNI 类型描述确定参数及结果如何跨界。调用入口、类型映射、Native 对象 owner 和回调 owner 是相关但不同的关系。
 
+## LVGL 在 Application API 中的架构地位
+
+在 ElenixOS 系统边界内，LVGL 是 GUI 子系统的组成部分。ElenixOS 选择并集成 LVGL 作为 GUI framework，LVGL 的公开 API 是 ElenixOS GUI API 的设计来源；LVGL upstream 是 ElenixOS 信任并管理的上游。Application 通过 SNI 使用 ElenixOS 选定版本所提供的接口，不能自行选择另一套 LVGL runtime version，也不能在 ElenixOS SNI/API surface 之外建立自己的 LVGL platform contract。
+
+经 ElenixOS 选择并纳入发布 surface 的 `lv.*` 接口属于正式 Application API。API ownership 属于 ElenixOS 的平台策略，不取决于绑定代码由谁编写：ElenixOS 选择 LVGL 版本和应用可见 API，审查并安排升级，决定接口变化何时进入 Application API，并为已经纳入正式 API 的接口制定兼容策略。因而，Application API 不额外建立一套与 LVGL 基本一一对应的 `eos.ui.*` facade 来长期镜像 LVGL；SNI 直接承载受控的 `lv.*` 接口。若 ElenixOS 定义与 LVGL 语义不同的高层 UI abstraction，该 abstraction 属于另一套 ElenixOS API。
+
+```mermaid
+flowchart TB
+    Upstream["LVGL upstream<br/>公开 API 与实现"] -->|受信任的上游| ElenixOS["ElenixOS"]
+    ElenixOS --> Version["选择 LVGL 版本"]
+    ElenixOS --> Surface["审查 API 变化并选择暴露范围"]
+    ElenixOS --> Upgrade["决定升级时机"]
+    ElenixOS --> Compatibility["负责正式 Application API 的兼容策略"]
+    Version --> App["JS Applications<br/>SNI 中的 lv.*"]
+    Surface --> App
+    Upgrade --> App
+    Compatibility --> App
+```
+
+直接绑定 LVGL API 不等于跟随 upstream 自动升级。每个 ElenixOS 发布版本将选定的 LVGL 版本及其应用可见 API surface 纳入自己的平台 contract。采用新版本前，ElenixOS 审查 upstream 的 API 与行为变化并完成兼容性评估；新增 API 是否进入 `lv.*` 由 ElenixOS 决定。对已选择且与既有 contract 兼容的 upstream API，绑定采用直接映射；只有实际不兼容变化需要处理时，才引入对应的 alias、生成适配器、小型兼容 shim，或在 ElenixOS 自身的 major API/version 中迁移。LVGL upstream 发布 major version 本身不触发 ElenixOS 升级；ElenixOS 可以继续采用当前稳定版本，也可以安排平台级迁移。
+
+LVGL binding generator 是该架构边界的一部分，负责把经 ElenixOS 选择的 API 转为 SNI 绑定机制：
+
+```mermaid
+flowchart LR
+    LVGL["LVGL public API"] --> Metadata["metadata / ElenixOS binding configuration"]
+    Metadata --> Resolver["SNI resolver / typed IR"]
+    Resolver --> Binding["generated SNI binding"]
+    Binding --> API["Application Realm 中的 lv.* API"]
+```
+
+生成器降低新增受支持 LVGL API 的绑定维护成本，但生成结果本身不决定平台稳定性。哪些绑定属于正式、稳定的 Application API，仍由 ElenixOS 的版本和发布策略确定。此定义针对 LVGL 作为 ElenixOS 所选完整 GUI framework 的架构角色；它不构成把所有第三方库直接暴露给 Application 的通用规则。硬件 vendor driver、RTOS 内部实现和文件系统实现不会因此自动成为 Application API。
+
 ## 类型系统：值、对象与句柄
 
 SNI 类型系统将基本值与对象分开。对象模型只有两种对象：Value Object 和 Handle Object。Value Object 表示跨界复制的数据；Handle Object 表示具有 Native identity、并由一个明确生命周期模型保护的 Native entity。两者在 JavaScript 中都可能表现为普通 JS object，但语义、identity 与回收方式不同。
@@ -283,6 +316,7 @@ Fatal reset 时 JerryScript heap 仍可能结构完整，但其中部分 handle 
 当前 SNI 核心定义位于本页：
 
 - SNI 的跨层职责和调用边界：**定义与边界**；
+- LVGL 的 Application API 归属、SNI binding generator 职责和兼容策略：**LVGL 在 Application API 中的架构地位**；
 - value / Value Object / JS object / Native object / handle / pointer：**类型系统：值、对象与句柄**；
 - control block、`eos_wdata`、身份复用和双向查找：**Native identity、wrapper 与查找关系**；
 - Pure Managed、Tree-Dependent、Hybrid，以及当前未收敛的临时/外部引用：**资源模型与所有权**；

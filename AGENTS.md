@@ -4,7 +4,7 @@ This file defines how AI agents review and modify ElenixOS documentation.
 
 These rules describe the documentation process, not current subsystem behavior. Keep them durable. Temporary implementation details, current bugs, and subsystem-specific facts belong in the documentation or issue that owns them, not in this file.
 
-## 1. Source of Truth
+## Source of Truth
 
 Chinese documentation is canonical.
 
@@ -14,7 +14,7 @@ Chinese documentation is canonical.
 - If the Chinese source is correct but generated English is wrong, treat it as a translation or generation problem.
 - Do not maintain Chinese and English documentation independently.
 
-## 2. Establish the System Model Before Writing
+## Establish the System Model Before Writing
 
 Do not write from filenames, recent commits, prompts, or assumptions about how similar systems usually work.
 
@@ -38,7 +38,7 @@ When evidence conflicts, investigate. Do not assume that newer documentation is 
 
 If the available evidence does not establish a behavior or contract, do not invent one. State only what can be supported.
 
-## 3. Write for the Reader, Not the Repository
+## Write for the Reader, Not the Repository
 
 Documentation structure follows reader goals and prerequisite knowledge, not source-tree layout, commit history, or whatever the current prompt happens to emphasize.
 
@@ -56,7 +56,7 @@ Top-level entry pages should orient readers before specializing. They should exp
 
 A general entry page is not the place to teach every role-specific workflow.
 
-## 4. Keep Documentation Types Distinct
+## Keep Documentation Types Distinct
 
 Classify a page by its primary purpose before editing it.
 
@@ -85,7 +85,7 @@ Do not use one document type as a substitute for another. In particular:
 
 If a page appears to need incompatible kinds of content, reconsider the information architecture before adding more material.
 
-## 5. Describe the Implemented System, Not an Imagined Design
+## Describe the Implemented System, Not an Imagined Design
 
 For documentation about existing behavior, write from the perspective of a finished system.
 
@@ -101,7 +101,7 @@ The first sentence documents the system. The second sounds like an architecture 
 
 This distinction is mandatory for concept, architecture, overview, and reference documentation.
 
-### 5.1 Prefer facts over prescriptions
+### Prefer facts over prescriptions
 
 When behavior is already implemented, state what the system does:
 
@@ -124,7 +124,7 @@ Avoid rewriting implemented behavior as:
 
 These forms are appropriate only when the page is actually defining a requirement or instructing the reader to perform an action.
 
-### 5.2 Normative language requires a real contract
+### Normative language requires a real contract
 
 Words such as **MUST**, **MUST NOT**, **required**, **prohibited**, **should**, and their Chinese equivalents such as “必须”“不得”“应当”“不应” must not be used merely because an implementation choice is desirable.
 
@@ -160,7 +160,7 @@ Acceptable when documenting an actual API precondition:
 
 > The caller must initialize the sensor service before calling `foo()`.
 
-### 5.3 Do not preserve review comments as documentation
+### Do not preserve review comments as documentation
 
 A bug fix, review comment, or design discussion may reveal a stable invariant. Document the invariant, not the reminder that produced it.
 
@@ -182,7 +182,7 @@ Better:
 
 If a design comment has no externally useful stable meaning, omit it rather than laundering it into documentation prose.
 
-### 5.4 Do not expose implementation advice without reader value
+### Do not expose implementation advice without reader value
 
 Before documenting an internal design detail, ask whether it helps the target reader understand, use, extend, implement, debug, or reason about the subsystem.
 
@@ -190,7 +190,7 @@ If not, leave it out.
 
 An implementation detail is not documentation-worthy merely because it is technically true.
 
-## 6. Architecture Documents Contracts and Semantics
+## Architecture Documents Contracts and Semantics
 
 Architecture documentation should explain the stable relationships that readers need to reason about the system. Depending on the subsystem, this includes:
 
@@ -229,7 +229,7 @@ Avoid replacing explanation with:
 
 Concrete API syntax belongs in reference documentation unless naming an API is necessary to explain a boundary.
 
-## 7. Explain Both Sides of a Boundary
+## Explain Both Sides of a Boundary
 
 For a subsystem between an upper consumer and a lower implementation, document both sides when relevant.
 
@@ -254,7 +254,7 @@ The lower-layer implementer should be able to determine:
 
 A subsystem contract is incomplete if a developer still needs substantial source archaeology to discover these basics.
 
-## 8. Make Stable Hidden Knowledge Explicit
+## Make Stable Hidden Knowledge Explicit
 
 If a normal user or implementer would otherwise need to grep configuration, trace initialization, inspect source, or rely on trial and error to discover a stable and externally relevant fact, consider documenting it.
 
@@ -285,7 +285,7 @@ Examples include:
 
 Do not document every internal constant. Document details whose omission would impose meaningful discovery cost on the intended reader.
 
-### 8.1 Configurable behavior
+### Configurable behavior
 
 When externally relevant behavior is configurable, documentation should normally state:
 
@@ -295,7 +295,7 @@ When externally relevant behavior is configurable, documentation should normally
 
 Do not say only that something is configurable while forcing readers to search the source for the actual default or configuration entry.
 
-### 8.2 Data semantics
+### Data semantics
 
 For externally visible data, document relevant:
 
@@ -309,7 +309,7 @@ For externally visible data, document relevant:
 
 A number without its semantics is incomplete documentation.
 
-### 8.3 Failure semantics
+### Failure semantics
 
 Where relevant, explain what happens when:
 
@@ -323,7 +323,7 @@ Where relevant, explain what happens when:
 
 Do not require readers to discover basic failure behavior by debugging Core.
 
-## 9. Preserve Valid Architecture Knowledge
+## Preserve Valid Architecture Knowledge
 
 Do not aggressively simplify existing architecture documentation.
 
@@ -353,7 +353,7 @@ Delete content when it is demonstrably:
 
 A shorter document is not automatically a better document.
 
-## 10. Tutorials and How-to Guides Must Be Executable
+## Tutorials and How-to Guides Must Be Executable
 
 A task-oriented guide must take the reader from a stated starting point to a concrete, verifiable result without requiring undocumented guesses.
 
@@ -369,7 +369,7 @@ Every tutorial should have a clear outcome, such as:
 
 “Understand this feature” is not a tutorial outcome; it belongs in conceptual documentation.
 
-### 10.1 Provide the complete working path
+### Provide the complete working path
 
 Where applicable, include:
 
@@ -389,7 +389,7 @@ Where applicable, include:
 
 Do not omit intermediate actions merely because maintainers already know them.
 
-### 10.2 Commands must be concrete and verified
+### Commands must be concrete and verified
 
 When the reader needs to execute a command, show the actual command and state the working directory when it matters.
 
@@ -410,7 +410,7 @@ Commands, menu entries, configuration keys, project types, output files, and UI 
 
 If multiple workflows exist, identify the recommended path and distinguish alternatives.
 
-### 10.3 Code examples must be usable
+### Code examples must be usable
 
 When a task requires code, provide the smallest complete example that correctly demonstrates the task.
 
@@ -428,7 +428,7 @@ Do not dump unrelated boilerplate merely to make an example look complete.
 
 Use pseudo-code for conceptual explanation, not as a substitute for real code in an executable tutorial unless it is explicitly labeled as non-executable.
 
-### 10.4 Show success conditions
+### Show success conditions
 
 After important steps, state what success looks like. This may be:
 
@@ -444,7 +444,7 @@ The reader should be able to distinguish success from a silent failure.
 
 Add short troubleshooting notes only for likely blockers directly related to the workflow. Broader diagnosis belongs in dedicated troubleshooting documentation.
 
-### 10.5 State prerequisites before the workflow
+### State prerequisites before the workflow
 
 Do not reveal required dependencies halfway through the tutorial.
 
@@ -452,13 +452,13 @@ List only prerequisites that are actually needed for that workflow, such as host
 
 Link to detailed installation instructions when appropriate, but do not hide information required to complete the current task behind another page.
 
-### 10.6 Keep one primary path
+### Keep one primary path
 
 A tutorial should present one clear recommended workflow. Alternative or advanced workflows may follow, but they must not compete with the primary path for a first-time reader.
 
 A tutorial may use one board, one application, or one environment as a concrete example. State that scope explicitly and do not imply that example-specific behavior is a system-wide contract.
 
-### 10.7 Quick Start has a special responsibility
+### Quick Start has a special responsibility
 
 A Quick Start should provide the shortest supported path from a fresh development environment to a meaningful working result:
 
@@ -476,7 +476,7 @@ Do not turn Quick Start into a directory of “Learn about X” links before the
 
 At the same time, do not assume that one specialized workflow is universal. If ElenixOS serves multiple major reader roles, the entry experience should orient and route readers before sending them into a role-specific tutorial.
 
-### 10.8 Clean-room walkthrough
+### Clean-room walkthrough
 
 Before considering a tutorial complete, mentally execute it as a technically competent developer who knows the programming language and tools but knows nothing about ElenixOS.
 
@@ -492,7 +492,7 @@ At every step ask:
 
 If a required action must be guessed, the tutorial is incomplete.
 
-## 11. Keep Information in the Right Place
+## Keep Information in the Right Place
 
 Do not solve every documentation problem by expanding the page nearest to the changed code.
 
@@ -517,7 +517,7 @@ The user's prompt describes the information need. It does not automatically dete
 
 Do not let recent task context redefine the documentation hierarchy.
 
-## 12. Use Progressive Disclosure
+## Use Progressive Disclosure
 
 Organize information from general to specialized:
 
@@ -539,7 +539,7 @@ Do not expose specialized implementation detail before the reader has enough con
 
 The goal is not to make every page self-contained. The goal is to let every reader find the correct next page without already understanding the entire system.
 
-## 13. Use Explicit Subjects and Precise Semantics
+## Use Explicit Subjects and Precise Semantics
 
 Make ownership and action clear.
 
@@ -561,7 +561,7 @@ Every meaningful section should teach something non-obvious: a boundary, flow, l
 
 If there is not enough meaningful material, inspect the implementation instead of padding the page.
 
-## 14. Keep System and Tooling Concepts Separate
+## Keep System and Tooling Concepts Separate
 
 Do not confuse ElenixOS itself with development tools, simulators, debugging utilities, package tools, test environments, or other auxiliary workflows.
 
@@ -569,7 +569,7 @@ A tool may be important without becoming the conceptual center of the system.
 
 Do not present an auxiliary environment as the default deployment model unless that is genuinely true.
 
-## 15. Navigation and Cross-Document Consistency
+## Navigation and Cross-Document Consistency
 
 A page does not exist in isolation.
 
@@ -589,7 +589,7 @@ When a mismatch exists, fix the link wording, page title, page scope, or documen
 
 A locally correct page can still leave the documentation globally inconsistent.
 
-## 16. Use Diagrams Only When They Clarify Structure or Behavior
+## Use Diagrams Only When They Clarify Structure or Behavior
 
 Use diagrams when they improve understanding of:
 
@@ -603,7 +603,34 @@ Use diagrams when they improve understanding of:
 
 Do not create diagrams merely to make a page look complete, and do not merge unrelated workflows into one diagram merely to reduce diagram count.
 
-## 17. Make Minimal, Intentional Changes
+### Avoid ASCII relationship diagrams
+
+Do not use ASCII-art flow diagrams, arrow chains, tree-shaped relationship diagrams, or pseudo-architecture diagrams in documentation unless a diagram is explicitly required.
+
+For example, avoid forms such as:
+
+```text
+    Component A
+        │
+        ▼
+    Component B
+        ├── responsibility X
+        └── responsibility Y
+```
+
+and:
+
+```text
+    A -> B -> C
+```
+
+when the same relationship can be stated clearly in normal prose.
+
+Simple ownership, dependency, trust, lifecycle, and API-boundary relationships should be described in concise technical prose. Use lists or tables only when they convey genuinely structured information.
+
+Diagrams are reserved for relationships whose topology, concurrency, state transitions, or data flow would be materially harder to understand in prose. Do not create a diagram merely to make a section appear more architectural.
+
+## Make Minimal, Intentional Changes
 
 Do not rewrite unrelated documentation merely to impose stylistic uniformity.
 
@@ -613,11 +640,11 @@ Broader restructuring is justified when it materially improves correctness, info
 
 When restructuring, preserve valid technical meaning and update affected navigation and cross-references.
 
-## 18. Mandatory Prose Audit
+## Mandatory Prose Audit
 
 After drafting or revising documentation, perform a dedicated prose pass before considering the task complete.
 
-### 18.1 Search for review-style or advisory wording
+### Search for review-style or advisory wording
 
 In Chinese documentation, inspect occurrences of terms such as:
 
@@ -659,7 +686,7 @@ Keep it only if it expresses:
 
 Otherwise, rewrite it as a factual description of current behavior or remove it.
 
-### 18.2 Detect role drift
+### Detect role drift
 
 Reject prose that sounds like:
 
@@ -681,7 +708,7 @@ Typical warning signs include:
 
 For implemented behavior, convert these to factual system statements only after verifying them against the current implementation.
 
-### 18.3 Distinguish facts, contracts, recommendations, and future work
+### Distinguish facts, contracts, recommendations, and future work
 
 Every normative-looking statement should clearly belong to one of these categories:
 
@@ -692,11 +719,11 @@ Every normative-looking statement should clearly belong to one of these categori
 
 Do not blur these categories.
 
-## 19. Reader Audits
+## Reader Audits
 
 Before finishing, perform the audits relevant to the changed pages.
 
-### 19.1 First-time reader audit
+### First-time reader audit
 
 Assume a technically competent reader who:
 
@@ -707,7 +734,7 @@ Assume a technically competent reader who:
 
 Ask whether the reader can understand the page's purpose and complete the ordinary task without unnecessary source-code archaeology.
 
-### 19.2 Implementer audit
+### Implementer audit
 
 For extension, porting, or subsystem-contract documentation, verify that an implementer can determine:
 
@@ -719,13 +746,13 @@ For extension, porting, or subsystem-contract documentation, verify that an impl
 - how failures are reported;
 - which boundaries are contractual.
 
-### 19.3 Reader-role audit
+### Reader-role audit
 
 For entry pages and navigation, simulate several plausible first-time readers with different goals.
 
 Check that each can recognize the path intended for them without being forced through unrelated tools or workflows.
 
-### 19.4 Prompt-bias audit
+### Prompt-bias audit
 
 Ask whether a feature became prominent mainly because the current task or prompt emphasized it.
 
@@ -733,7 +760,7 @@ If so, reassess its placement and navigation weight.
 
 Recent work should improve the relevant documentation, not redefine the whole documentation system.
 
-## 20. Final Verification
+## Final Verification
 
 Before completing a documentation change, verify all applicable items below.
 
