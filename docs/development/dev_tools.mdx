@@ -1,11 +1,11 @@
 ---
 sidebar_position: 7
-title: 开发工具
+title: Simulator 构建工具与日志
 ---
 
-# 开发工具
+# Simulator 构建工具与日志
 
-模拟器仓库中的日常系统开发工具包括 CMake / Makefile 和 Kconfig 配置工具；ElenixOS-Toolkit 则面向应用、表盘、模拟器调试和设备交互等开发工作流。
+本页介绍 ElenixOS-Simulator 仓库中的 CMake / Makefile、Kconfig 和 Native 日志入口。它们是桌面 Simulator 的主机侧工具，不是各 Board 固件的统一构建接口。Application / Watch Face 项目、EPKG 构建和分析由 [ElenixOS-Toolkit](./toolkit)负责；板级固件按[Platform 与 Board 集成](../integration/overview)和对应工程的说明构建。
 
 ## 构建与配置
 

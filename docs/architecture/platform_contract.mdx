@@ -36,7 +36,7 @@ sequenceDiagram
 
 ## 控制方向、数据方向与实现责任
 
-| 能力 | Core → Vendor 的控制 | Vendor → Core 的数据/状态 | 平台责任和可选能力 |
+| 能力 | Core 发起的控制请求 | Vendor 返回的数据 / 状态 | 平台责任和可选能力 |
 |---|---|---|---|
 | Sensor | Sensor Service 按聚合需求调用 enable/disable 和 set-rate；需求归零或电源策略变化才改变有效操作。 | Vendor 把每个样本按公共类型、单位、坐标系和启动后单调时间戳交给服务；服务复制样本、更新 FIFO/latest 并同步广播。 | `init/deinit` 也在操作表中，但当前 Service 不调用它们；目标 port 在注册后负责硬件初始化/停机。多实例允许注册，但服务当前为每种类型固定一个初始化时选出的默认实例，没有运行时优先级或故障转移。 |
 | Battery | Battery Service 初始化时和 LVGL timer 到期时调用 `request_update`；该调用发生在 Core 调用上下文，Vendor 应快速返回并将慢速读取移到自己的安全执行上下文。 | Vendor 取得百分比、电压、电流、充电状态后调用 Core 上报；Core 更新有效状态、历史和变化事件。变化事件同步在 `report_raw` 的调用上下文广播。 | 电量百分比必须来自平台可靠值；Core 不根据电压替 Vendor 推算。没有有效报告时应用读取到无效状态。若从 ISR 上报，所有事件订阅者也会在该上下文同步执行，不能假定它们位于 UI 主循环。 |
@@ -92,7 +92,7 @@ sequenceDiagram
 | Display / Vibrator | 注册状态和当前 Service 请求可观测。 | 主要物理动作操作为 void；没有每次操作的硬件完成/失败确认。 |
 | Power | Device `set_power` 有返回值。 | PM Service 当前忽略该返回值且不回滚已更新的软件状态；失败不会成为应用可订阅的统一硬件错误。 |
 | Speaker / Microphone | 操作可返回同步结果；Audio Service 把启动阶段失败映射到服务结果。 | 播放/录音启动后的异步设备故障没有统一完成错误事件。 |
-| File system | 各文件操作返回端口/服务结果或无效句柄。 | 结果表示该文件操作，不表示更高层应用事务已原子提交；DFW 还区分队列接受与实际落盘。 |
+| File system | 各文件操作返回端口/服务结果或无效句柄。 | 结果表示该文件操作，不表示更高层应用事务已原子提交。 |
 
 Vendor 应准确实现已定义的报告路径，不能在没有确认通道时伪造“硬件成功”信号。若某能力要求可靠异步确认，应先为该 Device/Service 建立带请求归属、完成/失败和取消语义的合同。
 

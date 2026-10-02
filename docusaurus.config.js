@@ -120,8 +120,8 @@ const config = {
           {to: '/blog', label: '博客', position: 'left'},
           {
             href: 'https://simulator.elenixos.com/wasm/latest/main.html',
-            label: '在线模拟器',
-            position: 'left',
+            label: '模拟器',
+            position: 'right',
           },
           {
             type: 'search',
@@ -154,7 +154,7 @@ const config = {
             items: [
               {label: '项目介绍', to: '/docs/intro'},
               {label: '快速开始', to: '/docs/getting_started/quick_start'},
-              {label: '构建与使用', to: '/docs/getting_started/build'},
+              {label: '构建 ElenixOS', to: '/docs/getting_started/build'},
               {label: '系统架构', to: '/docs/architecture/arch'},
               {label: '更新日志', to: '/docs/CHANGELOG'},
             ],
@@ -162,10 +162,10 @@ const config = {
           {
             title: '项目资源',
             items: [
-              {label: '脚本引擎指南', to: '/docs/architecture/script_engine'},
-              {label: 'JavaScript API', to: '/docs/architecture/script_engine/elenix_os'},
-              {label: '开发工具', to: '/docs/development/dev_tools'},
-              {label: '在线模拟器', href: 'https://simulator.elenixos.com/wasm/latest/main.html'},
+              {label: 'JavaScript API 参考', to: '/docs/architecture/script_engine/elenix_os'},
+              {label: 'ElenixOS-Toolkit', to: '/docs/development/toolkit'},
+              {label: 'Platform / Board 集成', to: '/docs/integration/overview'},
+              {label: 'Simulator 指南', to: '/docs/simulator/overview'},
             ],
           },
           {

@@ -47,10 +47,27 @@ Activity 拥有其页面 View；LVGL 父对象删除可能级联删除子控件�
 
 ## 生命周期流转
 
-应用启动：应用管理器 → SPM 创建/恢复程序 → Activity 创建应用页面 → 进入页面并建立 View → SNI/应用更新 UI。
+```mermaid
+flowchart TB
+    subgraph AppStart["应用启动"]
+        AppManager["应用管理器"] --> SPMStart["SPM 创建或恢复 Program"]
+        SPMStart --> CreateActivity["Activity 创建应用页面"]
+        CreateActivity --> CreateView["进入页面并建立 View"]
+        CreateView --> UpdateUI["SNI / Application 更新 UI"]
+    end
 
-应用离开前台：Activity 计算退出策略 → 完成页面过渡和栈分离 → Recent Apps 停放或驱逐 → SPM 挂起或停止对应程序。
+    subgraph AppBackground["应用离开前台"]
+        ExitPolicy["Activity 计算退出策略"] --> Transition["完成页面过渡并分离页面栈"]
+        Transition --> RecentApps["Recent Apps 停放或驱逐"]
+        RecentApps --> SPMStop["SPM 挂起或停止对应 Program"]
+    end
 
-表盘切换：表盘管理器 → 校验目标包 → 替换根 Activity → 停止旧表盘程序/资源 → enter 新根页面。
+    subgraph WatchfaceSwitch["表盘切换"]
+        WatchfaceManager["表盘管理器"] --> ValidatePackage["校验目标包"]
+        ValidatePackage --> ReplaceRoot["替换根 Activity"]
+        ReplaceRoot --> StopOld["停止旧表盘程序与资源"]
+        StopOld --> EnterNew["进入新根页面"]
+    end
+```
 
 应用视角的启动、挂起与异步资源边界见[Application 契约](../../application_contract)；跨 Activity/SPM/SNI 的 owner 规则见[Core 开发契约](../../core_development_contract)。

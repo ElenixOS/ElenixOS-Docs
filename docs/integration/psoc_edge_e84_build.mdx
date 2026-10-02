@@ -1,0 +1,45 @@
+---
+title: E84 开发工程构建与烧录
+---
+
+# PSoC Edge E84 开发工程构建与烧录
+
+本教程针对当前 [ElenixOS-PSoC-E84 工程](https://github.com/ElenixOS/ElenixOS-PSoC-E84)及 `APP_KIT_PSE84_AI` 默认目标。该集成仍在开发中，尚未形成稳定移植；命令成功只说明当前工程完成了对应的构建或下载步骤。
+
+## 前置条件
+
+- 已安装 ModusToolbox，以及该工程使用的 BSP、Middleware 和 GNU Arm Toolchain。
+- 有与 `TARGET` 匹配的开发板和 KitProg3。板卡跳线、显示设备和连接方式按目标工程说明准备。
+- 构建环境能够找到 ModusToolbox 工具。默认安装路径由工程构建文件探测；若安装在自定义位置，需设置 `CY_TOOLS_PATHS` 指向对应的 `tools_<版本>` 目录。
+- `CY_GETLIBS_SHARED_PATH` 指向共享依赖目录的父目录。下面以 `$HOME/ModusToolbox` 为例，依赖会放在其下的 `mtb_shared/`。
+
+## 获取工程并构建
+
+在主机的 bash/zsh shell 中，从保存源码的父目录执行：
+
+```bash
+git clone --recursive https://github.com/ElenixOS/ElenixOS-PSoC-E84.git
+cd ElenixOS-PSoC-E84
+mkdir -p "$HOME/ModusToolbox"
+make getlibs CY_GETLIBS_SHARED_PATH="$HOME/ModusToolbox"
+CY_SECONDSTAGE=1 make build -j2 TARGET=APP_KIT_PSE84_AI TOOLCHAIN=GCC_ARM CONFIG=Debug \
+  CY_GETLIBS_SHARED_PATH="$HOME/ModusToolbox"
+```
+
+命令从 `ElenixOS-PSoC-E84` 仓库根目录运行。当前 `common.mk` 默认选择 `APP_KIT_PSE84_AI`、`GCC_ARM` 和 `Debug`；上面的命令显式写出这些值，便于确认构建目标。工程顶层 Makefile 组合 CM33 Secure、CM33 Non-secure 和 CM55 项目，成功构建后应生成 `build/app_combined.hex`。
+
+更换 Evaluation Kit、工具链或显示模块时，先在工程 `common.mk`、对应 Board 配置和 README 中确认目标值及硬件要求。不能只替换命令里的板卡名称。
+
+## 烧录并启动
+
+确认已连接与目标配置匹配的 KitProg3 和开发板后，在仓库根目录执行：
+
+```bash
+CY_SECONDSTAGE=1 make program \
+  TARGET=APP_KIT_PSE84_AI TOOLCHAIN=GCC_ARM CONFIG=Debug \
+  CY_GETLIBS_SHARED_PATH="$HOME/ModusToolbox"
+```
+
+该工程调用 ModusToolbox 下载配置写入目标板。成功标志以下载器和目标工程输出为准；随后按板卡说明设置启动状态、外接显示器和线缆。也可以在 VS Code 打开 `ElenixOS-PSoC-E84.code-workspace`，运行 **Terminal > Run Task > Build** 和 **Program Application (KitProg3)**。
+
+板级工程的 `TARGET`、BSP、Linker Script、固件布局和下载器共同决定实际支持范围。此开发工程的构建或烧录结果不表示 E84 已成为稳定移植；固件下载与 EPKG 安装是不同流程，应用侧入口见 [Application 开发](../getting_started/application_development)和 [Watch Face 开发](../getting_started/watchface_development)。

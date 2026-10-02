@@ -11,16 +11,26 @@ title: EPKG 安装包格式
 
 ## 逻辑结构
 
-```text
-EPKG v1 package (.epk)
-├── Package Header                 必须，固定 60 字节
-├── FPMA / Fast Preview Metadata   必须，固定 32 字节
-├── File Table                     必须，目录项和文件项的索引
-├── File Data Region               必须，按条目顺序连续存放文件数据
-│   ├── manifest.json              必须，固定预览前缀
-│   ├── icon.bin                   可选，固定预览前缀
-│   └── main.js、脚本与静态资源    普通文件条目
-└── Signature Region               格式预留；当前 v1 包不含此区域
+```mermaid
+flowchart TB
+    Package["EPKG v1 package (.epk)"]
+    Header["Package Header<br/>必需，固定 60 字节"]
+    FPMA["FPMA / Fast Preview Metadata<br/>必需，固定 32 字节"]
+    FileTable["File Table<br/>目录项和文件项索引"]
+    FileData["File Data Region<br/>按条目顺序连续存放文件数据"]
+    Manifest["manifest.json<br/>必需，固定预览前缀"]
+    Icon["icon.bin<br/>可选，固定预览前缀"]
+    OtherFiles["main.js、脚本与静态资源<br/>普通文件条目"]
+    Signature["Signature Region<br/>格式预留；当前 v1 包不含此区域"]
+
+    Package -->|从 offset 0 开始| Header
+    Header -->|后续 offset 60| FPMA
+    FPMA -->|后续 offset 92| FileTable
+    FileTable -->|结束后开始| FileData
+    Package -.->|预留，v1 不包含| Signature
+    FileData --> Manifest
+    FileData --> Icon
+    FileData --> OtherFiles
 ```
 
 EPKG v1 的包头、FPMA、File Table 和 File Data 是实际格式结构。`manifest.json` 与 `icon.bin` 是 File Data Region 中具有固定位置语义的文件，不是独立的二进制容器层。当前格式没有单独的代码区、资源区、图片预览区或第二份资源索引：脚本和资源以普通文件项存放，由 File Table 编目；FPMA 为快速预览提供 manifest 和可选图标的位置、大小与校验值。
@@ -80,11 +90,10 @@ FPMA 字段 offset 相对于 FPMA 起点，整数同样为无符号 little-endia
 
 File Data 起点处的固定预览前缀如下：
 
-```text
-data_offset                         manifest.json 原始字节
-data_offset + manifest_size         icon.bin 原始字节（如存在）
-data_offset + manifest_size + icon_size
-                                    其余文件数据
+```mermaid
+flowchart LR
+    ManifestPrefix["data_offset<br/>manifest.json 原始字节"] --> IconPrefix["data_offset + manifest_size<br/>icon.bin 原始字节（如存在）"]
+    IconPrefix --> OtherData["data_offset + manifest_size + icon_size<br/>其余文件数据"]
 ```
 
 FPMA 不保存也不复制应用 ID、名称、版本、权限或 API 信息；这些内容只从 manifest 读取。预览读取路径可据此快速获得身份信息和图标，不必先解码普通 payload。

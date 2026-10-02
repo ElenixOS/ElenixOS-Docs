@@ -1,88 +1,22 @@
 ---
-sidebar_position: 3
-title: 构建与使用
+title: 板级固件构建路径
 ---
 
-# 构建与使用
+# 板级固件构建路径
 
-ElenixOS-Simulator 使用 CMake 构建，默认目标是 Native，也可以使用 Emscripten 构建 WASM。首次获取代码时需要初始化子模块。
+板级固件由目标 Platform / BSP 工程构建。ElenixOS Core 不提供一条适用于所有 SoC 和 Board 的通用固件命令：SDK、交叉编译器、配置、启动镜像布局和下载方式都由具体板级工程决定。本页帮助 Platform / BSP 开发者选择对应工程和后续说明。
 
-```bash
-git clone --recursive https://github.com/ElenixOS/ElenixOS-Simulator.git
-cd ElenixOS-Simulator
-```
+## 当前集成工程
 
-如果已经克隆了仓库：
+| 目标 | 状态 | 后续步骤 |
+|---|---|---|
+| PSoC Edge E84 系列 | 开发中，尚未形成稳定移植。 | 查看 [E84 开发工程构建与烧录](../integration/psoc_edge_e84_build)，再按工程说明选择目标板和连接方式。 |
+| 自有 SoC / Board | 由移植工程定义。 | 从[Platform 与 Board 集成](../integration/overview)和 [Platform / Vendor 契约](../architecture/platform_contract)开始，建立目标工程后使用其构建、配置和下载流程。 |
 
-```bash
-git submodule update --init --recursive
-```
+## 区分目标和产物
 
-## Native
+- **板级固件**：由 Platform / BSP 工程为目标芯片和板卡构建，再使用该工程的下载器烧录。
+- **Application / Watch Face 安装包**：由应用开发路径构建为 `.epk`，安装到已经运行 ElenixOS 的系统；它不是固件镜像。项目流程见[Application 开发](./application_development)和 [Watch Face 开发](./watchface_development)。
+- **Simulator 桌面程序**：由独立的 Simulator 工程构建，用于桌面迭代，不是板级固件目标。命令和运行方式见[Simulator 构建与运行](../simulator/build)。
 
-Native 构建需要 SDL2 开发库。使用 Debug 构建并运行：
-
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build --parallel
-./bin/main
-```
-
-也可以在已经存在 `build/` 配置目录时使用根目录 Makefile 的快捷目标：
-
-```bash
-make              # 构建已经配置好的 build/
-make run          # 构建后运行 Native 模拟器
-```
-
-Native 模拟器的模拟屏幕为 390×450 像素；窗口还包含用于模拟表冠和侧边按钮的控件。窗口缩放不会改变系统报告的显示分辨率。
-
-## WASM
-
-WASM 构建需要已激活的 Emscripten 工具链：
-
-```bash
-emcmake cmake -S . -B build-wasm -DEOS_PLATFORM=WASM -DCMAKE_BUILD_TYPE=Release
-cmake --build build-wasm --parallel
-```
-
-产物位于 `build-wasm/bin/`，包括 `main.html`、`main.js`、`main.wasm` 和预加载数据文件。浏览器需要通过 HTTP 服务器访问：
-
-```bash
-cd build-wasm/bin
-python3 -m http.server 8000
-```
-
-然后打开 [http://localhost:8000/main.html](http://localhost:8000/main.html)。不能直接用 `file://` 打开页面。
-
-## CMake 选项
-
-| 选项 | 默认值 | 作用 |
-|---|---:|---|
-| `EOS_PLATFORM` | `Native` | 选择 `Native` 或 `WASM` |
-| `USE_FREERTOS` | `OFF` | Native 下启用 FreeRTOS；WASM 下会被禁用 |
-| `LV_USE_DRAW_SDL` | `OFF` | 启用 SDL 绘制后端，并需要对应 SDL2_image 依赖 |
-| `LV_USE_LIBPNG` | `OFF` | 启用 PNG 支持 |
-| `LV_USE_LIBJPEG_TURBO` | `OFF` | 启用 JPEG 支持 |
-| `LV_USE_FFMPEG` | `OFF` | 启用 FFmpeg 支持 |
-| `LV_USE_FREETYPE` | `OFF` | 启用 FreeType 支持 |
-| `ASAN` | `OFF` | Debug 构建时启用 Address/Leak/Undefined sanitizer |
-
-上述可选后端只有在依赖库可被 CMake 找到时才能启用。
-
-## Kconfig
-
-内存策略、字体、显示参数、日志和 Recent Apps 等配置通过 Kconfig 管理：
-
-```bash
-cmake -B build
-cmake --build build --target menuconfig
-```
-
-配置保存在对应构建目录的 `.config` 中，生成头文件位于 `build/generated/`。详见[内核配置系统](../development/kconfig)。
-
-`menuconfig` 在保存配置时会同时刷新该构建目录的 `generated/eos_config_gen.h`。如果直接编辑 `.config`，运行 `cmake -B build` 重新生成配置头文件后再构建。
-
-## 日志与故障排查
-
-Native 运行时会把当前日志写入模拟器仓库的 `tmp/latest.log`，旧日志按时间归档。遇到 SDL2 找不到、子模块缺失或链接错误时，先确认依赖和 `git submodule update --init --recursive`，再使用一个新的构建目录重新配置。
+每个 Platform / Board 工程应说明自身的先决条件、目标选择、配置入口、构建产物和烧录步骤。Core 编译期选项由 Kconfig 管理，具体项目默认值仍由板级工程决定；配置入口见[内核配置系统](../development/kconfig)。移植时的 Core 边界与设备注册约束见 [Platform / Vendor 契约](../architecture/platform_contract)；系统内各层关系见[系统架构](../architecture/arch)。

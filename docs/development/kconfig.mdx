@@ -41,7 +41,6 @@ ElenixOS 采用 Kconfig 管理内核编译期配置。最终生效的取值由�
 | `EOSCFG_FONT_TTF` / `EOSCFG_FONT_TTF_FILE` | 开启 / 开启 | 默认从文件系统加载 TrueType 字体；`EOS_FONT_TTF_FILE_PATH` 为 `font.ttf`，相对于系统字体资源目录。大/中/小字体默认 30/26/22 px。可在 Font 菜单更换字体来源、路径和字号。 |
 | `EOS_DISPLAY_WIDTH` / `EOS_DISPLAY_HEIGHT` / `EOS_DISPLAY_RADIUS` | 390 / 450 / 80 px | 默认模拟屏幕几何尺寸；窗口缩放不改写系统显示坐标。Display 菜单可设定目标面板参数。亮度配置范围默认 5–100。 |
 | `EOSCFG_FS_POSIX` / `EOS_FS_PATH_MAX` / `EOS_LVGL_FS_LETTER` | POSIX / 256 字节 / `Z` | 默认文件系统接口、路径缓冲上限和 LVGL 文件盘符。配置值 `90` 对应盘符 `Z`，需与 LVGL 的 `LV_FS_DEFAULT_DRIVE_LETTER` 匹配。File system 菜单可调整。 |
-| `EOS_DFW_ENABLE` | 关闭 | 延迟文件写入默认不启用，因此普通写入按当前文件系统调用路径执行；启用后需按存储服务文档区分入队和落盘。 |
 | `EOSCFG_LANG_EN` | 开启 | Simulator 首次启动的默认界面语言为 English；Language 菜单可改为简体中文。 |
 | `EOS_USE_ASSERT` / `EOS_LOG_ENABLE_STD` / `EOS_LOG_MAX_LISTENERS` / `EOS_LOG_USE_COLOR` | 开启 / 开启 / 8 个 / 关闭 | 默认开启断言和标准输出日志监听器，最多登记 8 个日志 listener；日志最低级别由运行时日志服务管理，启动值为 `DEBUG`。Listener 表满时注册返回 `-1`。Logging 菜单控制断言、stdout listener、容量和颜色输出。 |
 | `EOS_RECENT_APPS_ENABLE` / `EOS_RECENT_APPS_MAX` / `EOS_RECENT_APPS_MEM_HIGH_WATERMARK` | 开启 / 3 个 / 2621440 字节 | 最多保留 3 个挂起应用，估算内存高水位为 2.5 MiB；达到限制后按 LRU 驱逐。Timer 恢复默认补发一次遗漏回调，动画从暂停点继续。Recent Apps 菜单可调整。 |

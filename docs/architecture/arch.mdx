@@ -6,7 +6,7 @@ title: 系统架构
 
 ElenixOS 由可移植的 Core 和平台集成组成。Core 定义应用模型、程序与页面管理、系统服务、设备契约及基础运行接口；平台集成把这些接口连接到具体 SoC、BSP、Vendor HAL 和硬件。应用依赖 Core 提供的公开模型与能力，不依赖某个芯片或驱动。平台差异收敛在接口实现和设备能力中，由对应契约传达给 Core。
 
-脚本 Application 和 Watch Face 以安装包作为部署单元。EPKG 格式契约定义安装身份、程序与资源文件的封装方式以及校验边界；Installer / Loader 按契约校验并解包，运行时消费安装后的应用身份和文件。开发侧的官方 VS Code 插件 ElenixOS-Toolkit 提供项目初始化、安装包构建和分析等工作流。格式定义见 [EPKG v1 安装包格式](./package_format)，开发流程见 [ElenixOS-Toolkit](../development/toolkit)，应用运行模型见[应用管理模块](./framework/app)。
+脚本 Application 和 Watch Face 以安装包作为部署单元。EPKG 格式契约定义安装身份、程序与资源文件的封装方式以及校验边界；Installer / Loader 按契约校验并解包，运行时消费安装后的应用身份和文件。EPKG 是开发工具与系统安装器共同使用的 Package Contract，不属于运行时或 Platform 的私有格式。格式定义见 [EPKG v1 安装包格式](./package_format)，应用运行模型见[应用管理模块](./framework/app)。
 
 理解 ElenixOS 时，应把它看作多个相互协作、但由不同 owner 管理的架构域，而不是单一的“应用调用驱动”层链。下图给出主要关系：Program/Runtime、Activity/UI 和系统服务是 Core 中不同的部分；虚线表示平台实现 Core 定义的接口；数据与状态可以沿控制请求的反方向返回。
 
@@ -141,7 +141,7 @@ JavaScript Runtime 位于 Core 的脚本执行域中。应用代码在 Program �
 | Device Abstraction / Contract | Core 怎样描述某类设备能力？ | 为 Service 与平台实现定义类型化边界、设备状态和对应操作/数据语义。各类型可以采用不同模式。 |
 | Platform / Vendor | 如何在目标芯片上实现这些操作？ | 实现 port/device 接口，接入 BSP、HAL、驱动和具体资源，并按设备契约返回数据或状态。 |
 
-典型的能力控制路径是 Application → Framework 或公开 Service API → Service → Device Contract → Platform 实现。典型的数据路径从平台采集或取得结果，再经对应 Device/Service 处理后返回上层。它们是不同方向的关系：Framework 的高层模型不会取代 Service 策略，Service 不需要知道 Vendor 的芯片细节，Vendor 也不拥有应用级策略。
+典型的能力控制由 Application 发起，经 Framework 或公开 Service API 进入 Service，再通过 Device Contract 到达 Platform 实现；数据与状态由平台取得后，经对应 Device/Service 返回上层。Framework 的高层模型不会取代 Service 策略，Service 不需要知道 Vendor 的芯片细节，Vendor 也不拥有应用级策略。
 
 ## 三类彼此独立的生命周期
 
@@ -161,9 +161,9 @@ ElenixOS 不把程序、页面和设备合成一个“应用对象”。独立�
 
 | 关系 | 大致方向 | 说明 |
 |---|---|---|
-| 架构依赖 | Application → Framework/公开 Service API → Service → Core 契约 | Platform Integration 实现 Core 定义的接口；上层不依赖具体 Vendor。JS 应用经 SNI 使用公开 binding。 |
-| 控制请求 | Application → Framework/Service → Device 操作 → 平台实现 | Service 依据自己的策略决定如何使用设备；请求方向不改变接口的 owner。 |
-| 数据与状态 | 平台实现 → Device/Service → Framework/Application | 数据依具体契约校验、规范化、缓存或仲裁；Push、Pull、回调等模型由相应子系统规定。 |
+| 架构依赖 | Application 通过 Framework / 公开 Service API 调用 Service；Service 使用 Core 契约访问设备。 | Platform Integration 实现 Core 定义的接口；上层不依赖具体 Vendor。JS 应用经 SNI 使用公开 binding。 |
+| 控制请求 | Application 发起请求，Framework / Service 执行策略并调用 Device，Platform 实现设备操作。 | Service 依据自己的策略决定如何使用设备；请求方向不改变接口的 owner。 |
+| 数据与状态 | 平台实现提供数据，经 Device / Service 处理后交给 Framework / Application。 | 数据依具体契约校验、规范化、缓存或仲裁；Push、Pull、回调等模型由相应子系统规定。 |
 | 生命周期与所有权 | 各对象的 owner 分别管理 | SPM 管脚本程序，Activity Controller 管页面，Service 管自身状态，平台集成管平台实现和注册。相互引用不意味着转移所有权。 |
 | 错误传播 | 从发生错误的边界向消费者 | 同步结果、状态、无效数据或异步通知因设备/Service 而异；ElenixOS 没有假定所有硬件都使用同一种成功确认机制。 |
 

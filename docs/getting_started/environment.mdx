@@ -1,15 +1,17 @@
 ---
 sidebar_position: 4
-title: 开发环境准备
+title: Simulator 环境准备
 ---
 
-# 开发环境准备
+# Simulator 环境准备
+
+本页只列出 ElenixOS-Simulator 的主机依赖，不是板级固件的通用工具链清单。Platform / Board 工程各自需要相应 SDK、交叉编译器和下载工具，目标选择见[板级固件构建路径](./build)。
 
 ## 必需工具
 
-Native 模拟器的 CMake 配置要求 CMake 3.10 或更高版本、支持 C99 的 C 编译器、支持 C++17 的 C++ 编译器和 SDL2 开发库。构建脚本还需要 Python 3；`kconfiglib` 用于使用 `menuconfig` 和生成 Kconfig 配置，未安装时构建可回退到默认配置。
+Native Simulator 的 CMake 配置要求 CMake 3.10 或更高版本、支持 C99 的 C 编译器、支持 C++17 的 C++ 编译器和 SDL2 开发库。构建脚本还需要 Python 3；`kconfiglib` 用于使用 `menuconfig` 和生成 Kconfig 配置，未安装时构建可回退到默认配置。
 
-WASM 构建另外需要 Emscripten SDK，并且应在激活 Emscripten 环境后使用 `emcmake` 配置。FreeRTOS 已随模拟器仓库提供，不需要另行下载。
+WASM Simulator 另外需要 Emscripten SDK，并且应在激活 Emscripten 环境后使用 `emcmake` 配置。FreeRTOS 已随模拟器仓库提供，不需要另行下载。
 
 项目没有在 CMake 中声明固定的 CPU、内存或 OpenGL 最低规格；实际编译和运行能力取决于主机、编译器与 SDL2 环境。Native 配置会为编译器加入 `-march=native`，因此编译器需要支持该选项。
 
@@ -55,3 +57,5 @@ cd ElenixOS-Simulator
 ```bash
 git submodule update --init --recursive
 ```
+
+完成环境准备后，按[Simulator 构建与运行](../simulator/build)选择 Native 或 WASM。此页不覆盖任何 Board 的固件构建、烧录或设备端验证。

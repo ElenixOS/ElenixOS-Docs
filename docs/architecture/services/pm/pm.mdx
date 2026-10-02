@@ -28,7 +28,7 @@ sequenceDiagram
 
 当前 `set_power` 的返回值没有向调用方传播，状态也不会因平台错误回滚；power device 缺失时 Core 记录错误，但不存在通用的“硬件拒绝/完成”异步结果。事件说明 Core 状态已改变，不是硬件已确认。如果产品需要可靠确认，必须为 Power Device/Service 增加明确的确认和失败合同。
 
-休眠会暂停 Power Manager 的 timer，并在启用 Deferred File Writer 时同步其写入；传感器服务观察同步状态事件，在低功耗/AOD 模式施加间隔下限，在休眠时关闭传感器但保留需求，唤醒后按剩余需求恢复。
+休眠会暂停 Power Manager 的 timer；传感器服务观察同步状态事件，在低功耗/AOD 模式施加间隔下限，在休眠时关闭传感器但保留需求，唤醒后按剩余需求恢复。
 
 ## 上层与下层责任
 

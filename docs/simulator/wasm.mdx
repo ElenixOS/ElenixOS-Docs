@@ -1,22 +1,15 @@
 ---
 sidebar_position: 3
-title: 网页运行（WASM Simulator）
+title: WASM Simulator 运行边界
 ---
 
-# 网页运行（WASM Simulator）
+# WASM Simulator 运行边界
 
 WASM 模拟器通过 Emscripten 将同一套 ElenixOS 模拟器编译为浏览器页面。在线版本位于[在线模拟器](https://simulator.elenixos.com/wasm/latest/main.html)。
 
-## 构建
+WASM 是浏览器中的辅助运行环境，不是 ElenixOS 设备固件目标；其浏览器文件系统、输入控件和可用设备能力受页面运行环境限制。板级构建目标见[板级固件构建路径](../getting_started/build)。
 
-先安装并激活 Emscripten SDK，然后在模拟器仓库根目录执行：
-
-```bash
-git clone --recursive https://github.com/ElenixOS/ElenixOS-Simulator.git
-cd ElenixOS-Simulator
-emcmake cmake -S . -B build-wasm -DEOS_PLATFORM=WASM -DCMAKE_BUILD_TYPE=Release
-cmake --build build-wasm --parallel
-```
+WASM 配置、构建和本地启动命令见[Simulator 构建与运行](./build)。该目标需要安装并激活 Emscripten SDK。
 
 构建产物位于 `build-wasm/bin/`，主要包括：
 
@@ -25,15 +18,6 @@ cmake --build build-wasm --parallel
 - `main.data`：预加载的数据文件（文件名可能随构建配置变化）
 
 WASM 构建会把系统文件目录预加载到页面的虚拟文件系统中；它不会访问宿主机的任意本地路径。
-
-## 本地运行
-
-```bash
-cd build-wasm/bin
-python3 -m http.server 8000
-```
-
-然后访问 [http://localhost:8000/main.html](http://localhost:8000/main.html)。必须通过 HTTP 服务加载，否则浏览器的模块和数据文件请求会受到 `file://` 限制。
 
 浏览器中的模拟显示为 390×450 像素，页面外壳提供表冠和侧边按钮控件。WASM 版本没有 Native 的 SDL 窗口或 FreeRTOS 运行模式。
 

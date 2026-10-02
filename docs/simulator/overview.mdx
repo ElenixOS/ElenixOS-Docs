@@ -5,22 +5,18 @@ title: 模拟器概述
 
 # 模拟器概述
 
-ElenixOS-Simulator 是面向桌面平台的独立模拟器项目，提供 Native 和 WASM 两种构建方式。
-Native 版本使用 SDL2 提供显示与输入，WASM 版本通过 Emscripten 在浏览器中运行。
-您可以在 PC 上编译并运行模拟器，以便快速迭代和调试。
+ElenixOS 是面向智能手表和资源受限穿戴设备的嵌入式操作系统。ElenixOS-Simulator 是独立的桌面开发辅助环境，提供 Native 和 WASM 两种构建方式：Native 使用 SDL2 提供显示与输入，WASM 通过 Emscripten 在浏览器中运行。
 
-本页面将介绍如何获取代码、搭建环境、编译运行以及基本使用方法。
+Simulator 适合快速迭代 UI、Application / Watch Face 和部分平台无关逻辑。它不会复现每个 Board 的驱动、传感器、功耗和时序行为，也不执行板级固件烧录。需要构建固件时，请按[Platform 与 Board 集成](../integration/overview)选择或创建工程，再从[板级固件构建路径](../getting_started/build)进入对应构建说明；需要运行桌面版本时，使用下方的 Simulator 指南。若在 VS Code 中使用 Toolkit 调试 Native Simulator，见 [Toolkit 调试流程](../development/toolkit)。
 
-## 模拟器运行方式
+Simulator 运行模型仍使用 ElenixOS 的 Application、Activity、Runtime 和 Service；窗口、WASM、headless 输入/显示和主机文件根目录属于 Simulator 平台行为。
 
-### 本地运行（Native Simulator）
+## 构建与运行入口
 
-本地运行是指在您的计算机上直接编译和运行 ElenixOS 模拟器，支持 Linux、macOS 和 Windows 操作系统。
+- [Simulator 环境准备](../getting_started/environment)：安装所选目标需要的主机依赖。
+- [Simulator 构建与运行](./build)：按 Native 或 WASM 完成配置、构建和启动。这是两种桌面目标共用的构建教程。
 
-[查看本地运行指南](./native)
+## 目标差异
 
-### 网页运行（WASM Simulator）
-
-网页运行是指通过浏览器访问 ElenixOS 模拟器，无需安装任何依赖，即可直接体验 ElenixOS。
-
-[查看网页运行指南](./wasm)
+- **Native Simulator：** SDL2 桌面窗口提供显示和硬件输入控件。运行模型、headless 调试和输入行为见 [Native Simulator 运行模型与调试](./native)。
+- **WASM Simulator：** ElenixOS 在浏览器的虚拟文件系统中运行，页面外壳模拟表冠和侧键输入。部署路径和浏览器边界见 [WASM Simulator 运行边界](./wasm)。
