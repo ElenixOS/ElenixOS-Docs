@@ -29,7 +29,7 @@ Activity 使用自己的页面状态和退出策略。页面过渡明确选择�
 
 SNI 回调记录 owner program 和 engine generation。进入回调前必须确认程序仍为活动状态、上下文未暂停且 generation 未变化；调用 JS 前进入 owner Realm。LVGL 对象删除或引擎复位后，旧 callback、旧句柄和旧 native pointer 都失效。
 
-引擎致命错误会保存错误上下文，清理受影响的程序和最近应用条目，并重建运行时。该事件表示系统已进入恢复路径；旧页面、View 和 JS 对象随原运行时失效，不能作为可恢复资源继续使用。
+引擎致命错误会保存错误上下文，销毁受影响的 SPM 程序并清理最近应用条目，再由 Script Engine Core 在当前 OS 进程内重建 JerryScript heap。Core 重建不等于崩溃程序一律自动重启：Application 和 JavaScript Watchface 进入错误处理/用户重启路径；Console fatal 会自动重建 Watchface，并按恢复条件重新启动先前的脚本应用。旧页面、View 和 JS 对象随旧引擎代次失效；捕获、重建顺序及各类型恢复路径见[脚本引擎概述](./script_engine_overview)。
 
 ## 线程与调用约束
 
@@ -53,5 +53,5 @@ Event Bus 本身不切换线程或排队：`eos_event_post` 在发布者上下�
 - [Activity](./framework/activity)：页面栈、根 Activity 和退出策略
 - [应用管理](./framework/app)：安装身份、单实例和 Recent Apps 协作
 - [脚本引擎](./script_engine_overview)：脚本包和程序行为
-- [SNI 与资源生命周期](./script_engine/sni)：脚本句柄、Realm 和原生对象边界
+- [SNI 架构与生命周期](./script_engine/sni)：脚本句柄、Realm 和原生对象边界
 - [事件总线](./kernel/event/events)：同步事件与订阅生命周期

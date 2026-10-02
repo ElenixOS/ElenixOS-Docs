@@ -57,4 +57,4 @@ Metric 的 `timestamp` 对传感器来源是采集样本的启动后单调毫秒
 - 当前 `battery.charging` 在没有有效 Battery Service 报告时仍返回 `false` 且 `valid=true`；判断电池数据是否可用时，JS 同时检查 `battery.percent.valid`。该行为是此 Metric 的特定语义，不适用于所有布尔 Metric。
 - Metric 是面向显示和脚本的语义适配层，不是所有系统数据的通用数据仓库。
 
-相关边界见[Application 契约](../../application_contract)、[传感器服务](../sensor)、[SNI 与资源生命周期](../../script_engine/sni)和[表盘系统](../../framework/watchface)。
+相关边界见[Application 契约](../../application_contract)、[传感器服务](../sensor)、[SNI 架构与生命周期](../../script_engine/sni)和[表盘系统](../../framework/watchface)。

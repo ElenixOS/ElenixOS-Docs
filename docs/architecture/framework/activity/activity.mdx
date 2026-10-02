@@ -28,6 +28,17 @@ Activity 生命周期包括进入、暂停、恢复和销毁：
 - 恢复表示同一 Activity 再次成为活动页面。
 - 销毁后，View、页面资源和 Activity 本体均不可再用。
 
+Activity lifecycle hooks 对应这些转换：
+
+| Hook | 当前触发语义 |
+|---|---|
+| `on_enter` | Activity 首次进入当前页面流程时调用一次，通常在此建立页面 View。 |
+| `on_pause` | 当前 Activity 离开前台时调用；应用子栈挂起时按从栈顶到 AppRoot 的顺序调用。它本身不决定页面是保留还是销毁，退出策略决定后续生命周期。 |
+| `on_resume` | 已进入过的 Activity 返回前台时调用；应用子栈恢复时按 AppRoot 到当前页的顺序调用。 |
+| `on_destroy` | Activity 终止时、其 View 删除和 Activity 存储释放之前调用。 |
+
+Activity 返回时选择 `DESTROY` 的路径会销毁当前页而不调用它的 `on_pause`；被返回到的页面在旧页销毁收尾后执行 `on_resume`。这些钩子描述页面生命周期，不改变 SPM 对关联脚本 Program 的独立所有权。
+
 页面过渡明确选择 `KEEP`、`DESTROY` 或 `SUSPEND`。过渡完成前，旧页面仍可能被动画快照或返回动画引用；清理必须由过渡收尾路径执行。停放的 Activity 不能使用普通直接销毁接口，驱逐时应通过 Recent Apps/按实例清理流程完成。
 
 ## 页面、脚本与对象所有权
