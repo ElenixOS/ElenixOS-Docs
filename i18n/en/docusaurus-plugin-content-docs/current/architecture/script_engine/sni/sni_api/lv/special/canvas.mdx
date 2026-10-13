@@ -5,77 +5,13 @@ sidebar_position: 4
 
 # Canvas
 
-Canvas is a special API component in ElenixOS used to draw graphics and images. This document describes the functionality, usage methods, and notes for the canvas component.
+`lv.canvas` is a canvas widget that inherits from `lv.obj`. The current binding provides `setBuffer`, `setDrawBuf`, `setPx`, `setPalette`, `getDrawBuf`, `getPx`, `copyBuf`, `fillBg`, `initBuffer`, and `freeBuffer`, as well as the `buf` and `drawBuf` properties.
 
-## Feature Introduction
-
-The canvas component allows developers to draw various graphics and images, such as lines, rectangles, circles, text, etc. Canvas components are typically used to create custom graphics, charts, games, etc.
-
-## Usage Methods
-
-### Creating Canvas
-
-Use the `new lv.canvas()` constructor to create a canvas object:
-
-```javascript
-// Create canvas object
+```js
 const canvas = new lv.canvas(eos.view.active());
+canvas.setSize(100, 100);
+canvas.initBuffer(100, 100, lv.COLOR_FORMAT_RGB565);
+canvas.setPx(10, 10, lv.color.hex(0xffffff));
 ```
 
-### Configuring Canvas
-
-Use the following methods to configure the canvas:
-
-```javascript
-// Set canvas size
-canvas.setSize(200, 200);
-
-// Set canvas position
-canvas.setPos(10, 10);
-
-// Get canvas buffer
-const buf = canvas.getBuffer();
-
-// Create drawing context
-const ctx = canvas.getContext("2d");
-```
-
-### Drawing Graphics
-
-Use the drawing context to draw various graphics:
-
-```javascript
-// Draw line
-ctx.beginPath();
-ctx.moveTo(10, 10);
-ctx.lineTo(190, 190);
-ctx.stroke();
-
-// Draw rectangle
-ctx.fillStyle = "#FF0000";
-ctx.fillRect(50, 50, 100, 100);
-
-// Draw circle
-ctx.beginPath();
-ctx.arc(100, 100, 50, 0, Math.PI * 2);
-ctx.fillStyle = "#00FF00";
-ctx.fill();
-
-// Draw text
-ctx.font = "20px Arial";
-ctx.fillStyle = "#000000";
-ctx.textAlign = "center";
-ctx.fillText("Hello", 100, 100);
-
-// Refresh canvas
-canvas.refresh();
-```
-
-### Example: Creating a Simple Canvas
-
-```javascript
-// Create canvas
-const canvas = new lv.canvas(eos.view.active());
-canvas.setSize(200, 200);
-canvas.align(lv.ALIGN_CENTER, 0, 0);
-```
+It is not an HTML canvas with an independent JavaScript 2D context; the old examples such as `getContext`, `beginPath`, and `fillRect` do not apply to the current API. The buffer is managed by the caller according to the interface contract, and the related handles cannot continue to be used after being released or deleted.

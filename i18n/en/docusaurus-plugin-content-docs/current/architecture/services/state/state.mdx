@@ -1,41 +1,14 @@
 ---
-sidebar_position: 12
+sidebar_position: 13
 title: State Service
 ---
 
-The state service is used for managing runtime persistent state, similar to the configuration service but specifically for storing runtime state information (such as battery capacity, cycle count, etc.).
+# State Service
 
-## State File Path
+The state service stores system state that must persist across runtime instances, and is distinct from the configuration service: configuration describes adjustable settings, while state records data formed during operation, such as battery capacity information.
 
-```c
-#define EOS_STATE_FILE_PATH EOS_SYS_DIR "state.json"
-```
+The service stores boolean, string, and numeric types by key, and writes state to the system state file. When reading a missing value, the caller provides a fallback value; dynamic strings and parsed JSON data are freed by the receiver according to its resource rules.
 
-## Service Initialization
+The persistence path is managed by the system storage configuration. Application scripts use isolated application configuration; the system state file is not part of the application script's configuration boundary.
 
-```c
-void eos_service_state_init(void);
-```
-
-## Boolean State
-
-```c
-eos_result_t eos_state_set_bool(const char *key, bool value);
-bool eos_state_get_bool(const char *key, bool default_value);
-```
-
-## String State
-
-```c
-eos_result_t eos_state_set_string(const char *key, const char *value);
-char *eos_state_get_string(const char *key, const char *default_value);
-```
-
-The returned string needs to be freed using `eos_free` when no longer needed.
-
-## Number State
-
-```c
-eos_result_t eos_state_set_number(const char *key, double value);
-double eos_state_get_number(const char *key, double default_value);
-```
+The state service owns system persistent state keys and values; consumers pull the current value and handle defaults, and do not write the state file directly. Persistence capability depends on the Storage/platform filesystem port; state is not an event log or an application-private configuration space. See [Application Contract](../../application_contract) and [Storage Service](../storage).

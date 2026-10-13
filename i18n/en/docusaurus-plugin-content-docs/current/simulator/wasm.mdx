@@ -1,187 +1,35 @@
 ---
 sidebar_position: 3
-title: WASM Simulator
+title: WASM Simulator Runtime Boundaries
 ---
 
-# WASM Simulator
+# WASM Simulator Runtime Boundaries
 
-ElenixOS provides a WASM (WebAssembly) version of the simulator, which you can access directly through a browser without installing any dependencies to experience ElenixOS.
+The WASM simulator compiles the same ElenixOS simulator into a browser page via Emscripten. The online version is available at [Online Simulator](https://simulator.elenixos.com/wasm/latest/main.html).
 
-Try it out online: [ElenixOS Simulator](https://simulator.elenixos.com/wasm/latest/main.html)
+WASM is an auxiliary runtime environment in the browser, not a target for ElenixOS device firmware; its browser file system, input controls, and available device capabilities are limited by the page runtime environment. For board-level build targets, see [Board-Level Firmware Build Path](../getting_started/build).
 
-## WASM Build Method
+For WASM configuration, build, and local startup commands, see [Simulator Build and Run](./build). This target requires the Emscripten SDK to be installed and activated.
 
-### Environment Requirements
+The build artifacts are located in `build-wasm/bin/` and mainly include:
 
-- **Operating system**: Linux, macOS, or Windows
-- **Build tools**:
-  - CMake (3.13+)
-  - Emscripten SDK (4.0.11 or higher)
+- `main.html`: Page entry point
+- `main.js` and `main.wasm`: Emscripten runtime code
+- `main.data`: Preloaded data file (the filename may vary with build configuration)
 
-### Install Emscripten SDK
+The WASM build preloads the system file directory into the page's virtual file system; it does not access arbitrary local paths on the host machine.
 
-1. **Download and install Emscripten SDK**
+The simulated display in the browser is 390×450 pixels, and the page shell provides crown and side button controls. The WASM version does not have the Native SDL window or FreeRTOS runtime mode.
 
-   ```bash
-   # Clone the Emscripten repository
-   git clone https://github.com/emscripten-core/emsdk.git
-   
-   # Enter the emsdk directory
-   cd emsdk
-   
-   # Install the specified version of Emscripten
-   ./emsdk install 4.0.11
-   
-   # Activate Emscripten
-   ./emsdk activate 4.0.11
-   
-   # Configure environment variables
-   source ./emsdk_env.sh
-   ```
+## Release Path
 
-### Build WASM Version
+The repository's WASM workflow deploys the build results to a path similar to the following:
 
-1. **Clone ElenixOS-Simulator repository**
-
-   ```bash
-   git clone --recursive https://github.com/ElenixOS/ElenixOS-Simulator
-   cd ElenixOS-Simulator
-   ```
-
-2. **Configure WASM build**
-
-   ```bash
-   emcmake cmake -S . -B build-wasm -DEOS_PLATFORM=WASM -DCMAKE_BUILD_TYPE=Release
-   ```
-
-3. **Build WASM artifacts**
-
-   ```bash
-   cmake --build build-wasm --parallel
-   ```
-
-4. **View build artifacts**
-
-   After building, the artifacts will be located in the `build-wasm/bin` directory, including:
-   - `main.html`: HTML entry file for the WASM simulator
-   - `main.js`: JavaScript glue code
-   - `main.wasm`: WebAssembly binary file
-   - `main.data`: Data file
-
-## Run in Browser
-
-### Local Run
-
-1. **Start local server**
-
-   ```bash
-   cd build-wasm/bin
-   python3 -m http.server 8000
-   ```
-
-2. **Access in browser**
-
-   Open your browser and visit `http://localhost:8000/build-wasm/bin/main.html` to see the ElenixOS simulator.
-
-### Access via GitHub Pages
-
-The ElenixOS-Simulator repository includes a workflow for automatically building and deploying the WASM version to GitHub Pages. After building, you can access it through the following links:
-
-`https://<owner>.github.io/<repo>/wasm/latest/main.html`
-
-## Embed in Other Pages
-
-### Direct Link
-
-If your page is hosted under the same GitHub Pages site as the WASM simulator, you can link directly:
-
-```html
-<a href="/ElenixOS-Simulator/wasm/latest/main.html" target="_blank" rel="noopener">Open ElenixOS Simulator</a>
+```text
+wasm/latest/main.html
+wasm/latest/main.js
+wasm/latest/main.wasm
+wasm/latest/main.data
 ```
 
-### Embed using iframe
-
-You can also embed the ElenixOS simulator in other pages using an iframe:
-
-```html
-<iframe
-    src="/ElenixOS-Simulator/wasm/latest/main.html"
-    width="100%"
-    height="720"
-    style="border:0"
-    loading="lazy"
-    referrerpolicy="no-referrer"
-></iframe>
-```
-
-If your page is hosted elsewhere, use the full absolute URL:
-
-```html
-<iframe
-    src="https://<owner>.github.io/<repo>/wasm/latest/main.html"
-    width="100%"
-    height="720"
-    style="border:0"
-    loading="lazy"
-    referrerpolicy="no-referrer"
-></iframe>
-```
-
-## VSCode Usage
-
-### Configure VSCode
-
-1. **Install recommended extensions**
-
-   - C/C++ extension
-   - CMake Tools extension
-   - GDB extension (for debugging)
-
-2. **Open project**
-
-   Open the ElenixOS-Simulator project with VSCode, it is recommended to directly open the workspace file `simulator.code-workspace`.
-
-3. **Configure build target**
-
-   - Press `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux) to open the command palette
-   - Type `CMake: Select a Kit` and select the Emscripten toolchain
-   - Type `CMake: Configure` to configure the project
-   - Type `CMake: Set Build Target` and select `main`
-
-### Build and Run
-
-1. **Build project**
-
-   - Press `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux) to open the command palette
-   - Type `CMake: Build` to build the project
-
-2. **Run simulator**
-
-   - After building, start a local server in the `build-wasm/bin` directory
-   - Visit `http://localhost:8000/build-wasm/bin/main.html` in your browser
-
-## Common Issues
-
-### Emscripten SDK Installation Failure
-
-- Ensure network connection is normal
-- Try using a different version of Emscripten SDK
-- Refer to the [Emscripten official documentation](https://emscripten.org/docs/getting_started/downloads.html) for installation
-
-### Build Failure
-
-- Ensure Emscripten SDK is correctly activated
-- Check if CMake version meets requirements (3.13+)
-- Ensure all submodules are correctly cloned
-
-### Browser Run Failure
-
-- Ensure using a modern browser (Chrome, Firefox, Safari, Edge, etc.)
-- Check if the browser supports WebAssembly
-- Ensure the local server is correctly started
-
-## Related Links
-
-- [ElenixOS-Simulator Repository](https://github.com/ElenixOS/ElenixOS-Simulator)
-- [Emscripten Official Documentation](https://emscripten.org/docs/)
-- [WebAssembly Official Documentation](https://webassembly.org/docs/)
+The specific site URL depends on the deployment repository and branch; when embedding in other pages, use the absolute or relative URL of the deployed `main.html`, and ensure that the JS, WASM, and data files in the same directory are accessible.

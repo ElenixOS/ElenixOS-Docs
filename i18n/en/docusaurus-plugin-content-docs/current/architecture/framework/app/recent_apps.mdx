@@ -1,0 +1,34 @@
+---
+title: Recent Apps
+sidebar_position: 5
+---
+
+
+# Recent Apps
+
+Recent Apps is the app switcher and also the retained registry of suspended script apps. It stores app IDs, App Activity, page state, snapshots, and resource estimates in most-recently-used order.
+
+## Entry and Behavior
+
+A long press of the crown opens Recent Apps; another long press on the Recent Apps page returns to the previous page. A short press of the crown enters the app list from the watch face, and performs back on ordinary pages. Selecting a Recent Apps card restores the corresponding app rather than starting a brand-new script context.
+
+## Suspension and Resumption
+
+When an app is suspended, the system retains the resumable Activity substack and page state, and pauses the program's script callback resources. On resumption, pages are reattached, and then timers and animations are resumed according to configuration:
+
+| Resource | Resumption strategy |
+|---|---|
+| Timer | Execute one missed callback, execute all missed callbacks (up to 10 catch-up firings), or skip missed callbacks and restart the timer |
+| Animation | Continue from the paused position, or jump to the end state |
+
+The Simulator by default fires at most one catch-up callback for timers that expired during suspension, and lets animations continue from the paused position.`EOS_RECENT_APPS_TIMER_STRATEGY`and`EOS_RECENT_APPS_ANIM_STRATEGY`can be adjusted in the Recent Apps group of [the kernel configuration system](../../../development/kconfig)].
+
+During suspension, whether a timer keeps running depends on its resumption strategy. Logic that requires accurate time can re-read the system time upon resumption.
+
+## Count and Eviction
+
+By default, up to 3 entries are retained, with an estimated memory high-water mark of 2.5 MiB; both can be adjusted via Kconfig. Once the count or memory high-water mark is exceeded, the system evicts entries in least-recently-used order. When an entry is evicted, the corresponding app is fully stopped, and its associated state such as the card, script resources, Activity, and snapshot is cleaned up as well.
+
+App uninstallation, script engine reset, and app stop also remove the corresponding Recent Apps entry. Entries that have already been evicted cannot be restored.
+
+Parking only describes the program/page retention policy; it does not automatically release the user_data or subscriptions of a given native Service consumer. For explicit cleanup responsibilities on the app side, see [the Application contract](../../application_contract).

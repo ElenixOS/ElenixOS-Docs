@@ -1,773 +1,94 @@
-# Script Engine
+---
+sidebar_position: 4
+title: Script Engine Overview
+---
 
-## Overview
+# Script Engine Overview
 
-ElenixOS watchfaces and applications are uniformly driven by the Script Engine, which is based on [JerryScript](https://jerryscript.net) for JavaScript code compilation and execution.
+The script runtime lets Applications and Watchfaces share a single JavaScript execution, Realm, module loading, and Native API boundary. It is coordinated by three different owners: the App/Watchface Manager selects the installed identity and Activity to open; SPM manages script program instances and their lifecycle; Script Engine Core executes JS; SNI safely connects registered capabilities and Native resources to each program Realm. The App/Watchface Manager requests program startup and resumption through SPM, and SPM is the management boundary between the program lifecycle and Script Engine Core.
 
-JerryScript is a lightweight JavaScript engine designed to run on resource-constrained devices, such as microcontrollers:
+## Core State and Program Lifecycle
 
-* The engine has very little RAM available (&lt;64 KB RAM)
-* The engine code has limited ROM space (&lt;200 KB ROM)
+Script Engine Core is a global JavaScript executor responsible for engine initialization, Realm, module resolution, execution, garbage collection, and engine-level error recovery. SPM creates a Program with an independent Realm and SNI context, and stores the installed identity, type, permissions, and the `ACTIVE`, `SUSPENDED`, `STOPPING`, `TERMINATED` lifecycle states. Core's execution state describes the current engine invocation window and is not equal to the lifecycle of a particular Program: after `main.js` finishes executing, Core can return to `IDLE` while the Program remains `ACTIVE`, and its Realm can still be re-entered through timer/event callbacks.
 
-The engine supports on-device compilation, execution, and provides JavaScript access to peripherals.
+| Layer | State it owns | State it does not own |
+|---|---|---|
+| App / Watchface Manager | Installed ID, entry selection, startup/switching flow for the corresponding Activity | JerryScript Realm and SNI Native resources |
+| SPM | Program instance, Realm association, program state, program-level errors, and callback gate | Activity page stack policy, device service policy |
+| Script Engine Core | Global engine state, JS invocation, Realm execution, module resolution, and engine generation | Application navigation, Recent Apps cards, and hardware capabilities |
+| SNI | Per-Program JS/Native API mapping, handles, and callback owner | Activity stack, service cache, and Vendor devices |
 
-Open Source URL: https://github.com/jerryscript-project/jerryscript
-
-![JerryScript LOGO](https://github.com/jerryscript-project/jerryscript/raw/master/LOGO.png)
-
-## Script Engine Basic Concepts
-
-The script engine is responsible for managing JerryScript in ElenixOS, with core functions including script parsing, running, stopping, and multi-instance management.
-
-The smallest unit that the script engine can run is a Script Program. Script programs can be divided into WatchFace and Application.
-
-```text
-Script Program
-├─ Application
-└─ WatchFace
-```
-
-### Script Working Directory
-
-The script working directory is the workspace for script program developers. The minimum script working directory structure is as follows:
-
-```text
-com.elenixos.demo
-├── main.js
-└── manifest.json
-```
-
-That is, it must contain at least two files: `manifest.json` and `main.js`.
-
-Where:
-- `main.js` is the script entry point;
-- `manifest.json` is used to describe the metadata of the script program.
-
-Developers can add script modules as needed. The module location is not restricted, as long as `main.js` can access it during import.
-
-Script programs can only access files and directories within their working directory. Accessing other locations will be blocked by the system.
-
-### Script Package
-
-The script working directory can be packaged using the `eos_pkg_builder.py` tool to generate a script package.
-
-The packaging tool will validate the structure of the target directory and generate a script package after validation passes.
-
-Currently, script packages are only used for distribution and do not include compression.
-
-### Script Program Context
-
-The script program's Context is a complete instance of a script program's run, storing data such as Realm, root Activity, and controlled resource linked list. Context is the runtime instance of Script Program and should not contain Engine global state. The lifecycle of the context depends on the type of script program - applications and watchfaces have different lifecycles.
-
-## System Architecture
-
-The Script Engine is the core module of ElenixOS, responsible for running watchfaces and applications.
-
-### Layered Architecture Design
-
-The script engine adopts a **three-layer architecture** design, dividing the system into Kernel layer, SPM layer (Script Program Manager), and SNI layer (Script Native Interface) to reduce coupling:
+When an application is retained by Recent Apps, SPM can keep its Program/Realm `SUSPENDED`; resuming restores the same instance and does not re-execute `main.js`. A new application entry runs `main.js` synchronously through SPM; this call occupies the execution context that initiated the launch, and JS does not run in parallel just because a loading Activity is shown first. Different programs cannot execute JavaScript in parallel; scheduling and suspension policy are decided by SPM/the caller.
 
 ```mermaid
-flowchart BT
-
-    subgraph application["Application Layer"]
-        direction BT
-        Watchface["Watchface"]
-        ThirdPartyApp["Third-Party Applications"]
-        SystemApp["System Applications"]
-    end
-
-    subgraph SPM["SPM Layer (Script Program Manager)"]
-        direction BT
-        Lifecycle["Lifecycle Management"]
-        Context["Context Management"]
-        Error["Error Handling"]
-        Callback["Callback Gate Validation"]
-
-        Lifecycle --> Context
-        Context --> Error
-        Error --> Callback
-    end
-
-    subgraph Kernel["Kernel Layer"]
-        direction BT
-        JerryScriptCore["JerryScript Core"]
-        Realm["Realm Management"]
-        Memory["Memory Management"]
-        Execution["Execution Control"]
-
-        JerryScriptCore --> Realm
-        Realm --> Memory
-        Memory --> Execution
-    end
-
-    subgraph SNI["Script Native Interface"]
-        direction BT
-        LVGL["LVGL UI API"]
-        ElenixOS["ElenixOS System API"]
-        SNI_TB["SNI Type Bridge Layer"]
-
-        SNI_TB-->LVGL
-        SNI_TB-->ElenixOS
-    end
-
-    application -->|Call| SPM
-    SPM -->|Delegate| Kernel
-    Kernel -->|Create-Run-Stop| Realm
-    Kernel --> SNI
-    SNI -->|Register| Realm
-    Realm --> application
+flowchart LR
+    Manager[App / Watchface Manager] -->|open / resume / suspend / stop| SPM
+    SPM -->|select program and Realm| Core[Singleton Script Engine Core]
+    Core -->|mount registered APIs| SNI[SNI]
+    SPM -->|owns| Program[Program instance + Realm + SNI context]
+    SNI -->|typed Native calls| Framework[Activity / UI / Services]
+    Framework -->|callback/result| SNI
+    SNI -->|active owner Realm| Core
 ```
 
-### Script Engine Core (SEC)
+## Package Identity and Module Loading
 
-The Script Engine Core (SEC) is responsible for managing JerryScript, Realm, GC, Module, and executing JS. It is responsible for "how to run JS" and does not know about concepts like Activity, View, WatchFace, or Application.
+Applications and watchfaces use the same EPKG v1 `.epk` container; `package_type` distinguishes Application from Watch Face, the `id` in `manifest.json` is the runtime identity, the API level is used for compatibility checks, and permission declarations are used for the authorization flow before launch. Package format, integrity verification, and installation belong to the Package/App boundary; the Script Engine receives an already-prepared program package and is not responsible for transport, installation, or uninstall UI. For the installation package structure, see [EPKG v1 Installation Package Format](./package_format); for the project and build tools, see [ElenixOS-Toolkit](../development/toolkit).
 
-The engine kernel is a single-executor model and does not support parallel execution of multiple scripts. The kernel instance must be initialized during system initialization. Correspondingly, there is only one kernel state.
+`main.js` is the program entry point. Module resolution is based on the program package path, normalizes module identifiers, and caches resolution results to maintain module instance semantics within the same program; the corresponding module state is cleaned up when the program/engine is released. Scripts can import files through the current package's module resolution mechanism, but this does not mean that a general-purpose Storage API automatically forms an application sandbox; the file access boundary is defined by the corresponding public API, see [Storage Contract](./services/storage).
 
-#### Kernel State
+## API and Native Extension Boundary
 
-```c
-typedef enum
-{
-	SCRIPT_ENGINE_STATE_RUNNING,
-	SCRIPT_ENGINE_STATE_IDLE,
-	SCRIPT_ENGINE_STATE_SUSPENDED,
-	SCRIPT_ENGINE_STATE_EXCEPTION,
-} script_engine_state_t;
-```
+Each Realm mounts the registered `lv` and `eos` APIs at creation time. SNI descriptions/bindings determine what scripts can call, how Native values are converted, who owns objects, and which Realm a callback returns to. An arbitrary C function or Vendor driver does not automatically become a script capability just because it is linked into the system; new script capabilities are selected from stable Framework/Service interfaces and explicitly registered through SNI.
 
-| State | Name | Description |
-|-------|------|-------------|
-| RUNNING | Running | Executing JS bytecode |
-| IDLE | Idle | Main program bytecode execution completed or not yet started |
-| SUSPENDED | Suspended | Script context saved, can resume execution |
-| EXCEPTION | Exception | Multiple exception states exist |
+Handle allocation, invalidation, explicit deletion, and fallback cleanup on program stop are part of the SNI contract. The types, return semantics, and lifecycle of public APIs constitute the script interface; internal handle numbering, Realm switching methods, resource linked lists, generator artifacts, and Native address mapping are implementation details. For specific ownership, suspension, and asynchronous callback rules, see [SNI Architecture and Lifecycle](./script_engine/sni).
 
-Possible exception states:
-1. Uncaught exception during bytecode execution
-2. Error when parsing source code to bytecode
-3. System-level exception caused during bytecode execution
+## Exceptions, Engine Rebuild, and Program Recovery
 
-The exception type will be recorded in the error information.
+Syntax/module errors, catchable JavaScript exceptions, and JerryScript fatal errors are different failure paths. A normal program stop ends a Program/Realm; a fatal reset rebuilds the JerryScript heap and the SNI global registration state within the current process. It does not restart the operating system process.
 
-```mermaid
-stateDiagram-v2
-    [*] --> IDLE
+### Normal stop and Core Cleanup
 
-    IDLE --> RUNNING : Execute
+When SPM normally terminates a Program, it first closes that program's callback gate, cleans up SNI references and page resources, and then calls Core stop/release Realm. Core releases the current Realm, module references, and execution state and returns to `IDLE`; the JerryScript global heap remains available for subsequent Programs. The full Core clean-up path separately calls `jerry_cleanup` and enters `UNINITIALIZED`, which is not at the same level as the normal stop of each Program.
 
-    IDLE --> EXCEPTION : Parse Error
+### Fatal reset capture and rebuild
 
-    RUNNING --> IDLE : Execution Finished
+JerryScript's fatal port returns to the recovery point via `setjmp`/`longjmp` within the fatal scope established by Core. During a Program's first run, the scope is established by `script_engine_run`; when subsequently entering JerryScript from a callback, the scope is established by the callback invocation path. Core saves the identity and error information of the crashed Program, then rebuilds the engine in the following order:
 
-    RUNNING --> EXCEPTION : Uncaught Exception
+1. Clean up the module queue, module references, Realm switching state, and current script package state held by Core.
+2. SPM marks all Programs as `STOPPING`, suspends LVGL timer dispatch, cleans up event descriptors and Sensor requests, invalidates timer/animation callbacks, cleans up Program Views, and destroys all SPM Programs and Recent Apps records.
+3. The fatal heap may still contain JerryScript handles that cannot be safely inspected or freed. The recovery path does not perform a normal SNI resource sweep; to avoid using records that are corrupted or still on the C call stack, some SNI/Native bookkeeping and resources are retained. The old SNI context shells and Program records are invalidated.
+4. Core calls `jerry_init` to reinitialize the JerryScript heap, calls `sni_init` to rebuild the SNI type and API registration state, increments the engine generation, then reopens LVGL timers and sets the Core state to `IDLE`.
+5. New Programs create new Realms, SNI contexts, and wrappers through the regular SPM startup path. Old Realms, JS values, handles, callbacks, and Programs are not restored or migrated.
 
-    RUNNING --> SUSPENDED : Suspend
+This recovery only holds within a valid fatal scope. If a JerryScript fatal occurs at a location with no active scope, or is triggered again during fatal recovery itself, the current port aborts the process and cannot transition into the rebuild flow described above.
 
-    SUSPENDED --> RUNNING : Resume
+### How applications are handled after a rebuild
 
-    SUSPENDED --> EXCEPTION : Restore Failed
+Core automatically rebuilding JerryScript does not mean that every crashed Program is automatically restarted. Program-level recovery is determined by the triggering path and the application type:
 
-    SUSPENDED --> IDLE : Stop
+| Scenario | Handling after engine rebuild |
+| --- | --- |
+| Fatal during the first launch of main.js | After `script_engine_run` completes the heap rebuild, it returns the execution error to the launcher; the launcher displays the error and handles the failure, and no separate delayed fatal event is published. |
+| Fatal in a runtime callback of an Application | Core publishes `EOS_EVENT_SCRIPT_FATAL` with a delay; the App manager displays a Restart/Exit error panel. After choosing Restart, a new Activity and a new SPM Program restart the application; the default path does not automatically restart that application. |
+| Fatal in a runtime callback of a JavaScript Watchface | The Watchface manager displays a Restart/Switch panel; after the user chooses, a new Activity and Program are rebuilt through the regular watchface switching path. |
+| Console fatal | The delayed fatal event is handled by the App manager: clean up the old Activity sub-stack and recreate the Watchface; if the foreground before the crash was a script Application, restore that application with a new Activity and a new Program. Native/System Applications are not restarted as script Programs. |
 
-    EXCEPTION --> IDLE : Reset / Reload
-```
+Fatal notifications during callback execution are published with a delay via `Dispatcher`, so that Core completes the heap rebuild and timer recovery before entering the App/Watchface handling path. SNI loses all old contexts in a global reset; for the local boundaries of handle and resource cleanup, see [SNI Architecture and Lifecycle](./script_engine/sni).
 
-:::note
-Engine state only describes "single JS execution window state", not program lifecycle.
-:::
+Ordinary `SUSPENDED`, engine `IDLE`, or catchable script exceptions are different states from a fatal reset; whether Realms, Activities, and service requirements are retained depends on the lifecycle contract of the corresponding owner.
 
-#### Script Engine Runtime
+## Execution Time and Thread Boundary
 
-The runtime is responsible for storing the global engine state of the entire script engine:
+Script Engine Core does not provide parallel JS threads. `main.js`, ordinary synchronous SNI APIs, and callbacks in `spm_call` all run on the current call stack; a timer, LVGL event, or Native async request only determines when JS is entered again, and does not turn a callback into a background thread. Native callbacks are delivered into the registered owner's Realm by a runtime context suitable for operating on JerryScript.
 
-```c
-typedef struct
-{
-	char error_info[SCRIPT_ERROR_INFO_MAX];             /**< Last run error information */
-	eos_script_error_type_t error_type;  // Error type
-    script_error_location_t error_location; /**< Error location info */
-    script_error_location_t backtrace[SCRIPT_BACKTRACE_MAX_FRAMES]; /**< Error backtrace */
-    uint32_t backtrace_count;     /**< Number of backtrace frames */
-} script_error_t;
+By default, Core limits a single synchronous JS execution to 3000 ms. JerryScript periodically calls the stop callback during VM execution, and Core checks the elapsed time based on the monotonic tick since startup; a timeout ends the current JS execution and returns to the calling path with `EOS_ERR_TIMEOUT`. Native Core can set the threshold to `0` to disable this check.
 
-typedef struct  
-{  
-	bool initialized; 
-	eos_cqueue_t *module_queue;
-	script_engine_state_t state;
-	script_program_t *current_program;
-	jerry_value_t old_realm; // OPTIONAL pending, need to determine based on JerryScript
-	
-	// Script timeout detection
-	uint32_t script_start_time;   /**< Script execution start time (tick) */
-    uint32_t script_timeout_ms;   /**< Script execution timeout (ms), 0 = no timeout */
-	script_error_t error;	
-} script_engine_runtime_t;
-```
+The stop callback only checks time while JerryScript is executing, and does not preempt a Native C function that has already been entered and is blocking. If file I/O, decoding, a Native API, or a synchronous callback occupies the current call stack for a long time, it will still delay the UI/Core main loop; whether there is a Dispatcher or a device-specific queue depends on the corresponding service contract. Therefore, execution timeout only covers the JS execution intervals that the VM can check.
 
-:::warning
-Must reset `script_start_time` when transitioning from `IDLE` to `RUNNING`
-Must reset `error` when transitioning from `EXCEPTION` to `IDLE`
-:::
+## Continue Reading by Lifecycle Topic
 
-:::note
-`EXCEPTION` indicates "execution failure", with the specific reason distinguished by `error_type`.
-:::
-
-### Engine Crash and Recovery
-
-#### Background
-
-When JerryScript encounters an unrecoverable internal error (e.g., OOM, assertion failure), it calls `jerry_port_fatal()` to terminate the process. On embedded devices, termination means a system crash. ElenixOS overrides this function to implement engine crash recovery: **reset the engine to a clean state and continue running**.
-
-Recoverable fatal errors:
-
-| Code | JerryScript Definition | Description |
-|------|----------------------|-------------|
-| 10 | `JERRY_FATAL_OUT_OF_MEMORY` | Out of memory |
-| 12 | `JERRY_FATAL_REF_COUNT_LIMIT` | Reference count limit |
-| 13 | `JERRY_FATAL_DISABLED_BYTE_CODE` | Disabled instruction executed |
-| 14 | `JERRY_FATAL_UNTERMINATED_GC_LOOPS` | GC loop limit reached |
-| 120 | `JERRY_FATAL_FAILED_ASSERTION` | Assertion failed |
-
-#### Recovery Mechanism
-
-Recovery is based on C `setjmp`/`longjmp`:
-
-```mermaid
-sequenceDiagram
-    participant JS as JavaScript
-    participant SE as ScriptEngine
-    participant Jerry as JerryScript
-
-    SE->>Jerry: script_engine_run()<br/>setjmp(recovery_point)
-    Jerry->>JS: Execute bytecode
-    JS-->>Jerry: OOM / Assertion
-    Jerry->>Jerry: jerry_port_fatal(code)
-    Jerry->>SE: longjmp(recovery_point, code)
-    Note over SE: CRITICAL ORDERING
-    SE->>SE: 1. Clean module queue & tracked modules
-    SE->>SE: 2. Destroy all SPM programs<br/>(calls cleanup_view for LVGL widgets)
-    SE->>Jerry: 3. jerry_init() — wipe & reinit heap
-    SE->>SE: 4. Increment engine_gen<br/>(invalidates stale SNI handles)
-    Note over SE: RECOVERY COMPLETE
-    SE-->>SE: return -SE_ERR_JERRY_EXCEPTION
-```
-
-**Key design points:**
-
-- **`jerry_port_fatal` is located in `ElenixOS/src/script_engine/jerry_port.c`**: A strong symbol that overrides JerryScript's weak default, performing a `longjmp` back to the setjmp recovery point in `script_engine_run()`
-- **Strict cleanup ordering**: All JS handles on the old heap must be freed **before** `jerry_init()` wipes the heap, otherwise dangling pointers occur
-- **Engine generation (`engine_gen`)**: Incremented after each recovery. SNI control blocks record the generation at creation time; `sni_node_from_native()` and `sni_obj_deleted_cb()` compare generations to detect and reject handles from stale sessions, preventing use-after-free
-
-#### LVGL Widget Cleanup
-
-When an SPM program is destroyed during engine recovery, its associated LVGL widgets are automatically cleaned up via the `cleanup_view` callback registered by the upper layer (e.g., watchface):
-
-```c
-typedef struct script_program {
-    // ...
-    void (*cleanup_view)(void *user_data);   // LVGL view cleanup callback
-    void *cleanup_user_data;                 // Callback argument (lv_obj_t *view)
-} script_program_t;
-```
-
-Triggered in:
-- `spm_terminate_program()` — normal termination
-- `spm_handle_engine_reset()` — emergency cleanup during engine crash
-
-#### Error Reporting
-
-Crash information flows to the user through:
-
-1. `_set_error_info()` in the recovery path records a string containing the crash code and description (e.g., `"Engine crash (code=10, Out of memory)"`)
-2. `spm_start_program()` saves the error to the persistent copy `s_last_error`
-3. The fault panel retrieves and displays it via `spm_get_last_error()`
-
-Fault panel example:
-```
-Code: -200
-ID: cn.sab1e.lv_example
-ErrorType: Engine crash
-Error: Engine crash (code=10, Out of memory)
-```
-
-#### Safety Guards
-
-- **Stale frame guard**: If `jerry_port_fatal` is called after the setjmp frame is gone, `abort()` is called directly to avoid longjmp to an invalid stack frame
-- **Recursion guard**: If a fatal error occurs during recovery (`fatal_recovering == true`), `abort()` is called to prevent infinite setjmp/longjmp loops
-
-#### Realm Manager
-
-The Realm Manager is a sub-module of the engine kernel, not separated into a separate file, but still holds the necessary Realm switching API. It encapsulates JerryScript's Realm operations to avoid confusion caused by multiple controls. Realm Core is a lightweight execution layer interface, only responsible for the creation, destruction, and switching of JavaScript runtime Realm, without any lifecycle semantics.
-
-Realm Manager provides Realm lifecycle management capabilities for Script Programs and serves as the system's only Realm operation entry point.
-
-### Script Program Manager (SPM)
-
-The Script Program Manager (SPM) is responsible for starting and closing script programs, switching between multiple script programs, and most importantly, managing the lifecycle of script programs.
-
-The Script Program Manager is a single-instance module with a doubly linked list internally storing non-stopped script programs.
-
-#### Script Program
-
-As introduced earlier, script programs include applications and watchfaces.
-
-##### Script Program State
-
-Script programs have the following states:
-
-```c
-typedef enum
-{
-	SCRIPT_PROGRAM_STATE_TERMINATED,
-	SCRIPT_PROGRAM_STATE_STOPPING,
-	SCRIPT_PROGRAM_STATE_ACTIVE,
-	SCRIPT_PROGRAM_STATE_SUSPENDED,
-} script_program_state_t;
-```
-
-| State | Name | Description |
-|-------|------|-------------|
-| TERMINATED | Terminated | Script program has completely stopped running, resources fully cleaned |
-| STOPPING | Stopping | Script program is stopping, callbacks are prohibited, resources are being cleaned |
-| ACTIVE | Active | Script program is alive and healthy |
-| SUSPENDED | Suspended | Script program is paused, cannot run any code of this program, but can resume to active state |
-
-```mermaid
-stateDiagram-v2
-    [*] --> ACTIVE
-
-    ACTIVE --> SUSPENDED : SuspendProgram
-    SUSPENDED --> ACTIVE : ResumeProgram
-
-    ACTIVE --> STOPPING : TerminateProgram
-    SUSPENDED --> STOPPING : TerminateProgram
-
-    STOPPING --> TERMINATED
-```
-
-Script program structure:
-
-```c
-typedef struct script_program
-{
-    // Doubly linked list structure
-	struct script_program *next;
-	struct script_program *prev;
-	
-	script_pkg_type_t type;    // Script program type
-	script_program_state_t state;    // Script program state
-	sni_context_t *sni_ctx;    // SNI context
-	script_pkg_t *script;    // Script information
-	jerry_value_t realm;    // Held Realm
-	
-	bool has_error;
-	script_error_t error;    // Script error, copied from kernel and saved
-} script_program_t;
-```
-
-#### Program Callbacks
-
-Callbacks are implemented from C to JS via `jerry_call()`.
-
-**Technically, `jerry_call()` belongs to Core.**
-**From a system entry perspective, `jerry_call()` should pass through Program Manager.**
-
-The main reason is that Script Core provides script calling capabilities.
-
-Script Program Manager is responsible for managing script program lifecycle. All callbacks must pass through Program Manager validation before entering JavaScript, and only after validation passes will it delegate to Core for execution.
-
-Therefore, before calling Core to execute, the program manager is responsible for validating the program state (ACTIVE/SUSPENDED, etc.), and after validation passes, delegates Core to execute jerry_call.
-
-### SNI Manager
-
-SNI must create a manager to manage the lifecycle of SNI contexts.
-
-SNI contexts are multi-instance because they need to support multiple script programs simultaneously.
-
-The SNI manager supports creation and destruction of SNI contexts.
-
-```c
-typedef struct sni_context
-{
-    sni_managed_resource_node_t *resource_heads[SNI_RESOURCE_CAT_COUNT];  /**< Categorized resource list heads */
-    void *event_ctx_list;                                                  /**< Event callback context linked list */
-	script_program_t *owner; // SNI context owner
-} sni_context_t;
-```
-
-#### Event Callbacks
-
-Events belong neither to Handle Object nor Value Object. On the JS side, only callbacks can be received, and the event itself cannot be obtained.
-
-The core of event callbacks lies in calling from C to JS, which is mainly achieved through the user data of the callback, enabling O(1) time complexity access.
-
-Event binding **uses linked list/doubly linked list for unified management (for lifecycle control)**
-Access path can achieve O(1) positioning through **native_ptr / user_data / control block**
-
-Event callbacks can only call the call entry provided by the program manager. The complete path is as follows:
-
-```mermaid
-flowchart TD
-A[lv_event occurs] --> B[Get binding through object]
-B --> C[Get jerry_value_t callback]
-
-C --> D{SPM validate program state}
-D -->|Allow| E[Engine execute call wrapper]
-D -->|Reject| F[Discard event]
-
-E --> G["jerry_call()"]
-```
-
-## Realm
-
-In ElenixOS, each script runs in an independent ECMAScript Realm. Realm is a concept in the ECMAScript language specification, used to implement JavaScript's multi-threaded execution environment. A Realm is a complete JavaScript runtime environment, including global objects, built-in objects, state, and APIs. The role of Realm is to isolate the runtime environments between different scripts, ensuring that scripts do not interfere with each other. The system mounts public APIs on each Realm, enabling scripts to safely access UI, system services, and hardware interfaces while maintaining the isolation of global objects, built-in objects, and state, thereby achieving a reliable and secure multi-script runtime environment.
-
-Realm can only be used in a single-threaded environment and cannot be shared across threads. Each Realm has its own global objects and built-in objects. Scripts can only access objects in their own Realm and cannot directly access objects in other Realms.
-
-## Applications
-
-Applications are divided into two categories:
-- System Applications
-- Script Applications
-
-### System Applications
-
-Written in C language, written into system firmware, cannot be deleted, and cannot be dynamically created during system runtime.
-
-Typical system applications include:
-- Settings
-- Flashlight
-
-### Script Applications
-
-Written in JavaScript, usually stored in Flash or other external storage devices, can be deleted, and can be dynamically installed and uninstalled during system runtime.
-
-### Application Lifecycle
-
-The application lifecycle is fully controlled by the script program manager and is completely bound to the root Activity.
-
-#### Application Creation
-
-When creating an application, the script program manager creates a root Activity for the application, collects the script package information `script_pkg_t` (including reading script source code and script name), then creates a script program instance and initializes its Realm. The script program enters the `ACTIVE` state and starts executing `main.js`.
-
-#### Application Suspension
-
-Currently, applications do not support suspension.
-
-#### Application Destruction
-
-When the application's root Activity is destroyed (Destroy), the script program enters the `STOPPING` state. The script program manager will call the application's `on_destroy` callback, clean up resources, and terminate the script program, finally entering the `TERMINATED` state.
-
-## Watchface
-
-Watchfaces are similar to applications.
-
-### Script Watchface Lifecycle
-
-The lifecycle of script watchfaces is fully controlled by the script program manager and supports suspension and resumption.
-
-#### Script Watchface Creation
-
-Script watchfaces are based on the system's root Activity, located at the bottom of the stack, cannot be deleted by `activity_back`, but can be replaced. The script program manager creates the script program instance for the watchface and initializes its Realm. The script program enters the `ACTIVE` state and starts executing `main.js`.
-
-#### Script Watchface Suspension
-
-When the user switches from the watchface to an application, the script program manager switches the watchface script program from `ACTIVE` state to `SUSPENDED` state, saves its context (including Realm), and releases kernel resources.
-
-#### Script Watchface Resumption
-
-When the user returns to the watchface from an application, the script program manager resumes the watchface script program from `SUSPENDED` state to `ACTIVE` state, restores its Realm and context, and reactivates the script program.
-
-#### Script Watchface Destruction
-
-Script watchface destruction only occurs during watchface switching. During switching, the script program manager first switches the current watchface script program from `ACTIVE` state to `STOPPING` state, cleans up resources, and then starts the new watchface script program.
-
-## Startup Process
-
-The startup process of the script engine is as follows:
-
-1. **During system startup**: Initialize the script engine kernel (Kernel), create a global runtime environment
-2. **During script program startup**: The Script Program Manager (SPM) creates a script program instance and requests the kernel to create a new Realm for sandbox isolation
-3. **API Registration**: The kernel automatically registers all functions and symbols in the new Realm, including LVGL UI API and ElenixOS system API
-4. **Script Execution**: The script program enters the `ACTIVE` state, the kernel starts executing `main.js`, and the script accesses functions and symbols through `eos.*` for UI drawing and system calls
-
-## Script Usage
-
-### Basic Usage
-
-Directly call LVGL functions in the script to draw UI. No additional operations are required after drawing. The system internally calls `lv_timer_handler` to perform rendering operations. The system automatically manages UI refreshing and rendering; developers only need to focus on UI creation and layout.
-
-### Script Stopping
-
-If you want to close a script, use the API provided by the script program manager. The script program manager will be responsible for cleaning up related resources and releasing the Realm.
-
-### Script Usage Notes
-
-1. **No Infinite Loops**: Scripts are prohibited from using infinite loops, as this will block the UI and cause the system to become unresponsive to user operations
-2. **Resource Management**: Objects and resources created by scripts will be automatically cleaned up when the script stops, but it is recommended to manually release resources that are no longer needed
-3. **Callback Functions**: Avoid performing time-consuming operations in callback functions to avoid affecting UI response speed
-4. **Global Variables**: Try to avoid using too many global variables to avoid occupying too much memory
-5. **Error Handling**: It is recommended to add error handling logic in critical code sections to improve script robustness
-
-## JS API Binding Layer
-
-The JS API layer is the interaction layer between the Script Engine and underlying hardware resources (such as UI drawing, sensors, peripherals). It is responsible for converting underlying hardware resources into JS APIs and binding them to Realm.
-
-### JS API Directory
-
-1. ElenixOS System API: [ElenixOS](/docs/architecture/script_engine/elenix_os)
-2. LVGL UI API: [LVGL](/docs/architecture/script_engine/lvgl)
-
-## Timeout Mechanism
-
-### Overview
-
-Since JavaScript is single-threaded, if there are infinite loops or long blocking operations in the script, the entire system will become unresponsive. To prevent this, the ElenixOS script engine implements a timeout mechanism that can automatically detect and terminate timed-out script execution.
-
-### Timeout Mechanism Principle
-
-The script engine's timeout mechanism is implemented based on JerryScript's `jerry_execution_stop_callback` mechanism. When JerryScript executes JavaScript code, it periodically calls the registered stop callback function. The script engine uses this callback to detect whether the execution time has timed out.
-
-**Timeout Detection Flow:**
-
-```mermaid
-flowchart TD
-    A[Script starts execution] --> B[Record start time]
-    B --> C{Execute JavaScript code}
-    C --> D[JerryScript calls stop callback]
-    D --> E{Check if timeout}
-    E -->|Yes| F[Set timeout flag]
-    F --> G[Switch to STOPPING state]
-    G --> H[Throw timeout exception]
-    H --> I[Terminate script execution]
-    E -->|No| J[Continue execution]
-    J --> C
-```
-
-### Core Implementation
-
-#### Timeout Detection Callback Function
-
-```c
-static jerry_value_t _vm_exec_stop_callback(void *user_p)
-{
-    (void)user_p;
-
-    if (engine_ctx.state == SCRIPT_STATE_STOPPING)
-    {
-        return jerry_string_sz("Script terminated by request");
-    }
-
-    if (engine_ctx.script_timeout_ms > 0 && engine_ctx.state == SCRIPT_STATE_RUNNING)
-    {
-        uint32_t elapsed = eos_tick_get() - engine_ctx.script_start_time;
-        if (elapsed >= engine_ctx.script_timeout_ms)
-        {
-            EOS_LOG_W("Script execution timeout (%u ms)", elapsed);
-            engine_ctx.stop_is_timeout = true;
-            _change_state(SCRIPT_STATE_STOPPING);
-            return jerry_string_sz("Script execution timeout");
-        }
-    }
-
-    return jerry_undefined();
-}
-```
-
-#### Key Data Structure
-
-```c
-typedef struct {
-    script_state_t state;         /**< Current state */
-    uint32_t script_start_time;   /**< Script execution start time (tick) */
-    uint32_t script_timeout_ms;   /**< Script execution timeout (ms), 0 = no timeout */
-    bool stop_is_timeout;         /**< Flag indicating whether stopped due to timeout */
-} script_engine_context_t;
-```
-
-### Timeout Configuration
-
-#### Default Timeout
-
-```c
-#define SCRIPT_DEFAULT_TIMEOUT_MS 3000  // Default timeout: 3 seconds
-```
-
-#### Set Timeout
-
-```c
-void script_engine_set_timeout(uint32_t timeout_ms);
-uint32_t script_engine_get_timeout(void);
-```
-
-**Parameter Description:**
-- `timeout_ms`: Timeout in milliseconds. Set to 0 to disable timeout detection.
-
-### Infinite Loop Solution
-
-#### Problem Scenario
-
-If there are infinite loops in JavaScript scripts, the script will continue to execute and cannot respond to system events:
-
-```javascript
-// Dangerous code: infinite loop
-while (true) {
-    // Perform some operations
-}
-
-// Dangerous code: long blocking
-function heavyCalculation() {
-    let result = 0;
-    for (let i = 0; i < 1000000000; i++) {
-        result += i;
-    }
-    return result;
-}
-```
-
-#### Solution
-
-The timeout mechanism solves the infinite loop problem in the following ways:
-
-1. **Periodic Detection**: JerryScript calls the stop callback after executing a certain number of bytecodes
-2. **Time Judgment**: Calculate the time difference from the start of script execution to the current time in the callback
-3. **Timeout Handling**: If the time difference exceeds the set timeout:
-   - Set `stop_is_timeout` flag to true
-   - Switch the script state to `SCRIPT_STATE_STOPPING`
-   - Return error information, JerryScript will throw an exception to terminate execution
-4. **Error Handling**: After the system catches the timeout exception, it calls `eos_app_handle_script_error` to handle the script error
-
-#### Timeout Handling Flow
-
-```mermaid
-sequenceDiagram
-    participant Script as JavaScript Script
-    participant Engine as Script Engine
-    participant Jerry as JerryScript Core
-    participant System as System Service
-
-    Script->>Engine: Execute script
-    Engine->>Engine: Record start time
-    Engine->>Jerry: jerry_run()
-
-    loop Bytecode execution loop
-        Jerry->>Engine: Call stop callback
-        Engine->>Engine: Calculate elapsed time
-        alt Not timed out
-            Engine-->>Jerry: Return undefined, continue execution
-        else Timed out
-            Engine->>Engine: Set stop_is_timeout = true
-            Engine->>Engine: Switch state to STOPPING
-            Engine-->>Jerry: Return error message
-            Jerry-->>Engine: Throw exception
-            Engine->>System: Call eos_app_handle_script_error()
-            Note over System: Error type: EOS_SCRIPT_FAULT_UNRESPONSIVE
-            Note over System: Error code: SE_ERR_TIMEOUT
-        end
-    end
-```
-
-### Error Types
-
-The script engine defines specific timeout error types:
-
-| Error Type | Error Code | Description |
-|------------|------------|-------------|
-| `EOS_SCRIPT_FAULT_UNRESPONSIVE` | `SE_ERR_TIMEOUT` | Script execution timeout/unresponsive |
-| `EOS_SCRIPT_FAULT_ERROR_EXCEPTION` | `SE_ERR_JERRY_EXCEPTION` | Script execution exception |
-
-### Timeout Detection Timing
-
-Timeout detection occurs at the following times:
-
-1. **When script starts execution**: Record start time `script_start_time`
-2. **When callback function is called**: When the script resumes execution from suspended state, re-record the start time
-3. **JerryScript periodic callback**: Regular detection during execution
-
-### Best Practices
-
-#### Avoid Long Blocking
-
-```javascript
-// Not recommended: blocks main thread for a long time
-function processData(data) {
-    for (let i = 0; i < data.length; i++) {
-        // Process each data item
-        heavyProcessing(data[i]);
-    }
-}
-
-// Recommended: process in batches using timer
-function processDataAsync(data, index = 0) {
-    if (index >= data.length) return;
-
-    // Process only a small portion each time
-    const batchSize = 100;
-    for (let i = index; i < Math.min(index + batchSize, data.length); i++) {
-        heavyProcessing(data[i]);
-    }
-
-    // Continue processing in the next event loop
-    setTimeout(() => processDataAsync(data, index + batchSize), 0);
-}
-```
-
-#### Use LVGL Timer Component (SNI)
-
-For computationally intensive tasks, it is recommended to use the LVGL Timer component to split tasks into multiple small tasks to avoid blocking the main thread. By executing in batches through timers, UI responsiveness can be maintained.
-
-```javascript
-// Use LVGL Timer for time-consuming operations
-function heavyTask(data, total, current = 0) {
-    // Number of items processed per frame
-    const chunkSize = 100;
-    let processed = 0;
-
-    // Process current batch
-    for (let i = current; i < current + chunkSize && i < total; i++) {
-        // Execute single processing
-        processItem(data[i]);
-        processed++;
-    }
-
-    // Update progress
-    const newCurrent = current + processed;
-
-    if (newCurrent < total) {
-        // Create timer to continue processing in next frame
-        const timer = new lv.timer();
-        timer.setCb(() => {
-            heavyTask(data, total, newCurrent);
-            timer.delete(); // Delete timer after completion
-        });
-        timer.setPeriod(0); // Execute as soon as possible (in next LVGL tick)
-        timer.start();
-    } else {
-        // Task completed
-        eos.console.log("Heavy task completed");
-    }
-}
-
-// Usage example
-const largeData = generateLargeData();
-heavyTask(largeData, largeData.length);
-```
-
-#### Set Appropriate Timeout
-
-Adjust the timeout based on actual script requirements:
-
-```c
-// For simple UI scripts, use default timeout
-script_engine_set_timeout(3000);  // 3 seconds
-
-// For scripts requiring long calculations, extend timeout appropriately
-script_engine_set_timeout(10000); // 10 seconds
-
-// Disable timeout detection (not recommended)
-script_engine_set_timeout(0);
-```
+- [Application / Framework Contract](./application_contract): installation identity, launch, suspension, resumption, and program stop.
+- [Runtime](./runtime): system-level relationships among Activity, View, events, thread contexts, and platform initialization.
+- [SNI Architecture and Lifecycle](./script_engine/sni): JS handles, callbacks, asynchronous requests, and teardown ordering.
+- [Platform / Vendor Contract](./platform_contract): device and service boundaries beneath the script API.

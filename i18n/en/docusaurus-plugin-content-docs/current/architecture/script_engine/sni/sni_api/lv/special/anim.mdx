@@ -5,77 +5,19 @@ sidebar_position: 7
 
 # Animation
 
-Animation is a special API component in ElenixOS used to create and manage animation effects. This document describes the functionality, usage methods, and notes for the animation component.
+`lv.anim` is a script-configurable LVGL animation object:
 
-## Feature Introduction
-
-The animation component allows developers to create and manage various animation effects, such as position changes, size changes, transparency changes, etc. Through the animation component, developers can add vivid visual effects to applications, improving user experience.
-
-## Usage Methods
-
-### Creating Animations
-
-Use the `new lv.anim()` constructor to create an animation object:
-
-```javascript
-// Create animation object
+```js
 const anim = new lv.anim();
-```
-
-### Configuring Animations
-
-Use the following methods to configure animations:
-
-```javascript
-// Set animation target object
+anim.init();
 anim.setVar(obj);
-
-// Set animation value range
-anim.setValues(startValue, endValue);
-
-// Set animation duration (milliseconds)
-anim.setDuration(1000);
-
-// Set animation execution callback
-anim.setExecCb((varObj, value) => {
-    // Execute animation logic, such as setting position, size, etc.
-    varObj.setX(value);
-});
-
-// Set animation completion callback
-anim.setReadyCb(() => {
-    eos.console.log("Animation completed");
-});
-
-// Set animation path (easing function)
-anim.setPathCb(lv.anim_path_ease_in_out);
-```
-
-### Starting Animations
-
-Use the `start()` method to start the animation:
-
-```javascript
-// Start animation
+anim.setValues(0, 100);
+anim.setDuration(300);
+anim.setCustomExecCb((_anim, value) => obj.setX(value));
+anim.setPathCb(anim.pathEaseInOut());
 anim.start();
 ```
 
-### Example: Creating a Translation Animation
+After construction, `init()` must be called before setting the variable and other parameters. The current binding provides methods for animation initialization, variable, duration/delay, start/end values, custom execution callback, path callback, ready/delete callbacks, play, repeat, and `start`; path functions are provided as instance methods such as `pathLinear`, `pathEaseIn`, `pathEaseOut`, `pathEaseInOut`, and return built-in path values that can be passed to `setPathCb`. The custom execution callback receives `(anim, value)`, and typically operates on the object to be updated through a closure. The global `lv.anim_path_ease_in_out` and `setExecCb` in the old examples are not the current interface names.
 
-```javascript
-// Create an object
-const obj = new lv.obj(eos.view.active());
-obj.setSize(100, 100);
-obj.setPos(50, 50);
-
-// Create animation
-const anim = new lv.anim();
-anim.setVar(obj);
-anim.setValues(50, 200);
-anim.setDuration(1000);
-anim.setExecCb((varObj, value) => {
-    varObj.setX(value);
-});
-anim.setPathCb(lv.anim_path_ease_in_out);
-anim.start();
-```
+Animation callbacks execute in the LVGL main loop. After the Activity/View or the script context to which the animation belongs is destroyed, the animation handle becomes invalid; when the application is suspended, Recent Apps continues or jumps to the end state according to the animation resume policy.

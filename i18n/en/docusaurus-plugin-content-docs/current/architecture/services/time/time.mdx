@@ -1,22 +1,12 @@
 ---
-sidebar_position: 13
+sidebar_position: 14
 title: Time Service
 ---
 
-The time service provides functionality to get the system time.
+# Time Service
 
-## Service Initialization
+The time service provides the system and applications with a unified view of date and time. The platform time port is responsible for reading the current time, and the service converts it into a common date-time representation and reports initialization or read errors.
 
-```c
-eos_result_t eos_service_time_init(void);
-```
+Consumers should obtain the system time through the time service, and should not access the platform clock themselves or assume that all platforms have the same time zone and time synchronization source.
 
-Returns `EOS_OK` on success, or an error code on failure.
-
-## Get System Time
-
-```c
-eos_datetime_t eos_time_get(void);
-```
-
-Returns the current date and time with millisecond precision.
+Time reading is a synchronous pull: the Core calls the registered time device and obtains a value returned in the common date-time type; when the time device does not exist, the caller cannot assume that a valid time is available. The Platform is responsible for the clock source, RTC/time synchronization, and conversion, and the Core does not provide an asynchronous time update stream. For the responsibilities of the upper and lower layers, see the [Application Contract](../../application_contract) and the [Platform/Vendor Contract](../../platform_contract).

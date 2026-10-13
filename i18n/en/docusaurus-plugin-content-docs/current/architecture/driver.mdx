@@ -1,0 +1,42 @@
+---
+sidebar_position: 7
+title: Platform Port and Driver
+---
+
+
+# Platform Port and Driver
+
+Platform Port is the integration layer that consumes ElenixOS Core; it implements the port/device contract declared by Core and connects BSP, Vendor SDK, interrupts, DMA, clocks, file system, and GUI/HAL to the OS. The port header files in the Core repository describe the interfaces; chip-specific implementations belong to the actual platform engineering.
+
+## What the platform provides to Core
+
+The integration project first prepares the execution environment required by the OS (clocks, critical sections/scheduling, memory, file system, and LVGL display/input), then registers the device operations that the target actually has, and initializes services before the relevant services are enabled. Core does not guess on behalf of the platform which Vendor drivers exist, nor does it have a unified discovery, hot-plug, or shutdown scheduler covering all devices.
+
+There are two categories of operation direction:
+
+- Core/Service synchronously calls Device ops to request actions such as enable, sample rate, display/power settings, audio open/submit, etc. Platform operations should be bounded and return quickly; if the work is slow, queue it to a platform task and then report the result through that device contract.
+- The platform pushes samples/status to Core, or pulls real-time values when Core calls. Vendors need to convert hardware units and board-level coordinates into OS common data semantics before reporting, and propagate invalid/error states as specified.
+
+## Responsibilities drivers must not have
+
+- Do not decide cross-consumer sample rates, volume/power business policies, or application permissions on behalf of the Service.
+- Do not directly execute application/JS callbacks, do not create or destroy Activity/View, and do not touch LVGL/JerryScript.
+- Do not assume that another platform implementation has the same capabilities as this board; missing optional operations must be identifiable, and call failures must be returned/reported according to the device contract.
+- Do not retain borrowed buffers beyond the owner's lifecycle; asynchronous DMA/tasks must stop and confirm no further access before Core reclaims memory or shuts down the device.
+
+## Interrupts, tasks, and callbacks
+
+Vendor callbacks do not automatically switch to a unified thread. Device ops are usually executed in the synchronous call context of the initiating service; Event Bus callbacks execute synchronously in the publisher's context; the Dispatcher queues short tasks to the Core main loop. Sensor reports enter Native consumers synchronously on the call stack of`eos_sensor_notify`; battery report changes also publish events synchronously. Therefore, the ISR can handle acquisition or queuing; if the downstream chain is not confirmed as a whole to be ISR-safe, the platform needs to defer first, then call the entry point that dispatches consumers.
+
+Various operations have different execution contexts: Time's pull, Platform control operations, Battery acquisition, and Sensor sample publishing each follow their own conventions.`callback`in function names does not mean the operation is necessarily asynchronous or thread-safe; platform ports handle context and buffer requirements according to the corresponding documentation.
+
+## Data/error propagation```mermaid
+flowchart LR
+    HW[SoC / Sensor / Codec / Display] -->|原始值、状态| Adapt[Vendor Driver / Adapter]
+    Adapt -->|规范化后的契约数据| Device[Device / Port API]
+    Device --> Service[Core Service]
+    Service -->|值、有效性、错误、事件| App[Framework / Application]
+    Service -->|同步操作请求| Device
+```Synchronous operation errors are returned along the call result; asynchronous devices update status or submit data in the reporting path. A sample value of zero is not a fault flag; it is necessary to distinguish between no sample yet, stale sample, device error, and a legitimate zero value. The fact that a feature is available in a software simulator does not mean the target hardware has implemented it.
+
+Sensor coordinate/time/sampling requirements, Audio buffering, Display/Power states, and device registration order are defined by [platform port contract](./platform_contract); the Device operation table and capability lifecycle are described in [device contract](./device_architecture_design).

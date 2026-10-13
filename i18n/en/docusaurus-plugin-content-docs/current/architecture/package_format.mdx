@@ -1,0 +1,167 @@
+---
+sidebar_position: 2
+title: EPKG Package Format
+---
+
+
+# EPKG v1 Package Format
+
+This page defines the **Package Contract** for ElenixOS packages: what a package is, which logical regions it contains internally, and how the system interprets them. Currently, applications and watch faces use the same EPKG v1`.epk`container. The package format is part of the ElenixOS system contract; the OS's Package Manager / Installer / Loader and development tools all read or generate packages according to this contract. The official VS Code tool ElenixOS-Toolkit implements project initialization, package building, and analysis workflows on the development side, and the format contract is independent of the plugin. For specific workflows, see [ElenixOS-Toolkit](../development/toolkit).
+
+The "region" here refers to a **Package Region / Logical Region**, i.e., a logical region inside the package file, and does not refer to Flash, FAT, file system, or storage device partitions. The installer extracts the files in the package to the system installation directory, which is a subsequent installation storage behavior and is different from the region division within the package.
+
+## Logical Structure```mermaid
+flowchart TB
+    Package["EPKG v1 package (.epk)"]
+    Header["Package Header<br/>必需，固定 60 字节"]
+    FPMA["FPMA / Fast Preview Metadata<br/>必需，固定 32 字节"]
+    FileTable["File Table<br/>目录项和文件项索引"]
+    FileData["File Data Region<br/>按条目顺序连续存放文件数据"]
+    Manifest["manifest.json<br/>必需，固定预览前缀"]
+    Icon["icon.bin<br/>可选，固定预览前缀"]
+    OtherFiles["main.js、脚本与静态资源<br/>普通文件条目"]
+    Signature["Signature Region<br/>格式预留；当前 v1 包不含此区域"]
+
+    Package -->|从 offset 0 开始| Header
+    Header -->|后续 offset 60| FPMA
+    FPMA -->|后续 offset 92| FileTable
+    FileTable -->|结束后开始| FileData
+    Package -.->|预留，v1 不包含| Signature
+    FileData --> Manifest
+    FileData --> Icon
+    FileData --> OtherFiles
+```The EPKG v1 package header, FPMA, File Table, and File Data are the actual format structures.`manifest.json`and`icon.bin`are files within the File Data Region that have fixed positional semantics, not independent binary container layers. The current format has no separate code region, resource region, image preview region, or second resource index: scripts and resources are stored as ordinary file entries and cataloged by the File Table; FPMA provides the location, size, and checksum values of the manifest and optional icon for fast preview.
+
+| Content | Current Requirement |
+|---|---|
+| Package Header, FPMA, File Table, File Data | Required for EPKG v1; the manifest is a required file, so the file table contains at least one file entry. |
+|`manifest.json`| Required at the root path, located at the start of the preview prefix, using`NONE`. |
+|`icon.bin`| Optional at the root path; if present, located at a fixed preview position after the manifest and using`NONE`. |
+| Directory entries and other files | Optional; enumerated by the File Table. The application still requires the files needed at runtime, such as the root path`main.js`. |
+| Signature Region | Reserved for future format; current v1 packages do not contain this region, and the signature offset / size must be zero. |
+
+## Package Header and Version
+
+The Package Header identifies the package format with a fixed magic`EPKG`, and`format_version`independently indicates the format version, currently`1`. The v1 package header starts at file offset`0`and is fixed at 60 bytes; FPMA is fixed to start at offset`60`with a length of 32 bytes, the File Table is fixed to start at offset`92`, and the package header's`data_offset`points to the start of File Data, i.e., the end of the File Table. The package header also describes the package type, entry count, total data size before and after compression, and`header_crc32`. These fixed offsets and dynamic lengths allow the Loader to locate subsequent regions without scanning the file contents; readers parse explicit little-endian fields and do not rely on C struct layout.
+
+All integers are unsigned little-endian. The offsets in the table below are relative to the start of the package file, and fields must be serialized item by item and cannot be written directly into a C struct with compiler padding:
+
+| Offset | Field | Length | v1 Meaning |
+|---:|---|---:|---|
+| 0 |`magic`| 4 | ASCII`EPKG`. |
+| 4 |`format_version`| 4 | Fixed to`1`. |
+| 8 |`header_size`| 4 | Fixed to`60`. |
+| 12 |`package_type`| 4 |`1`Application,`2`Watch Face. |
+| 16 |`flags`| 4 | Fixed to`0`; unknown bits are rejected. |
+| 20 |`file_count`| 4 | Number of File Table records, including directory entries. |
+| 24 |`fpm_offset`| 4 | Must equal`header_size`, i.e.,`60`. |
+| 28 |`fpm_size`| 4 | Fixed to`32`. |
+| 32 |`table_offset`| 4 | Must equal`fpm_offset + fpm_size`, i.e.,`92`. |
+| 36 |`data_offset`| 4 | Start position of File Data, i.e., the end position of the File Table. |
+| 40 |`signature_offset`| 4 | Fixed to`0`for the current unsigned v1. |
+| 44 |`signature_size`| 4 | Fixed to`0`for the current unsigned v1. |
+| 48 |`total_stored_size`| 4 | Sum of`stored_size`for all file entries. |
+| 52 |`total_original_size`| 4 | Sum of`original_size`for all file entries. |
+| 56 |`header_crc32`| 4 | Package header CRC-32; set this field to zero before calculation. |`package_type`is installation routing information:`1`indicates Application,`2`indicates Watch Face. It is not application metadata and is not duplicated in the manifest. The header's ordinary`flags`must be zero in v1. The installer uses this to invoke the application or watch face installation path; stable identity and display information come from the in-package`manifest.json`. If the unknown format version, type, flag bits, region positions, or header checksum do not conform to the v1 contract, the current parser rejects the package.
+
+The package header also records`signature_offset`and`signature_size`. For the current unsigned v1 package, these two values must be`0`. They are format extension points for appending an independent signature region in the future and do not mean that the current package is signed.
+
+## FPMA Fast Preview Region
+
+Immediately following the package header is the fixed 32-byte`FPMA`(Fast Preview Metadata Area). Its`fpm_version`is independent of the EPKG`format_version`, currently`1`. FPMA describes the original length and CRC-32 of the required manifest and optional`icon.bin`; flag bit 0 indicates the icon is present, and the remaining flag bits must be zero in v1. The current parser limits the manifest and icon to 1 MiB each.
+
+The FPMA field offsets are relative to the start of FPMA, and the integers are also unsigned little-endian:
+
+| Offset | Field | Length | v1 Meaning |
+|---:|---|---:|---|
+| 0 |`magic`| 4 | ASCII`FPMA`. |
+| 4 |`fpm_version`| 4 | Fixed to`1`, independent of the EPKG format version. |
+| 8 |`area_size`| 4 | Fixed to`32`. |
+| 12 |`flags`| 4 | bit 0 indicates the presence of`icon.bin`; other bits must be zero. |
+| 16 |`manifest_size`| 4 | Original byte count of the root path`manifest.json`. |
+| 20 |`icon_size`| 4 | Original byte count of`icon.bin`;`0`when absent. |
+| 24 |`manifest_crc32`| 4 | CRC-32 of the original manifest bytes. |
+| 28 |`icon_crc32`| 4 | CRC-32 of the original icon bytes;`0`when absent. |
+
+The fixed preview prefix at the start of File Data is as follows:```mermaid
+flowchart LR
+    ManifestPrefix["data_offset<br/>manifest.json 原始字节"] --> IconPrefix["data_offset + manifest_size<br/>icon.bin 原始字节（如存在）"]
+    IconPrefix --> OtherData["data_offset + manifest_size + icon_size<br/>其余文件数据"]
+```FPMA does not store or copy the application ID, name, version, permissions, or API information; these are read only from the manifest. The preview read path can thus quickly obtain identity information and the icon without first decoding the ordinary payload.
+
+## Manifest, Identity, and Type`manifest.json`is a required root-path UTF-8 JSON object. EPKG v1 requires non-empty strings`id`,`name`,`version`,`author`,`description`, and requires`minApiLevel`,`targetApiLevel`to be 16-bit unsigned integers.`id`is the stable identity key used by the application or watch face during installation and runtime, and must match`[A-Za-z0-9][A-Za-z0-9._-]*`; the API level field provides the compatibility range, checked by the corresponding application or watch face installation path. Other manifest fields such as`permissions`are read by the existing manifest / permission layer according to their definitions and are not copied into the package header.
+
+The package type is determined solely by the header's`package_type`, and the manifest does not need a separate type field. The icon has only one fixed source: the optional root-path file`icon.bin`. The manifest must not use a`icon`field to point to an alternative icon. Application and Watch Face share the same container; different package types do not change the internal region layout.
+
+## File Table and File Data
+
+The File Table is located after FPMA and before File Data, and contains directory and file records according to the count provided by`file_count`. Each record starts with a fixed 28-byte prefix, describing the relative path, entry type, per-file codec, data offset, stored length, original length, and original file CRC-32; the record itself carries the path bytes, and its length must be at least enough for the fixed record prefix and the path, then aligned to a four-byte boundary and padded with zero bytes. The entry type indicates an ordinary file or directory; the codec value for`NONE`is`0`, and`LZ4_BLOCK`is`1`. The entry flags in v1 must be zero. The File Table itself has no independent overall CRC field.
+
+The offsets within a record are relative to the start of that record; the`data_offset`in the record is an absolute offset relative to the start of the package file. The field layout is as follows:
+
+| Offset Within Record | Field | Length | Meaning |
+|---:|---|---:|---|
+| 0 |`record_size`| 4 | Total length of this record, at least`28 + path_len`, aligned to 4 bytes. |
+| 4 |`path_len`| 4 | Byte count of the following UTF-8 path, excluding the NUL terminator. |
+| 8 |`entry_type`| 1 |`0`ordinary file,`1`directory. |
+| 9 |`codec`| 1 |`0``NONE`,`1``LZ4_BLOCK`. |
+| 10 |`flags`| 2 | Fixed to`0`in v1. |
+| 12 |`data_offset`| 4 | Absolute offset of the file data in the package;`0`for directory entries. |
+| 16 |`stored_size`| 4 | Stored byte count in the package;`0`for directory entries. |
+| 20 |`original_size`| 4 | Original byte count after decoding;`0`for directory entries. |
+| 24 |`crc32`| 4 | CRC-32 of the original file bytes;`0`for directory entries. |
+| 28 |`path`|`path_len`| UTF-8 relative path bytes, without a NUL terminator. |
+| Following | Zero padding | As needed | Pad to`record_size`; padding values must be zero. |
+
+The path must be a safe relative path, using`/`as the separator, and must satisfy the following conditions:
+
+- Must not start or end with`/`; must not contain backslash`\`, NUL, or control bytes.
+- Must not have empty path components, and must not have`.`or`..`components; duplicate paths must not appear in the File Table.
+- The path is encoded in UTF-8, and its byte length must be less than`EOS_FS_PATH_MAX`, so that a NUL terminator can be reserved in the target buffer.
+
+The`data_offset`,`stored_size`,`original_size`, and`crc32`of directory records must all be zero; directory records may be present or absent.`NONE`files must satisfy`stored_size == original_size`. File data is arranged contiguously in File Table order: the first file starts at the package header's`data_offset`, and each subsequent file immediately follows the end position of the previous file; empty files may occupy a zero-length range at the current cursor. All file ranges must be within the file data region, and the final cursor must equal the end of the file data; the sum of the individual file sizes must also match the total size fields in the package header.
+
+The reference builder writes records in the following order:`manifest.json`, (if present)`icon.bin`, directory entries, and other files; the latter two categories are sorted lexicographically by normalized path. Readers process by the offset and path in the record and should not infer content from the package file name.
+
+The current read/write implementation of EPKG v1 also imposes the following capacity limits. Out-of-bounds packages are rejected by the Builder, or return a format error during OS/Toolkit validation; they are not accepted by truncating paths or ignoring extra entries. The target file system must also accommodate the installation directory prefix and the in-package relative path; the path length allowed by the format does not mean that every target can combine or store it. For Core path buffer limits, see [Storage Service Paths](./services/storage).
+
+| Item | Limit | Description |
+|---|---:|---|
+| File Table entry count | 1024 | Both files and directories count toward`file_count`. |
+| Path | Less than 256 bytes | Calculated as the byte count of the UTF-8 encoded relative path. |
+|`manifest.json`| 1 MiB | FPMA fast preview also needs to read the full manifest. |
+|`icon.bin`| 1 MiB | The icon is an optional file; packages exceeding the limit are not accepted for preview/build. |
+| Single LZ4 raw data block | 16 KiB | Large files are split into multiple raw LZ4 blocks; this is not the overall file size limit. |
+
+The various length, offset, and cumulative size fields in the package are 32-bit unsigned values, so the storage range of EPKG v1 is limited by the 32-bit offset/length fields; the target file system, RAM, available Flash, and the decompression buffer during installation may also impose smaller practical limits.`manifest.json`must be the first file entry of File Data and use`NONE`; the optional`icon.bin`immediately follows and also uses`NONE`. Other files may use`NONE`per file or a bounded`LZ4_BLOCK`, with each LZ4 raw data block limited to 16 KiB. A`LZ4_BLOCK`file consists of consecutive block records, and each block has the following format:
+
+| Offset Within Block | Field | Length | Meaning |
+|---:|---|---:|---|
+| 0 |`raw_block_size`| 4 | Decoded original block length, at most 16 KiB. |
+| 4 |`compressed_block_size`| 4 | Byte count of the following raw LZ4 block. |
+| 8 | raw LZ4 block |`compressed_block_size`| LZ4 block data; LZ4 frame is not used. |
+
+Each block uses a safe LZ4 block decoder, and the decoded result must exactly equal the block's declared`raw_block_size`. The sum of the original lengths of all blocks must equal the entry's`original_size`; the sum of all block headers and compressed bytes must equal`stored_size`. The reference builder's`auto`strategy selects`LZ4_BLOCK`only when the compressed result together with the block header is smaller than the original file; otherwise it writes`NONE`. Decoding uses bounded compressed and original buffers and does not allocate the entire file for decompression.
+
+The stored length of a`NONE`file equals the original length.`LZ4_BLOCK`is a storage encoding, not a runtime compressed file system: the complete checksum and installation decode file by file, and the installation result is ordinary files. The data of an unsigned v1 package must be contiguous to the end of the file, with no extra regions or padding at the end.
+
+EPKG v1 has no independent Program / Payload region and no additional Resource Index. The root path`main.js`is the script entry point used by the current Application / Watch Face Runtime; like the application's other scripts and static resources, it is an ordinary file indexed by the File Table. Successful format parsing or a previewable manifest does not by itself guarantee that a runnable entry point exists in the package or that the script is executable.
+
+## Verification and System Interpretation Flow
+
+All checksum fields use CRC-32/ISO-HDLC, i.e.,`zlib.crc32(data) & 0xffffffff`: initial value`0xffffffff`, reflected polynomial`0xedb88320`, final XOR`0xffffffff`, serialized as little-endian`uint32_t`. The Header CRC is calculated over the complete 60-byte package header, but the`header_crc32`field at offset 56–59 is zeroed before calculation; FPMA's manifest/icon CRC is calculated over the respective original bytes; the File Table's file CRC is calculated over the decompressed original file bytes. The current format has no overall package CRC or checksum that can replace a signature. CRC is used to detect whether the corresponding data matches the recorded value and does not prove the source or publisher identity of the package.
+
+When the OS Package Manager opens a package, it checks the EPKG magic / version, Header CRC, fixed region positions, FPMA, File Table structure, path safety, data boundaries, and total length relationships. The preview path reads the manifest and optional icon, which can only indicate that these preview contents are readable. The formal installation path for an Application / Watch Face also parses the manifest, checks the type and API compatibility, fully verifies the file payload and CRC, and then selects the corresponding installation directory according to`package_type`and unpacks. Therefore, successful preview, completed transfer, or file existence cannot replace full installation verification.
+
+The installation package defines deployment data and installation identity, and does not define the application's Realm, page lifecycle, permission grant results, or runtime API behavior; these boundaries are described in [Application and Framework Contract](./application_contract), [Application Management](./framework/app), and [Watch Face System](./framework/watchface).
+
+## Current Contract and Signature Status
+
+| Status | EPKG v1 Capability |
+|---|---|
+| Currently implemented | EPKG v1 Header and FPMA; Application / Watch Face types; manifest identity and API metadata; File Table and safe paths; optional`icon.bin`; per-file`NONE`/`LZ4_BLOCK`; Header, manifest, icon, and file CRC; preview, full verification, and unpacking during installation. Both the OS and Toolkit interpret packages according to the same format. |
+| Format reserved but not yet implemented |`signature_offset`/`signature_size`in the package header, and a signature region that can be appended after the file data, using the`SIGN`magic and an independent`signature_version`. The current Toolkit does not generate valid signatures; neither the OS Loader / Installer nor the Toolkit parser performs full signature verification, and both reject non-zero signature offset / size. |
+
+Therefore, the signature region is a format-level extension reservation, not a currently dependable security mechanism. The current version has no complete signature generation, signature verification, or trust source determination chain; EPKG v1 packages should be regarded as unsigned packages. This document does not define keys, algorithms, certificates, or trust policies not yet specified in v1.
+
+Official application and watch face projects are usually built by [ElenixOS-Toolkit](../development/toolkit)into installation packages conforming to this contract. The Toolkit provides the build and analysis entry points; the package's stable regions, field semantics, and Loader constraints are defined by this page.

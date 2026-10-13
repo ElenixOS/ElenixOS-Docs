@@ -12,8 +12,8 @@ ElenixOS 采用 Kconfig 管理内核编译期配置。最终生效的取值由�
 脚本 `kconfig.py genconfig` 对以下三层以 `replace=True` 方式合并，**后载入的值覆盖先载入的值**：
 
 1. Kconfig 内置 `default` 声明 — 内核定义的基线默认值
-2. `defaults.conf` — 受版本控制的文件，为当前项目设定基线
-3. `build/.config` — 不受版本控制，存储经由 `menuconfig` 产生的本地修改
+2. 项目 `defaults.conf` — 为当前平台/产品设定基线；Simulator 的文件位于 `main/src/config/defaults.conf`
+3. 构建目录 `.config` — 本机构建目录保存的 `menuconfig` 修改，优先级最高
 
 合并产物写入 `build/generated/eos_config_gen.h`，每个值与 native 宏名一一对应，以 `#ifndef` 守卫输出。
 
@@ -26,7 +26,27 @@ ElenixOS 采用 Kconfig 管理内核编译期配置。最终生效的取值由�
 3. `eos_config_gen.h` — Kconfig 合并产物（可选，由构建自动生成）
 4. `eos_config_defaults.h` — 内核兜底默认值
 
-任一阶段均可阻止后续阶段的定义生效，形成从构建命令行到内核回退的完整覆盖链。
+任一阶段均可阻止后续阶段的定义生效，形成从构建命令行到内核回退的完整覆盖链。比如 Simulator 的 Native CMake 配置会把 `EOS_SYS_ROOT_DIR` 编译宏设为仓库 `fs/` 目录，优先于 Kconfig 中的 `/` 默认值。
+
+## Simulator 常用默认值
+
+下表列出 Simulator 项目 `main/src/config/defaults.conf` 当前采用的、会影响日常开发或运行的默认值。它们表示未被本机构建目录 `.config` 覆盖时的 Simulator 基线；其他 BSP 可有不同的项目默认值。
+
+| Kconfig 项 | Simulator 默认值 | 影响与调整入口 |
+|---|---:|---|
+| `EOSCFG_COMPILE_MODE_DEBUG` | 开启 | Core 以 Debug 编译模式运行；可在 `menuconfig` 的 Build & Compilation 中切换 Release。 |
+| `EOSCFG_MEM_STDLIB` / `EOS_OVERRIDE_LVGL_STDLIB_MALLOC_ENABLE` | 开启 / 关闭 | Core 默认使用 C 标准分配器；Simulator 默认不把 LVGL 的 stdlib 分配器替换为 EOS allocator。Memory 菜单可切换。 |
+| `EOS_MEM_TRACK_ENABLE` / `EOS_MEM_TRACK_TABLE_SIZE` | 配置值为开启 / 4096 项 | 这两个符号目前没有 Core 源码消费者，因此修改它们不会启停或限制当前的 allocation tracking；`eos_mem.c` 目前独立记录分配统计。 |
+| `EOS_CACHE_ENABLE` / `EOS_CACHE_SIZE` / `EOS_CACHE_HEADER_COUNT` / `EOS_CACHE_USE_DEDICATED_MEM` | 开启 / 524288 字节 / 16 项 / 关闭 | LVGL 图片解码缓存预算为 512 KiB，另有最多 16 个缓存头记录；Simulator 不使用专用缓存内存池。Image cache 菜单可调整预算与数量。内核 Kconfig 原始预算为 393216 字节，Simulator 项目默认将其覆盖为 524288 字节。 |
+| `EOSCFG_FONT_TTF` / `EOSCFG_FONT_TTF_FILE` | 开启 / 开启 | 默认从文件系统加载 TrueType 字体；`EOS_FONT_TTF_FILE_PATH` 为 `font.ttf`，相对于系统字体资源目录。大/中/小字体默认 30/26/22 px。可在 Font 菜单更换字体来源、路径和字号。 |
+| `EOS_DISPLAY_WIDTH` / `EOS_DISPLAY_HEIGHT` / `EOS_DISPLAY_RADIUS` | 390 / 450 / 80 px | 默认模拟屏幕几何尺寸；窗口缩放不改写系统显示坐标。Display 菜单可设定目标面板参数。亮度配置范围默认 5–100。 |
+| `EOSCFG_FS_POSIX` / `EOS_FS_PATH_MAX` / `EOS_LVGL_FS_LETTER` | POSIX / 256 字节 / `Z` | 默认文件系统接口、路径缓冲上限和 LVGL 文件盘符。配置值 `90` 对应盘符 `Z`，需与 LVGL 的 `LV_FS_DEFAULT_DRIVE_LETTER` 匹配。File system 菜单可调整。 |
+| `EOSCFG_LANG_EN` | 开启 | Simulator 首次启动的默认界面语言为 English；Language 菜单可改为简体中文。 |
+| `EOS_USE_ASSERT` / `EOS_LOG_ENABLE_STD` / `EOS_LOG_MAX_LISTENERS` / `EOS_LOG_USE_COLOR` | 开启 / 开启 / 8 个 / 关闭 | 默认开启断言和标准输出日志监听器，最多登记 8 个日志 listener；日志最低级别由运行时日志服务管理，启动值为 `DEBUG`。Listener 表满时注册返回 `-1`。Logging 菜单控制断言、stdout listener、容量和颜色输出。 |
+| `EOS_RECENT_APPS_ENABLE` / `EOS_RECENT_APPS_MAX` / `EOS_RECENT_APPS_MEM_HIGH_WATERMARK` | 开启 / 3 个 / 2621440 字节 | 最多保留 3 个挂起应用，估算内存高水位为 2.5 MiB；达到限制后按 LRU 驱逐。Timer 恢复默认补发一次遗漏回调，动画从暂停点继续。Recent Apps 菜单可调整。 |
+| `EOS_ENABLE_TEST_APP` | 开启 | 在 Simulator 中包含内建测试应用；可在 Miscellaneous 菜单关闭。 |
+
+本机构建目录中的 `.config` 会覆盖表中的 Simulator 默认值。若需要确认某个具体构建的最终配置，可查看该目录下的 `.config` 和 `generated/eos_config_gen.h`；CMake `-D` 参数及平台配置宏还可能在预处理阶段覆盖生成值。
 
 ## 操作
 
@@ -34,8 +54,8 @@ ElenixOS 采用 Kconfig 管理内核编译期配置。最终生效的取值由�
 
 | 目标 | 操作 |
 |------|------|
-| `make` / `make build` | `cmake --build build`（CMake 按需自动重配置） |
-| `make menuconfig` | 编辑 `build/.config`（`cmake -B build && cmake --build build --target menuconfig`） |
+| `make` / `make build` | 构建已经配置好的 `build/` 目录 |
+| `make menuconfig` | 编辑 `build/.config` 并刷新该构建目录的 `generated/eos_config_gen.h`（`cmake -B build && cmake --build build --target menuconfig`） |
 | `make run` | 构建并运行 |
 
 ### 依赖安装
@@ -64,7 +84,7 @@ cmake --build build-wasm --target menuconfig    # 编辑 build-wasm/.config
 
 ## 与 CMake 选项的边界
 
-CMake 选项（`-DUSE_FREERTOS=ON` 等）控制构建行为——编译单元、链接目标、编译标志。Kconfig 选项控制内核运行时行为——内存策略、文件系统类型、字体引擎、日志策略等。二者作用于不同阶段，不存在功能重叠。
+CMake 选项（如 `EOS_PLATFORM`、`USE_FREERTOS` 和可选 LVGL 后端）控制平台、依赖、编译单元和链接行为。Kconfig 管理内存策略、文件系统类型、字体、日志和 Recent Apps 等编译期配置宏。两者入口不同，但 CMake `-D` 编译定义可能优先覆盖同名 Kconfig 宏；Simulator 的 `EOS_SYS_ROOT_DIR` 是一个实际例子。运行 `menuconfig` 会保存 `.config` 并更新已配置构建目录的生成头文件；直接编辑 `.config` 后则重新运行 `cmake -B build`。
 
 ## CI 行为
 

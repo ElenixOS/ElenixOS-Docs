@@ -1,0 +1,96 @@
+---
+sidebar_position: 3
+title: Platform / Vendor Porting Contract
+---
+
+
+# Platform / Vendor Porting Contract
+
+Platform porters implement the port/device operations declared by Core and register available devices before consumer services start. Core already provides device state, service policies, data caching, unit semantics, application APIs, and lifecycle management; Vendor provides chip access, board-level conversion, interrupt/DMA/RTOS glue, and non-portable HAL. Board-level implementations should not duplicate service policies, nor expose raw driver interfaces to applications.
+
+## Startup and Registration Protocol
+
+Core does not have a unified`port_init`, generic device`init/deinit`, or runtime hot-plug protocol covering all Vendors. Platform integration is responsible for preparing infrastructure and devices, then initializing services that depend on these devices, and finally entering Core initialization and the main loop.```mermaid
+sequenceDiagram
+    participant Host as Platform Integration
+    participant Port as Vendor Port
+    participant Device as Device Registry
+    participant Service as OS Service
+    participant Core as eos_init / Main Loop
+
+    Host->>Port: 初始化时钟、显示/输入、FS、线程/临界区
+    Port->>Device: 注册已实现的设备操作与能力
+    Host->>Service: 初始化依赖设备的服务
+    Host->>Core: eos_init()
+    loop 每次系统循环
+        Host->>Core: eos_main_loop()
+    end
+```Device registration must precede initialization of services that bind device instances. Sensor Service in particular requires explicit initialization: currently`eos_init()`does not call it, and platform integration must initialize the service after sensor registration and before Sensor API usage. When Sensor Service initializes, it binds the current default device of each type to the service instance; devices registered afterward will not automatically be taken over by that instance. There is also currently no unified deregistration, replacement, failover, or device hot-plug path.
+
+Device initialization failure does not necessarily prevent system startup: currently`eos_init()`calls Battery Service initialization but does not check its failure result, while Sensor Service is initialized separately by the integration project. Core can still run without a battery, but battery status is invalid; without sensors, corresponding requirements or reads fail, or there are no samples. Therefore,`eos_init()`returning only indicates that the initialization process completed, not that all device services are available; the platform checks initialization results and capabilities as needed for the target product.
+
+Operation tables for different device types are not a unified template. Successful registration means Core saved the implementation entry point, not that the device has actually started, is available, or that subsequent operations will necessarily succeed. Vendor should keep the operation table and its referenced state valid for at least the entire registration period; currently device registration has no paired generic deregistration protocol.
+
+## Control Direction, Data Direction, and Implementation Responsibility
+
+| Capability | Core-initiated control requests | Data / status returned by Vendor | Platform responsibility and optional capabilities |
+|---|---|---|---|
+| Sensor | Sensor Service calls enable/disable and set-rate according to aggregated demands; effective operation changes only when demand reaches zero or power policy changes. | Vendor delivers each sample to the service with common type, unit, coordinate system, and monotonic timestamp since boot; the service copies samples, updates FIFO/latest, and broadcasts synchronously. |`init/deinit`are also in the operation table, but the current Service does not call them; the target port is responsible for hardware initialization/shutdown after registration. Multiple instances are allowed to register, but the service currently fixes one default instance selected at initialization for each type, with no runtime priority or failover. |
+| Battery | Battery Service calls`request_update`at initialization and when the LVGL timer expires; this call occurs in the Core calling context, and Vendor should return quickly and move slow reads to its own safe execution context. | Vendor obtains percentage, voltage, current, and charging status, then calls Core to report; Core updates valid status, history, and change events. Change events are broadcast synchronously in the calling context of`report_raw`. | Battery percentage must come from a reliable platform value; Core does not infer it from voltage on behalf of Vendor. When there is no valid report, applications read an invalid status. If reported from an ISR, all event subscribers also execute synchronously in that context, and they cannot be assumed to be in the UI main loop. |
+| Display / Power | Display and PM services call registered brightness and power operations; calls are initiated synchronously in the service path. | Device status is reported by the platform via the device status interface; PM events represent Core software state changes. | LVGL display driver, scanout, and pointer/encoder input are provided by platform graphics/HAL integration. Display device ops are not a framebuffer output API. Some display operations have no unified error return; PM software state cannot be treated as hardware confirmation. |
+| Speaker | Audio Player synchronously opens sample format, borrows output buffer, submits PCM, pauses/resumes/stops. | The speaker implementation consumes submitted PCM; playback progress, drain, and EOF notifications are optional ops. | The speaker is independent of the microphone and can be missing separately. Which PCM sample rates/channels/bit depths are supported is indicated by whether the device reports success; Core does not provide generic resampling. |
+| Microphone | Audio Service opens format, hands the shared ring buffer to the device, starts/stops DMA, and reads the write cursor. | Vendor produces PCM into the shared buffer, and the Service consumes and writes to the target file. | The buffer is created by the Service and released after closing the device and stopping DMA; Vendor must not continue writing after stopping. Optional initialization, gain, and other capabilities cannot be assumed to exist. |
+| Time | Time Service performs synchronous reads on the device. | Vendor returns the current date-time value. | Core does not specify the RTC chip, time calibration source, or timezone source; the target platform must provide data conforming to the common date-time representation. |
+| Haptic | Haptic Service maps feedback intent to device intensity and on/off. | Currently only one-way control exists; there is no vibration sample stream that applications can subscribe to. | The on/off operation is void; the current Service has no per-pulse success/failure confirmation, and no complete missing-device capability API. Applications cannot confirm that physical feedback actually occurred. |
+| Input | The platform registers LVGL display/indev at startup; knob and key adapters report physical actions to the Core input path. | Pointer events enter LVGL indev; crown/side keys enter Crown/Chrome/PM through their respective input entry points. | This is not a unified input Provider or Event Bus protocol. Touch, crown knob, crown key, and side key have different delivery paths; only inputs available on the current target need to be registered. |
+| Storage | Core/Service performs synchronous file, directory, and path operations on the filesystem port. | The filesystem returns content, handles, and error codes. | The platform provides the actual filesystem and an optional virtual root; this root mapping is not an application isolation policy. Caller path restrictions are implemented in higher-layer APIs. |
+
+This table describes directions and does not define a lifecycle common to all devices: Battery is requested by Core and reported by Vendor; Sensor has sampling demands issued by Core and samples pushed by Vendor; Time is pulled by Core; audio includes both Core control and continuous PCM production/consumption. Porting implementations follow the corresponding device contract, and each device retains its Push/Pull model.
+
+## Sensor Data Protocol```mermaid
+sequenceDiagram
+    participant Consumer as Native Consumer
+    participant Service as Sensor Service
+    participant Device as Sensor Device
+    participant Vendor as HAL / Sensor Driver
+
+    Consumer->>Service: 建立订阅或采样需求
+    Service->>Device: 需求聚合后的 enable / set-rate
+    Device->>Vendor: 调用注册的操作
+    Vendor-->>Service: 上报标准样本和采集时间戳
+    Service->>Service: 复制、限速、缓存 FIFO/latest
+    Service-->>Consumer: 同步 Push 回调
+    Consumer->>Service: 取消订阅 / 释放需求
+    Service->>Device: 重算所有剩余需求
+```Sensors are required to report in the units and coordinates defined by the Core common data contract; timestamps are monotonic milliseconds since platform boot, not UTC.`eos_sensor_notify`copies the input parameters, but then synchronously executes consumer callbacks in the caller's context, and the sample pointer is valid only until the callback returns. Therefore, samples obtained from an ISR must first be delivered to a task or main loop that can safely run Core/consumer callbacks, and then the notification entry point is called. The hardware FIFO capabilities listed in the sensor device header are currently not wired and consumed by Sensor Service; the platform should read the hardware FIFO itself and report sample by sample, unless the current target integration separately implements the complete path.
+
+Reporting identifies samples by Sensor Type, without a registered device name or instance ID; the Service cannot distinguish multiple sources of the same type at notification time. Therefore, current multi-instance registration is mainly used for device lookup and does not constitute aggregation of multiple Providers of the same type. One Sensor Type should have the default instance bound by the Service as the active source.
+
+The effective period is the shortest period among all Native subscriptions, algorithm requests, and compatible demands, further limited by the minimum interval policy of the power mode; it is not a hardware ODR guarantee. The frequency that Sensor Service sends to the device is obtained by integer conversion and may be limited by the device's own discrete frequencies. Releasing a demand ID only removes that consumer and must not directly disable the device; Core disables the default device only when remaining demand is zero or policy prohibits enabling.
+
+## Capabilities, State, and Fault Propagation
+
+- Required/optional operations are defined separately by each device type; some registration entry points validate required operations, while others only validate the registration object.`NULL`indicates unsupported only when that type is explicitly marked optional; there is no unified validator. Optional operations are handled by the Service according to defined fallback/error paths and are not indicated as supported by silent success.
+- Device state distinguishes unregistered, ready, busy, and error, but how each type changes state is defined by its contract; there is no global device state machine or automatic reconnection mechanism.
+- Synchronous device operations can return errors and be mapped by the Service; asynchronous data sources propagate results through reported values, validity, or state changes. Vendor should not submit seemingly valid zero samples on error.
+- Sensor data publication and Battery reports synchronously enter Core consumer/event callbacks. Interrupts only complete acquisition and queuing; if consumers may access LVGL, the filesystem, or JS, publication must be executed in an appropriate task context.
+- LVGL pointer, display refresh, touch, crown, and side key initialization belong to the platform GUI/HAL path;`eos_dev_display`device operation tables do not cover these responsibilities.
+
+Different devices currently have different strengths of error propagation, and the system has no unified confirmation model:
+
+| Path | Currently observable result | Current limitation |
+|---|---|---|
+| Sensor | Demand acquisition can report no device, invalid state, etc.; Vendor can report Device status; invalid samples are reflected in no samples/timestamps. | enable/disable/set-rate operations are void; the notification entry point ignores uninitialized, uncached, or illegal type data, with no per-sample error receipt. |
+| Battery | The Service retains invalid status; after receiving a qualified report, it updates the snapshot and emits change events according to thresholds. |`request_update`is void; there is no unified request ID, failure callback, or timeout event. |
+| Display / Vibrator | Registration status and current Service requests are observable. | The main physical action operations are void; there is no per-operation hardware completion/failure confirmation. |
+| Power | Device`set_power`has a return value. | PM Service currently ignores this return value and does not roll back the updated software state; failures do not become a unified hardware error that applications can subscribe to. |
+| Speaker / Microphone | Operations can return synchronous results; Audio Service maps startup-phase failures to service results. | Asynchronous device failures after playback/recording starts have no unified completion error event. |
+| File system | Each file operation returns a port/service result or an invalid handle. | The result represents that file operation, not that a higher-layer application transaction was atomically committed. |
+
+Vendor should accurately implement the defined reporting paths and must not fake a "hardware success" signal when there is no confirmation channel. If a capability requires reliable asynchronous confirmation, a contract with request ownership, completion/failure, and cancellation semantics should first be established for that Device/Service.
+
+## Contracts Not Yet Defined by Current Interfaces
+
+Platform porting needs to verify buffer lifecycle and error semantics. The current speaker`borrow`/`enqueue`operations expose the buffer acquisition and submission steps, but the device header does not fully define ownership transfer or reuse timing of the buffer after submission; this semantics has not yet formed a cross-platform guarantee. The target port and its tests can explicitly verify current implementation behavior, but until a stable public guarantee is formed, this item remains undefined behavior.
+
+Similarly, most Display hardware operations have no return value, and PM Service first updates Core software state and then requests the power device; the software state or events observed by applications do not prove that physical power switching succeeded. Device status and target platform diagnostics are used to observe actual faults, and Core does not provide hardware success confirmation.

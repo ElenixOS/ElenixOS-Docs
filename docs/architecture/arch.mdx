@@ -1,383 +1,186 @@
+---
+title: 系统架构
+---
+
 # 系统架构
 
-## 整体架构
+ElenixOS 由可移植的 Core 和平台集成组成。Core 定义应用模型、程序与页面管理、系统服务、设备契约及基础运行接口；平台集成把这些接口连接到具体 SoC、BSP、Vendor HAL 和硬件。应用依赖 Core 提供的公开模型与能力，不依赖某个芯片或驱动。平台差异收敛在接口实现和设备能力中，由对应契约传达给 Core。
 
-ElenixOS 采用分层架构设计，从底层到上层依次为硬件层、驱动层、设备管理器、服务层、框架层和应用层。系统内核功能整合到框架层中，包括脚本引擎、事件系统和 Activity 管理等核心组件。这种架构设计使得系统具有良好的可移植性和可扩展性。
+脚本 Application 和 Watch Face 以安装包作为部署单元。EPKG 格式契约定义安装身份、程序与资源文件的封装方式以及校验边界；Installer / Loader 按契约校验并解包，运行时消费安装后的应用身份和文件。EPKG 是开发工具与系统安装器共同使用的 Package Contract，不属于运行时或 Platform 的私有格式。格式定义见 [EPKG v1 安装包格式](./package_format)，应用运行模型见[应用管理模块](./framework/app)。
+
+理解 ElenixOS 时，应把它看作多个相互协作、但由不同 owner 管理的架构域，而不是单一的“应用调用驱动”层链。下图给出主要关系：Program/Runtime、Activity/UI 和系统服务是 Core 中不同的部分；虚线表示平台实现 Core 定义的接口；数据与状态可以沿控制请求的反方向返回。
 
 ```mermaid
-flowchart BT
-
-    subgraph L1["应用层"]
-        direction BT
-        WATCHFACE["表盘系统"]
-        APP["第三方应用"]
-        SYSAPP["系统应用"]
+flowchart TB
+    subgraph APP["应用与安装身份"]
+        NativeApp["内建 Native Application"]
+        JSApp["JavaScript Application"]
+        Package["EPKG 安装包<br/>部署单元"]
     end
 
-    subgraph L2["内核层"]
-        direction BT
-
-        subgraph R1["系统服务子系统"]
-            direction BT
-            DISPATHCER["事件调度"]
-            ANIM["动画系统"]
-            EVENT["事件系统"]
-            ACTIVITY["活动控制器"]
-            LANG["多语言支持"]
-            PKG["软件包管理器"]
+    subgraph CORE["ElenixOS Core"]
+        Installer["Package Installer / Loader<br/>校验与解包"]
+        subgraph FRAMEWORK["Framework 与 UI"]
+            AppAPI["Application Framework<br/>应用/表盘管理与公开模型"]
+            Activity["Activity Controller<br/>根页面、页面栈与导航"]
+            View["Activity-owned View<br/>LVGL UI"]
         end
 
-        subgraph R2["脚本运行子系统"]
-            direction BT
-            subgraph SE["Script Engine"]
-                direction BT
-                JERRY["JerryScript"]
-                REALM["Realm隔离"]
-            end
-            subgraph SPM["SPM层"]
-                direction BT
-                SPM_LIFECYCLE["生命周期管理"]
-                SPM_CONTEXT["上下文管理"]
-                SPM_ERROR["错误处理"]
-            end
-            subgraph SNI["SNI接口层"]
-                direction BT
-                SNI_SERVICE["服务API"]
-                SNI_UI["UI组件API"]
-                SNI_EVENT["事件API"]
-            end
+        subgraph SCRIPT["Program 与 JavaScript Runtime"]
+            SPM["SPM<br/>Program 生命周期 owner"]
+            Program["Program Instance<br/>Realm 与程序资源"]
+            Engine["Script Engine<br/>执行 JavaScript"]
+            SNI["SNI<br/>已注册的 eos / lv bindings"]
         end
 
-        UI["内置UI控件"]
+        Services["System Services<br/>系统状态、策略与共享能力"]
+        Device["Device Abstraction<br/>按设备类型定义的契约"]
+        Port["Platform Port Contracts<br/>文件系统、内存、临界区等"]
+        Infra["Core 基础设施<br/>初始化、主循环、事件与调度支持"]
     end
 
-    subgraph L3["服务层"]
-        direction BT
-        SENSOR_SERVICE["传感器服务"]
-        DISPLAY_SERVICE["显示服务"]
-        BATTERY_SERVICE["电池服务"]
-        PM_SERVICE["电源管理服务"]
-        HAPTIC_SERVICE["触觉服务"]
-        TIME_SERVICE["时间服务"]
-        STORAGE_SERVICE["存储服务"]
-        CONFIG_SERVICE["配置服务"]
-        STATE_SERVICE["状态服务"]
-        LOG_SERVICE["日志服务"]
+    subgraph DEV["开发工具"]
+        Toolkit["VS Code Extension<br/>ElenixOS-Toolkit"]
     end
+    Contract["EPKG Package Contract"]
 
-    subgraph L4["设备管理器"]
-        direction BT
-        DEV_MGR["设备管理器"]
-        SENSOR_DEV["传感器设备"]
-        DISPLAY_DEV["显示屏设备"]
-        BATTERY_DEV["电池设备"]
-        POWER_DEV["电源设备"]
-        TIME_DEV["时间设备"]
-        VIBRATOR_DEV["震动器设备"]
+    subgraph PLATFORM["Platform Integration"]
+        Integration["平台适配与设备注册<br/>port 实现、设备适配器"]
+        Vendor["BSP / SoC / Vendor HAL<br/>硬件驱动与平台后端"]
     end
+    Hardware[(硬件与平台资源)]
 
-    subgraph THIRD_PARTY["依赖库"]
-        direction BT
-        LVGL["LVGL"]
-        JERRYSCRIPT["JerryScript"]
-        OtherSW["Other Libraries"]
-    end
+    Toolkit -.->|Build| Package
+    Package -.->|Analyze| Toolkit
+    Contract -.->|定义包格式| Package
+    Package -->|安装包| Installer
+    Installer -->|校验、解包后的身份与文件| AppAPI
+    NativeApp -->|Native Framework / Service API| AppAPI
+    NativeApp -->|公开 Service API| Services
+    JSApp -->|应用身份与脚本| SPM
+    AppAPI -->|创建或恢复脚本实例| SPM
+    SPM -->|拥有并管理| Program
+    Program -->|在 Realm 中运行| Engine
+    Engine -->|调用已注册绑定| SNI
+    SNI -->|eos API| AppAPI
+    SNI -->|eos API| Services
+    SNI -->|lv API| View
+    AppAPI -->|页面协调| Activity
+    Activity -->|拥有页面 View| View
+    AppAPI -->|公开服务能力| Services
+    Services -->|设备操作请求| Device
+    Integration -.->|实现并注册| Device
+    Integration -.->|实现| Port
+    Integration -.->|图形与输入集成| View
+    Vendor --> Integration
+    Integration --> Hardware
+    Hardware --> Integration
+    Integration -->|数据与设备状态| Device
+    Device -->|契约数据与结果| Services
+    Infra -.->|支撑| AppAPI
+    Infra -.->|支撑| Services
 
-    subgraph L5["驱动层"]
-        direction BT
-        SENSOR_DRIVER["传感器驱动"]
-        DISPLAY_DRIVER["显示驱动"]
-        BATTERY_DRIVER["电池驱动"]
-        POWER_DRIVER["电源驱动"]
-        TIME_DRIVER["时间驱动"]
-        VIBRATOR_DRIVER["震动器驱动"]
-        FS_DRIVER["文件系统驱动"]
-    end
-
-    subgraph L6["硬件层"]
-        direction BT
-        MCU["MCU / SoC"]
-        BLUETOOTH["Bluetooth"]
-        SENSORS_HW["传感器硬件"]
-        STORAGE["存储器"]
-        DISPLAY_HW["显示与输入"]
-        PMIC["电源管理芯片"]
-    end
-
-    L6 --> L5
-    L5 --> L4
-    L4 --> L3
-    L3 --> L2
-    L2 --> L1
-    THIRD_PARTY --> L2
-    L5 --> THIRD_PARTY
+    SPM -.->|程序实例与页面关联；各自管理生命周期| Activity
 ```
 
-## 模块依赖关系
+## 核心架构思想
 
-### 核心模块依赖图
+- **Core 与平台实现分离。** Core 面向自身定义的 port 和设备契约；平台工程实现这些契约并接入 SoC/BSP。Core 和应用不以 Vendor 类型或寄存器接口作为依赖。
+- **应用与硬件隔离。** 应用通过 Framework 和公开 Service API 使用系统能力。脚本应用只能经 SNI 访问已注册的 Native API。应用不直接调用设备操作表或驱动。
+- **策略与机制分离。** Service 保有系统状态、共享策略和跨消费者协调；设备契约规定 Core 与平台实现之间的操作和数据语义；平台负责实际硬件操作与平台后端。
+- **对象按 owner 管理。** Program、Activity/View、Service 状态和平台注册设备有各自的生命周期 owner。一个对象被另一层引用或关联，不意味着所有权转移。
+- **能力按契约表达。** 平台能力并不假定处处相同。能力缺失、操作失败或数据无效的表达由相应设备类型和 Service 契约定义；上层按公开结果处理。
+- **上层依赖稳定边界。** Application、Service 扩展和平台移植分别经 Framework/Service API、Core 扩展点、Device/port 契约进入系统，不把平台差异传播到应用模型。
 
-```mermaid
-graph TD
-    subgraph 应用层
-        AppMgr["应用管理"]
-        WatchfaceMgr["表盘管理"]
-        SystemApp["系统应用"]
-        ThirdPartyApp["第三方应用"]
-    end
+## 架构域
 
-    subgraph 内核层
-        ScriptEngine["脚本引擎"]
-        UIModule["UI模块"]
-        EventSystem["事件系统"]
-    end
+| 架构域 | 解决的问题与主要对象 | 不负责什么 |
+|---|---|---|
+| Application 与安装身份 | 表示内建 Native 应用或已安装脚本应用的稳定身份、manifest 和文件。EPKG 是交付/安装单元；Installer 校验并解包后，Application Framework 管理已安装身份与资源。 | 不等同于一次运行实例、一个 Activity 或一棵 View。包内区域定义见[EPKG v1 安装包格式](./package_format)。 |
+| Program 与 JavaScript Runtime | 对脚本应用创建和管理 Program Instance、Realm、SNI context，并执行 JavaScript。SPM 管程序生命周期，Script Engine 执行脚本，SNI 提供受控的 JS/Native 边界。 | 不管理全局 Activity 页面栈，也不代替 Service 的系统策略。内建 Native 应用通常没有 SPM Program。 |
+| Activity 与 UI | 表示系统根页面、导航页面及其进入、暂停、恢复和销毁；Activity Controller 管理页面关系，Activity 拥有其 View，View 根植于 LVGL 对象树。 | 不拥有 JavaScript Realm；Activity 不是 Program 的别名。 |
+| Application Framework | 提供面向应用的高层模型，并协调应用/表盘身份、启动入口、页面导航及公开系统能力。它把 Program 管理交给 SPM，把页面关系交给 Activity Controller。 | 不直接实现芯片驱动，也不接管 Service 或页面对象的生命周期。 |
+| System Services | 为系统和应用提供共享能力，并在需要时持有状态、缓存、策略、需求仲裁或调度。Native Framework 可使用公开 Service API，脚本应用经 SNI 使用已注册的对应 API。 | 不提供某块板子的硬件实现；Service 的策略不应搬到 Vendor 驱动中。 |
+| Device Abstraction 与 port 接口 | Device Contract 按设备类型定义 Core 与设备实现间的操作、状态和数据边界；port contract 提供文件系统、内存、临界区等平台基础接口。 | 不定义应用语义，也不意味着所有设备共用一种注册、热插拔或关闭流程。 |
+| Platform Integration | 组合平台启动、port 实现、设备注册、设备适配器和 BSP/Vendor 后端，将 Core 契约接到目标硬件。 | 不决定应用权限、页面切换、Program 状态或 Service 策略。 |
+| Core 基础设施 | 为 Core 子系统提供初始化、主循环、内存、事件和调度等通用支撑。 | 不替代应用/页面/设备 owner，也不构成所有异步行为都适用的统一队列。 |
 
-    subgraph 服务层
-        SensorService["传感器服务"]
-        DisplayService["显示服务"]
-        BatteryService["电池服务"]
-        PMService["电源管理服务"]
-        StorageService["存储服务"]
-    end
+图中的 Core 边界由 Framework/UI、Program Runtime、Services、Device Abstraction、port contracts 和基础设施共同构成。Device 与 port 接口属于 Core 的抽象面；接口的具体实现位于 Platform Integration。某项设备操作是否可选、缺失如何发现、状态如何回报，则看该类型自己的契约，不能从一张通用注册图推导。
 
-    subgraph 设备管理器
-        DeviceManager["设备管理器"]
-        SensorDevice["传感器设备"]
-        DisplayDevice["显示屏设备"]
-        BatteryDevice["电池设备"]
-        PowerDevice["电源设备"]
-    end
+## Application、Program、Activity 与 View
 
-    subgraph 驱动层
-        SensorDriver["传感器驱动"]
-        DisplayDriver["显示驱动"]
-        BatteryDriver["电池驱动"]
-        PowerDriver["电源驱动"]
-        FileSystemDriver["文件系统驱动"]
-    end
+这几个概念描述不同阶段和不同对象：
 
-    subgraph 硬件层
-        Hardware["硬件"]
-    end
+| 概念 | 含义 | 主要 owner |
+|---|---|---|
+| Package | EPKG 安装容器，包含安装身份 metadata、入口脚本和随包文件。安装会校验并展开其内容。 | Package / Installer |
+| Installed Application | 已安装并可由稳定 ID 发现、排序和启动的应用身份及文件。内建 Native Application 可以不以脚本包安装。 | Application Framework |
+| Program Instance | 一次脚本应用或表盘的可执行实例，关联稳定应用 ID、实例 ID、Realm 和 SNI context。相同 ID 不并行建立第二个未终止脚本实例。 | SPM |
+| Activity | 一个系统或应用页面及其在根页面/页面栈中的状态。一个 Activity 通常拥有一个页面 View。 | Activity Controller 与所属页面流程 |
+| View | Activity 的 LVGL 页面根对象及其 UI 子树。父对象删除可使子对象及引用句柄失效。 | Activity / LVGL 对象树 |
+| JS Realm | Program 执行 JavaScript 的隔离上下文。SNI 在此 Realm 中安装受支持的 Native bindings。 | Program / SPM 与 Script Engine 协作 |
 
-    subgraph 第三方库
-        LVGL["LVGL"]
-        JerryScript["JerryScript"]
-        CJSON["cJSON"]
-    end
+脚本应用的 Program 可以关联应用 Activity 及其子页面；一个 Program 经历多个页面状态时，不因此变成多个 Program。反过来，系统页面或内建 Native Activity 也可以存在而没有脚本 Program。应用身份在多次启动间稳定，Program Instance 则代表其中一次尚未终止的执行生涯。
 
-    AppMgr --> ScriptEngine
-    WatchfaceMgr --> ScriptEngine
-    SystemApp --> ScriptEngine
-    ThirdPartyApp --> ScriptEngine
+切换前台页面首先改变 Activity/UI 状态；Recent Apps 等上层流程再决定程序和页面是暂时停放以便恢复，还是被完整驱逐。恢复会重新附接原有实例和页面状态，而不是把 Activity 当成 Realm 重建。销毁时，Activity Controller 清理页面对象，SPM 清理 Program/Realm/SNI 资源，关联资源按各自 owner 的合同收尾。
 
-    ScriptEngine --> UIModule
-    ScriptEngine --> SensorService
-    ScriptEngine --> DisplayService
-    ScriptEngine --> BatteryService
-    ScriptEngine --> PMService
-    ScriptEngine --> StorageService
-    ScriptEngine --> EventSystem
+## Runtime 与 Native System 边界
 
-    UIModule --> LVGL
-    SensorService --> DeviceManager
-    DisplayService --> DeviceManager
-    BatteryService --> DeviceManager
-    PMService --> DeviceManager
-    StorageService --> FileSystemDriver
+JavaScript Runtime 位于 Core 的脚本执行域中。应用代码在 Program 所属 Realm 中由 Script Engine 执行；SPM 创建、恢复、挂起和停止 Program，并协调该实例关联的运行时资源。SNI 是 Realm 与 Native System 之间的边界：它只向脚本安装已注册的 `eos`、`lv` 等 bindings，并将参数、返回值、句柄和回调按绑定合同带入 Native 实现。
 
-    DeviceManager --> SensorDevice
-    DeviceManager --> DisplayDevice
-    DeviceManager --> BatteryDevice
-    DeviceManager --> PowerDevice
+因此，JS 应用不能因为某个 Native C 函数存在就直接调用它；只有明确注册并成为脚本 API 的能力才对 JS 可见。Native 资源仍由其 Native owner 管理，JS 引用本身不转移 Activity、View、Service 或设备对象的所有权。页面对象和脚本程序结束时，分别沿页面与 SNI/Program 的 owner 路径失效和清理。
 
-    SensorDevice --> SensorDriver
-    DisplayDevice --> DisplayDriver
-    BatteryDevice --> BatteryDriver
-    PowerDevice --> PowerDriver
+## Framework、Service、Device 与 Platform
 
-    SensorDriver --> Hardware
-    DisplayDriver --> Hardware
-    BatteryDriver --> Hardware
-    PowerDriver --> Hardware
-    FileSystemDriver --> Hardware
+这四者分开存在，是因为它们回答不同问题：
 
-    ScriptEngine --> JerryScript
-    StorageService --> CJSON
+| 部分 | 回答的问题 | 架构责任 |
+|---|---|---|
+| Framework | 应用以什么系统模型工作？ | 提供应用/表盘模型和高层协作入口；协调页面与程序 owner，不替它们持有所有权。 |
+| Service | 哪个系统组件持有共享策略和状态？ | 实现设备无关的服务语义、缓存、请求协调和面向系统/应用的结果。不同 Service 实际持有的状态并不完全相同。 |
+| Device Abstraction / Contract | Core 怎样描述某类设备能力？ | 为 Service 与平台实现定义类型化边界、设备状态和对应操作/数据语义。各类型可以采用不同模式。 |
+| Platform / Vendor | 如何在目标芯片上实现这些操作？ | 实现 port/device 接口，接入 BSP、HAL、驱动和具体资源，并按设备契约返回数据或状态。 |
 
-    LVGL --> Hardware
-    JerryScript --> Hardware
-```
+典型的能力控制由 Application 发起，经 Framework 或公开 Service API 进入 Service，再通过 Device Contract 到达 Platform 实现；数据与状态由平台取得后，经对应 Device/Service 返回上层。Framework 的高层模型不会取代 Service 策略，Service 不需要知道 Vendor 的芯片细节，Vendor 也不拥有应用级策略。
 
-## 架构层次说明
+## 三类彼此独立的生命周期
 
-### 1. 硬件层
+ElenixOS 不把程序、页面和设备合成一个“应用对象”。独立意味着状态和生命周期 owner 不同，并不表示任何状态组合都合法；Framework、Recent Apps 和各 owner 在跨域操作时负责协调。
 
-硬件层包含各种硬件组件，如 MCU/SoC、蓝牙、传感器、存储器、显示屏和电源管理芯片等。这些硬件组件是 ElenixOS 运行的基础。
+| 生命周期 | owner 与管理对象 | 与其他生命周期的关系 |
+|---|---|---|
+| Program lifecycle | SPM 管脚本 Program、Realm、SNI context，并执行启动、恢复、挂起和停止。 | 页面切换可发生在 Program 仍保留期间；挂起 Program 不等于销毁 Activity/View。 |
+| Activity / UI lifecycle | Activity Controller 管根 Activity、页面栈、页面过渡；Activity/View 按页面规则暂停、恢复、停放或销毁。 | Activity 可以属于脚本应用，也可以是无 Program 的 Native/系统页面；页面销毁也不必等同于 Realm 立即销毁。 |
+| Device / Service lifecycle | Platform Integration 建立目标平台设备和 port 实现；Core Service 持有自己的状态、缓存和消费者需求。 | 这些系统级对象不随单个应用启动或退出；应用请求或订阅的清理另由相应 Service 合同管理。 |
 
-### 2. 驱动层
+这种分离允许系统保存可恢复的脚本执行状态、独立处理页面过渡，并在应用切换期间继续提供共享设备能力。涉及多类对象的停放、驱逐和错误恢复必须由相应 owner 协作，不能由调用方任选一套析构顺序。
 
-驱动层是硬件抽象的最底层，由移植方实现：
-- 传感器驱动：加速度计、陀螺仪、心率传感器等
-- 显示驱动：屏幕控制和显示输出
-- 电池驱动：电池状态采集
-- 电源驱动：电源管理芯片控制
-- 文件系统驱动：存储设备访问
+## 依赖、控制、数据与所有权
 
-### 3. 设备管理器
+一次函数调用只能说明局部控制关系，不能单独说明系统依赖、数据返回或资源归属：
 
-设备管理器是上层获取设备实例的唯一路径：
-- 统一管理设备实例的注册和查找
-- 维护设备状态机
-- 提供状态上报机制
-- 支持单实例和多实例设备管理
+| 关系 | 大致方向 | 说明 |
+|---|---|---|
+| 架构依赖 | Application 通过 Framework / 公开 Service API 调用 Service；Service 使用 Core 契约访问设备。 | Platform Integration 实现 Core 定义的接口；上层不依赖具体 Vendor。JS 应用经 SNI 使用公开 binding。 |
+| 控制请求 | Application 发起请求，Framework / Service 执行策略并调用 Device，Platform 实现设备操作。 | Service 依据自己的策略决定如何使用设备；请求方向不改变接口的 owner。 |
+| 数据与状态 | 平台实现提供数据，经 Device / Service 处理后交给 Framework / Application。 | 数据依具体契约校验、规范化、缓存或仲裁；Push、Pull、回调等模型由相应子系统规定。 |
+| 生命周期与所有权 | 各对象的 owner 分别管理 | SPM 管脚本程序，Activity Controller 管页面，Service 管自身状态，平台集成管平台实现和注册。相互引用不意味着转移所有权。 |
+| 错误传播 | 从发生错误的边界向消费者 | 同步结果、状态、无效数据或异步通知因设备/Service 而异；ElenixOS 没有假定所有硬件都使用同一种成功确认机制。 |
 
-### 4. 服务层
+## 系统级稳定边界
 
-服务层向上提供标准 API 接口：
+- Application 依赖公开 Framework/Service 能力，不依赖 SoC、Vendor HAL、驱动或设备操作表。
+- JavaScript 只能通过 SNI 已注册的 bindings 进入 Native System；Native 函数不会自动成为 JS API。
+- Program、Activity/View、Service 状态和平台注册设备由不同 owner 管理；跨域协调不能合并或绕过这些 owner。
+- Service 保有系统级策略与状态；Platform/Vendor 实现设备机制并遵守类型契约，不接管应用语义。
+- 平台能力及其缺失方式由对应 Device/Service 契约表达；移植不能把某块开发板存在的能力默认为所有平台共有。
+- 扩展必须选择与能力归属一致的边界：应用入口进入 Application Framework，系统策略进入 Service，硬件能力进入 Device Contract 与平台实现，脚本 API 进入公开 SNI binding。
 
-| 服务名称 | 功能描述 |
-|---------|---------|
-| 传感器服务 | 传感器采样与数据处理，支持 Pull/Push 模式 |
-| 显示服务 | 屏幕亮度管理与电源控制 |
-| 电池服务 | 电池状态监测与电量管理 |
-| 电源管理服务 | 系统电源状态与睡眠管理 |
-| 触觉服务 | 触觉反馈控制 |
-| 时间服务 | 系统时间获取 |
-| 存储服务 | 文件系统操作与 JSON 存储 |
-| 配置服务 | 系统配置管理 |
-| 状态服务 | 运行时持久化状态管理 |
-| 日志服务 | 基于监听器的日志系统 |
+## 按开发角色继续阅读
 
-### 5. 框架层
-
-框架层是 ElenixOS 的核心，包含以下子系统：
-
-- **系统服务子系统**：事件调度、动画系统、事件系统、活动控制器、多语言支持、软件包管理器等
-- **脚本运行子系统**：包含三层架构
-  - **核心引擎层（Script Engine）**：负责 JerryScript 的底层操作，包括 Realm 管理、编译执行、内存操作
-  - **SPM层（Script Program Manager）**：作为中间层，管理程序生命周期（启动/挂起/恢复/终止）、JS回调门验证、错误快照持久化
-  - **SNI接口层**：提供服务API、UI组件API、事件API等脚本接口
-- **内置UI控件**：基于 LVGL 构建的各种UI组件
-
-### 6. 应用层
-
-应用层包含表盘系统、第三方应用和系统应用等。这些应用基于脚本引擎运行，使用 SNI 访问系统服务和UI组件。
-
-## 核心设计原则
-
-### 设备-服务交互原则
-
-系统遵循"上层发控制指令，下层只做状态上报"的核心原则：
-
-```mermaid
-flowchart LR
-    driver["驱动层"] -->|上报状态| device_manager["设备管理器"]
-    device_manager -->|更新state| device_manager
-    service["服务层"] -->|查询控制| device_manager
-    application["应用层"] -->|控制指令| service
-```
-
-### 数据流
-
-ElenixOS 的数据流如下：
-
-1. **用户输入**：通过硬件层的输入设备（如触摸屏）获取用户输入
-2. **事件处理**：输入事件通过驱动层传递到设备管理器
-3. **状态上报**：设备管理器更新状态并通知服务层
-4. **服务处理**：服务层处理业务逻辑并响应请求
-5. **事件分发**：事件系统将事件分发给相应的处理程序
-6. **应用响应**：应用根据事件执行相应的逻辑
-7. **UI更新**：应用通过 UI 模块更新界面
-8. **显示输出**：UI 模块将界面渲染到显示屏上
-
-### 传感器数据上报流程
-
-```mermaid
-flowchart LR
-    driver["driver"] -->|sensor_report| fast_queue["快速入队"]
-    fast_queue -->|写入| ring_buffer["环形缓冲区"]
-    ring_buffer -->|调度| service_layer["服务层"]
-    service_layer -->|回调分发| subscribers["订阅者"]
-```
-
-## 脚本执行流程
-
-1. **脚本加载**：从文件系统加载应用或表盘的脚本文件
-2. **脚本解析**：脚本引擎解析 JavaScript 代码
-3. **SPM管理**：SPM层创建程序上下文，管理生命周期状态（IDLE/SUSPENDED/RUNNING）
-4. **模块导入**：脚本通过 SPM 层导入所需的模块和 API
-5. **脚本执行**：在 Realm 中执行脚本，通过 SPM 层调用 SNI
-6. **原生调用**：SNI 调用原生代码，访问系统服务和硬件
-7. **结果返回**：将执行结果通过 SPM 层返回给脚本
-
-## 脚本程序管理器
-
-脚本程序管理器（Script Program Manager，SPM）是脚本引擎的中间管理层，负责：
-
-- **程序生命周期管理**：管理脚本程序的启动、挂起、恢复和终止
-- **上下文保存/恢复**：支持脚本运行时上下文的保存和恢复，实现状态持久化
-- **JS回调门验证**：验证 JavaScript 回调的合法性和安全性
-- **错误快照持久化**：捕获脚本错误并保存快照信息，便于调试和分析
-- **Realm隔离**：为每个程序提供独立的 Realm 环境，确保隔离性和安全性
-
-### 脚本程序状态机
-
-SPM管理的是脚本程序（Script Program）的生命周期状态：
-
-```c
-typedef enum
-{
-    SCRIPT_PROGRAM_STATE_TERMINATED,  // 终止态
-    SCRIPT_PROGRAM_STATE_STOPPING,    // 停止中
-    SCRIPT_PROGRAM_STATE_ACTIVE,      // 活跃态
-    SCRIPT_PROGRAM_STATE_SUSPENDED,   // 暂停态
-} script_program_state_t;
-```
-
-```mermaid
-stateDiagram-v2
-    [*] --> ACTIVE : 创建程序
-
-    ACTIVE --> SUSPENDED : SuspendProgram (Activity切换)
-    SUSPENDED --> ACTIVE : ResumeProgram (返回表盘)
-
-    ACTIVE --> STOPPING : TerminateProgram
-    SUSPENDED --> STOPPING : TerminateProgram
-
-    STOPPING --> TERMINATED : 清理完成
-```
-
-| 状态 | 说明 | 触发条件 |
-|------|------|----------|
-| **ACTIVE** | 活跃态，脚本程序存活且健康 | 创建程序 |
-| **SUSPENDED** | 暂停态，程序暂停但可恢复 | Activity切换时调用 suspend() |
-| **STOPPING** | 停止中，禁止调用任何回调 | 调用 terminate() |
-| **TERMINATED** | 终止态，资源完全清理完成 | 清理完成 |
-
-### 与内核状态的区别
-
-SPM管理的是**脚本程序**的生命周期，而脚本引擎内核管理的是**单次JS执行**的状态：
-
-| 层级 | 状态管理对象 | 关注点 |
-|------|------------|--------|
-| **SPM层** | 脚本程序 (Script Program) | 程序的启动/暂停/恢复/终止 |
-| **Kernel层** | JS执行窗口 | 字节码的解析/执行/异常 |
-
-内核状态机关注的是单次JS代码执行的状态转换（RUNNING/IDLE/SUSPENDED/EXCEPTION），而SPM关注的是脚本程序作为一个整体的生命周期管理。
-
-## 当前核心边界
-
-调用方向必须保持单向：应用/表盘 → SNI/SPM → 框架与服务 → 端口。上层可以组合公开 API，但不能访问下层私有上下文或通过 LVGL `user_data` 绕过框架所有权。
-
-| 生命周期对象 | 负责模块 | 不能做的事 |
-| --- | --- | --- |
-| 程序、Realm | SPM / Script Engine | 上层直接销毁 Realm |
-| JS/原生句柄 | SNI Context | 暴露裸指针给 JS |
-| 页面、Activity 栈 | Activity Controller | 直接删除栈内 View |
-| Widget 附加数据 | `eos_wdata` | 假设单一 `user_data` 布局 |
-| 设备能力 | Service / Port | 应用直接调用平台驱动 |
-
-输入先进入平台端口和输入层，再由 Chrome、Activity 或控件确定前景目标；传感器等设备数据先进入服务，经订阅或读取接口供表盘和应用使用。脚本回调必须回到所属 SPM 程序上下文，不能在平台回调中直接调用任意 Realm。
-
-Recent Apps 增加了一个中间状态：页面从当前栈分离但仍然存活，程序暂停但未终止。架构中的“应用关闭”不能再等同于“Activity 离开”。
+- 安装包格式、区域语义、校验与签名预留见[EPKG v1 安装包格式](./package_format)；项目创建、包构建与分析见 [ElenixOS-Toolkit](../development/toolkit)。
+- 应用身份、安装、启动及应用可依赖的能力见[Application 与 Framework 契约](./application_contract)。
+- 程序状态和跨 Runtime 的生命周期协调见[运行时](./runtime)；JS 与 Native 资源边界见[SNI 架构](./script_engine/sni)。
+- 根 Activity、页面栈、View 和页面过渡见[Activity 页面](./framework/activity)。
+- 设备类型边界和通用约束见[Device 架构](./device_architecture_design)，具体能力进入[Sensor](./services/sensor)、[Audio](./services/audio)、[存储](./services/storage)等子系统文档。
+- 平台注册和移植责任见[Platform / Vendor 契约](./platform_contract)；新增 Service、设备类型或 Native/JS 能力的扩展边界见[Core 开发契约](./core_development_contract)。

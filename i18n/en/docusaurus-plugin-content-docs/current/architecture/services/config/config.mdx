@@ -3,78 +3,12 @@ sidebar_position: 6
 title: Configuration Service
 ---
 
-The configuration service is responsible for managing system configuration information, including device name, language, display settings, backlight brightness, and other system-level configurations. All configurations are stored in the system configuration file (config.json).
+# Configuration Service
 
-## Configuration Keys
+The configuration service manages system-level settings and persists them as JSON. Configuration items cover device and language, display and power, audio and haptics, watchface and app ordering, and security options. System modules access them through typed configuration and should not parse or rewrite the system configuration file themselves.
 
-### System Configuration Keys
+When reading a configuration item that is missing or has a type mismatch, the caller-provided default value is used. Dynamic strings and JSON trees are freed by the caller according to their respective resource rules. Development debug options may also be stored as ordinary configuration data and do not thereby become compile-time configuration.
 
-```c
-#define EOS_CONFIG_KEY_DEVICE_NAME_STR "device_name"                  // Device name
-#define EOS_CONFIG_KEY_LANGUAGE_STR "language"                       // Language
-#define EOS_CONFIG_KEY_WATCHFACE_ID_STR "wf_id"                      // Watchface ID
-#define EOS_CONFIG_KEY_BLUETOOTH_BOOL "bluetooth"                    // Bluetooth switch
-#define EOS_CONFIG_KEY_DISPLAY_BRIGHTNESS_NUMBER "display_brightness" // Display brightness
-#define EOS_CONFIG_KEY_SPEAKER_VOLUME_NUMBER "speaker_volume"         // Speaker volume
-#define EOS_CONFIG_KEY_MUTE_BOOL "mute"                              // Mute switch
-#define EOS_CONFIG_KEY_SLEEP_TIMEOUT_SEC_NUMBER "sleep_timeout_sec"   // Sleep timeout
-#define EOS_CONFIG_KEY_AOD_MODE_BOOL "aod_mode"                      // AOD mode switch
-#define EOS_CONFIG_KEY_WAKE_ON_RAISE_BOOL "wake_on_raise"           // Wake on raise switch
-#define EOS_CONFIG_KEY_VIBRATOR_STRENGTH_NUMBER "vibrator_strength" // Vibration strength
-#define EOS_CONFIG_KEY_APP_ORDER_ARRAY "app_order"                  // App order
-```
+Script configuration and system configuration are isolated from each other and are stored in the data directory of the corresponding app or watchface; system-level configuration is not part of the script configuration boundary.
 
-## Default Values
-
-```c
-#define EOS_CONFIG_DEFAULT_DEVICE_NAME "Elenix Watch"                  // Default device name
-#define EOS_CONFIG_DEFAULT_WATCHFACE_ID_STR "cn.sab1e.clock"           // Default watchface ID
-```
-
-## Service Initialization
-
-Initialize the configuration service on first system run:
-
-```c
-void eos_service_config_init(void);
-```
-
-## Boolean Configuration
-
-```c
-eos_result_t eos_config_set_bool(const char *key, bool value);
-bool eos_config_get_bool(const char *key, bool default_value);
-```
-
-## String Configuration
-
-```c
-eos_result_t eos_config_set_string(const char *key, const char *value);
-char *eos_config_get_string(const char *key, const char *default_value);
-```
-
-The returned string needs to be freed using `eos_malloc(str)` when no longer needed.
-
-## Number Configuration
-
-```c
-eos_result_t eos_config_set_number(const char *key, double value);
-double eos_config_get_number(const char *key, double default_value);
-```
-
-## JSON Configuration
-
-```c
-cJSON *eos_config_get_json(const char *key);
-eos_result_t eos_config_set_json(const char *key, cJSON *json_value);
-```
-
-The returned cJSON object needs to be freed using `cJSON_Delete()` after use.
-
-## Add Configuration Item
-
-Add a new configuration item to the system configuration file:
-
-```c
-eos_result_t eos_config_add_item(const char *key, const char *value);
-```
+The configuration service is a synchronous Core-owned settings snapshot, and when a key is missing the reader provides the default semantics; it is not a real-time device data subscription. JS `eos.config` writes to the corresponding app/watchface configuration location based on the current script identity, whereas the generic Storage API does not automatically apply this identity isolation. For the calling layer, see [Application Contract](../../application_contract).

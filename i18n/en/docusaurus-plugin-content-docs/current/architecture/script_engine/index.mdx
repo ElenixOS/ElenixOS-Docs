@@ -1,172 +1,35 @@
 ---
-title: JS API General Usage
 sidebar_position: 1
+title: JavaScript Programs and Runtime Constraints
 ---
 
-# JS API General Usage
+# JavaScript Programs and Runtime Constraints
 
-ElenixOS provides rich JavaScript APIs for developing applications and watchfaces. This document introduces the general usage of JS APIs, including basic concepts, naming conventions, error handling, and more.
+ElenixOS applications and watchfaces can be implemented with JavaScript scripts. Scripts run in the JavaScript engine provided by the system, accessing ElenixOS capabilities through `eos` and creating and manipulating LVGL objects through `lv`.
 
-## Script Engine Architecture
+## Script Package Entry
 
-ElenixOS's script engine adopts a three-layer architecture design:
+A script package should contain at least the `manifest.json` required by the runtime and an entry script. The entry file name for applications and watchfaces is `main.js`. The package's API compatibility is declared by `minApiLevel` and `targetApiLevel`; when `minApiLevel` is higher than the current system API level, the application will not start.
 
-### Three-Layer Architecture
+The manifest provides the script's identity, display information, API compatibility range, and optional permission declarations. The system checks the compatibility range; unrecognized permissions will not grant capabilities.
 
-1. **Core Engine Layer (Script Engine Core)**
-   - Responsible for JerryScript's underlying operations
-   - Realm management, compilation execution, memory operations
+## Runtime Constraints
 
-2. **SPM Layer (Script Program Manager)**
-   - Intermediate management layer, separating program lifecycle from JS execution
-   - Manages program startup, suspend, resume, and termination
-   - Supports context save/restore for state persistence
-   - JS callback gate validation and error snapshot persistence
+- **Directly calling `script_engine` to start an application or watchface is prohibited.** Application/watchface startup, resume, suspend, and stop must be managed through SPM; the script engine is merely the execution layer used by SPM.
+- Scripts execute in the system event loop; long synchronous work or blocking waits will occupy the event loop and delay other work.
+- The current script context only provides the two system API namespaces `eos` and `lv`.
+- LVGL/ElenixOS objects visible to JS are handles managed by the runtime. After the owning Activity, View, or native object is destroyed, the original handle can no longer be used.
+- Script exceptions, parse failures, module link failures, unresponsiveness, and engine crashes are categorized and handled by the runtime; legacy internal error constants do not constitute an application interface.
+- Script callbacks should return as soon as possible. When deferred processing is needed, the timing or event mechanisms provided by the runtime should be used.
 
-3. **SNI Layer (Script Native Interface)**
-   - Provides interface between scripts and native code
-   - Includes service API, UI component API, event API, etc.
+## Lifecycle
 
-## Basic Concepts
+A script application creates a runtime context and executes the entry on startup; when switching to another page, the application can be suspended, and when returning to the application, the same context is resumed. Recent Apps retains a limited number of suspended applications; when the memory watermark or count limit is reached, the least recently used application is fully stopped and its context released.
 
-### API Namespaces
+A script watchface runs as the root Activity. When an application is opened, the watchface pauses, and when returning to the watchface, it resumes; when switching watchfaces, uninstalling a watchface, or resetting the engine, the old watchface is destroyed.
 
-ElenixOS's JavaScript APIs are exposed to scripts through the following namespaces:
+## Next Steps
 
-- `eos` - System API
-- `lv` - LVGL UI API
-
-### Object-Oriented Style
-
-ElenixOS's JavaScript APIs adopt an object-oriented style, using constructors to create objects and instance methods to operate objects:
-
-```javascript
-// Create a button
-const button = new lv.button(eos.view.active());
-
-// Set button size and position
-button.setSize(100, 50);
-button.setPos(10, 10);
-
-// Add label
-const label = new lv.label(button);
-label.setText("Click Me");
-```
-
-### Event Handling
-
-ElenixOS's JavaScript APIs use callback functions to handle events:
-
-```javascript
-// Bind click event
-button.addEventCb((e) => {
-    eos.console.log("Button clicked!");
-}, lv.EVENT_CLICKED, null);
-```
-
-## Naming Conventions
-
-### Constant Naming
-
-Constants use all uppercase letters with underscores between words:
-
-```javascript
-// Event types
-lv.EVENT_CLICKED
-lv.EVENT_PRESSED
-
-// Object flags
-lv.OBJ_FLAG_CLICKABLE
-lv.OBJ_FLAG_CHECKABLE
-
-// Alignment
-lv.ALIGN_CENTER
-lv.ALIGN_TOP_LEFT
-```
-
-### Method Naming
-
-Methods use camelCase naming convention with lowercase first letter:
-
-```javascript
-// Set methods
-button.setSize(width, height);
-button.setPos(x, y);
-
-// Get methods
-const width = button.getWidth();
-const height = button.getHeight();
-```
-
-### Constructor Naming
-
-Constructors use camelCase naming convention with lowercase first letter:
-
-```javascript
-// Create objects
-const button = new lv.button(parent);
-const label = new lv.label(parent);
-```
-
-## Error Handling
-
-### Exception Handling
-
-Use try-catch to catch potential errors:
-
-```javascript
-try {
-    // Code that may throw errors
-    const button = new lv.button(null);
-} catch (e) {
-    // Handle error
-    eos.console.error("Error creating button:", e);
-}
-```
-
-### Error Types
-
-ElenixOS's JavaScript APIs may throw the following types of errors:
-
-- **TypeError** - Parameter type error
-- **ReferenceError** - Reference to non-existent object
-- **RangeError** - Parameter value out of range
-
-## Memory Management
-
-### Object Lifecycle
-
-In ElenixOS, object lifecycles are managed by the garbage collector. When objects are no longer referenced, the garbage collector automatically reclaims their memory.
-
-### Manual Release
-
-For some resource-intensive objects, manual release can be performed to save memory:
-
-```javascript
-// Create object
-const timer = new lv.timer(parent);
-
-// Use object
-// ...
-
-// Manually release object
-timer.delete();
-```
-
-## Asynchronous Operations
-
-### Timers
-
-See [Timer](./sni/sni_api/lv/special/timer).
-
-## Debugging Tips
-
-### Log Output
-
-Use `eos.console.log` to output log information:
-
-```javascript
-eos.console.log("Debug information");
-eos.console.error("Error information");
-eos.console.warn("Warning information");
-```
+- [ElenixOS JS API](./elenix_os): System services, Activity, sensors, and constants
+- [LV API](./lvgl): LVGL objects and widgets
+- [SNI Architecture and Lifecycle](./sni): Usage boundaries between script handles and native objects

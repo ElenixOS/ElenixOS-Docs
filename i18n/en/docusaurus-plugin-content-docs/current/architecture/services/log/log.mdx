@@ -1,134 +1,18 @@
----
-sidebar_position: 9
+{"translation": "---
+sidebar_position: 6
 title: Log Service
 ---
 
-The log service uses a listener-based design pattern, supporting multiple listeners to receive log messages.
+# Log Service
 
-## Log Levels
+The log service filters by severity level and dispatches formatted messages to registered listeners. The system provides four levels: debug, info, warning, and error; the global minimum level determines which messages are dispatched.
 
-```c
-typedef enum {
-    EOS_LOG_LEVEL_DEBUG = 0,  // Debug level
-    EOS_LOG_LEVEL_INFO,       // Info level
-    EOS_LOG_LEVEL_WARN,       // Warning level
-    EOS_LOG_LEVEL_ERROR       // Error level
-} eos_log_level_t;
-```
+Listeners are responsible for their own lifecycle. System listeners cannot be unregistered like ordinary listeners; deactivating a listener does not remove the registration. Listener callbacks should return as quickly as possible, and the message buffer is only valid during dispatch—if it needs to be retained long-term, the receiver must copy it.
 
-## Log Listeners
+Log tags are used to identify the source of a message. The platform can provide listeners such as standard output; whether color output is enabled is determined by the build configuration.
 
-### Listener Callback Function
+The Core log level defaults to `DEBUG` at startup, so DEBUG, INFO, WARN, and ERROR all pass level filtering. The Simulator project enables the stdout listener by default, and Native startup logs are also written to the Simulator's `tmp/latest.log`; if a target platform does not register an output listener, logs are still filtered by level but will not be automatically written to a serial port or file. The Simulator accepts at most 8 listeners; when slots are exhausted, `eos_log_register_listener()` returns `-1`. `EOS_LOG_ENABLE_STD`, `EOS_LOG_MAX_LISTENERS`, and `EOS_LOG_USE_COLOR` can be adjusted via the Logging group in Kconfig; the minimum level can also be changed at runtime using the log API.
 
-```c
-typedef void (*eos_log_listener_cb_t)(
-    eos_log_level_t level,
-    const char *buf,
-    size_t len,
-    void *user
-);
-```
-
-### Listener Flags
-
-```c
-#define EOS_LOG_FLAG_SYSTEM   (1 << 0)  // System listener, cannot be deleted
-```
-
-### Add Log Listener
-
-```c
-eos_log_listener_id_t eos_log_add_listener(
-    eos_log_listener_cb_t cb,
-    eos_log_level_t min_level,
-    uint32_t flags,
-    void *user
-);
-```
-
-### Remove Log Listener
-
-```c
-eos_result_t eos_log_remove_listener(eos_log_listener_id_t id);
-```
-
-### Set Listener Level
-
-```c
-eos_result_t eos_log_set_level(eos_log_listener_id_t id, eos_log_level_t level);
-```
-
-## Log Output
-
-### Output Log
-
-```c
-void eos_log(eos_log_level_t level, const char *fmt, ...);
-```
-
-## Log Macros
-
-Convenient log output macros (when `EOS_LOG_DISABLE` is not defined):
-
-```c
-#define EOS_LOG_D(fmt, ...)  // Debug level
-#define EOS_LOG_I(fmt, ...)  // Info level
-#define EOS_LOG_W(fmt, ...)  // Warning level
-#define EOS_LOG_E(fmt, ...)  // Error level
-```
-
-If `EOS_LOG_TAG` is defined, log messages will include the tag prefix.
-
-## Colorful Log
-
-When `EOS_LOG_USE_COLOR` is enabled, color output is supported:
-
-```c
-#define EOS_LOG_COLOR_RESET   "\033[0m"
-#define EOS_LOG_COLOR_RED     "\033[31m"
-#define EOS_LOG_COLOR_GREEN   "\033[32m"
-#define EOS_LOG_COLOR_YELLOW  "\033[33m"
-#define EOS_LOG_COLOR_BLUE    "\033[34m"
-#define EOS_LOG_COLOR_CYAN    "\033[36m"
-```
-
-## Pointer Check Macros
-
-### Check Pointer and Return
-
-```c
-#define EOS_CHECK_PTR_RETURN(ptr)
-```
-
-If pointer is NULL, logs error and returns.
-
-### Check Pointer and Return Specified Value
-
-```c
-#define EOS_CHECK_PTR_RETURN_VAL(ptr, ret_val)
-```
-
-### Check Pointer, Free, and Return
-
-```c
-#define EOS_CHECK_PTR_RETURN_FREE(ptr, free_var)
-#define EOS_CHECK_PTR_RETURN_VAL_FREE(ptr, ret_val, free_var)
-```
-
-## Assertion Macros
-
-When `EOS_USE_ASSERT` is enabled:
-
-```c
-#define EOS_ASSERT(expr)
-```
-
-If expression is false, logs error and executes assertion handler.
-
-## Debug Helper
-
-Print LVGL object coordinate information:
-
-```c
-#define EOS_DEBUG_PRINT_POS(obj)
-```
+The Core first filters by global level, then synchronously invokes listeners; the message memory received by a listener is only valid during the callback. The platform output backend is a log listener, not an application storage or notification service. If a sink requires time-consuming I/O, it should copy the needed content in the listener and queue it itself; see [Context Differences of the Event Bus](../../kernel/event/events).
+"}
+}

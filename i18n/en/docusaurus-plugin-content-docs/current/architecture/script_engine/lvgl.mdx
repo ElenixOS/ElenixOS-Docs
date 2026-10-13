@@ -5,96 +5,54 @@ sidebar_position: 2
 
 # LVGL UI API
 
-ElenixOS provides rich UI components and interfaces based on the LVGL (LittlevGL) graphics library, allowing developers to create and manage user interfaces in JavaScript. This document will detail the LVGL UI API exposed by ElenixOS to the script runtime, based on actual usage patterns in project engineering.
+Scripts use the LVGL classes registered in the current runtime through `lv`. Object constructors receive a parent object; the page root object usually comes from `eos.view.active()`.
 
-## Basic Concepts
+```js
+const view = eos.view.active();
+const button = new lv.button(view);
+button.setSize(180, 64);
+button.align(lv.ALIGN_CENTER, 0, 0);
 
-### LVGL Introduction
-
-LVGL is a lightweight embedded graphics library designed for resource-constrained devices such as microcontrollers. It provides rich UI components and features, including:
-
-- Various UI controls (buttons, labels, input fields, etc.)
-- Layout system
-- Style system
-- Animation effects
-- Event handling
-
-### API Namespace
-
-In ElenixOS, the LVGL API is exposed to JavaScript scripts through the `lv` namespace:
-
-```javascript
-// Create a label
-const label = new lv.label(eos.view.active());
-label.setText("Hello, ElenixOS!");
-```
-
-## Component Creation and Layout
-
-### Component Creation
-
-Create UI components using constructor syntax:
-
-```javascript
-// Create a button
-const button = new lv.button(eos.view.active());
-
-// Create a label
 const label = new lv.label(button);
-label.setText("Click Me");
+label.setText("Hello, ElenixOS!");
+label.center();
 ```
 
-### Layout System
+## Currently Exported Classes
 
-LVGL provides multiple layout methods, including:
+The classes currently registered in the runtime are: `obj`, `button`, `label`, `arc`, `bar`, `screen`, `color`, `timer`, `anim`, `buttonmatrix`, `calendar`, `chart`, `canvas`, `checkbox`, `dropdown`, `image`, and `imagebutton`. Among these, `screen` and `color` are static utility classes, while `obj`, the widget classes, `timer`, and `anim` are used according to their respective constructors.
 
-#### Absolute Layout
+Class names in the complete LVGL documentation do not automatically constitute the ElenixOS JS API; scripts may only use registered classes. Specific methods and properties are subject to the current page and bindings.
 
-```javascript
-// Set component position
-button.setPos(10, 10);
+## Objects, Layout, and Styles
 
-// Set component size
-button.setSize(100, 50);
+Generic objects provide operations for position, size, alignment, parent-child relationships, flags, events, and deletion; for example, `setPos`, `setSize`, `align`, `setFlexFlow`, `addFlag`, `addEventCb`, and `delete`. Widgets then provide their own properties, such as `label.setText` or `bar.setValue`.
+
+```js
+const panel = new lv.obj(view);
+panel.setSize(300, 100);
+panel.setFlexFlow(lv.FLEX_FLOW_ROW);
+panel.setStyleBgColor(lv.color.hex(0x202020), 0);
 ```
 
-#### Flex Layout
+The actual entry point for the color utility is `lv.color.hex(number)`. Layout constants, directions, events, styles, and widget constants are exported as `lv` root constants, but the available set of constants comes from the current bindings, not from all the macros of native LVGL.
 
-```javascript
-// Create a flex layout container
-const container = new lv.obj(eos.view.active());
-container.setSize(lv.pct(100), 50);
-container.align(lv.ALIGN_CENTER, 0, 0);
-container.setFlexFlow(lv.FLEX_FLOW_ROW);
+## Events
 
-// Add child components
-const button1 = new lv.button(container);
-const label1 = new lv.label(button1);
-label1.setText("Button 1");
-
-const button2 = new lv.button(container);
-const label2 = new lv.label(button2);
-label2.setText("Button 2");
+```js
+button.addEventCb((event) => {
+    eos.console.log("Button clicked");
+}, lv.EVENT_CLICKED, null);
 ```
 
-#### Grid Layout
+Objects also provide `removeEventCb`, `removeEventCbWithUserData`, and `sendEvent`. Event callbacks execute synchronously in the LVGL runtime context, and blocking will delay other work in that context. After a widget or parent object is deleted, the related callbacks and script handles become invalid accordingly.
 
-```javascript
-// Create a grid layout container
-const container = new lv.obj(eos.view.active());
-container.setSize(lv.pct(100), 100);
-container.align(lv.ALIGN_CENTER, 0, 0);
+## Resource Lifecycle
 
-// Add child components
-const button1 = new lv.button(container);
-button1.setSize(100, 50);
-button1.align(lv.ALIGN_TOP_LEFT, 10, 10);
+Objects created by scripts are usually managed along with the parent object tree; `timer` and `anim` are independent script resources. When an Activity/View is destroyed, the program stops, or the engine resets, the related resources are cleaned up by the runtime. Scripts should use the deletion interfaces provided by objects when they are no longer needed, and should always avoid retaining handles that have already been deleted.
 
-const button2 = new lv.button(container);
-button2.setSize(100, 50);
-button2.align(lv.ALIGN_TOP_RIGHT, -10, 10);
+## Related Interfaces
 
-const button3 = new lv.button(container);
-button3.setSize(100, 50);
-button3.align(lv.ALIGN_BOTTOM_LEFT, 10, -10);
-```
+- [ElenixOS JS API](./elenix_os)
+- [Special LVGL API](./special)
+- [SNI Architecture and Lifecycle](./sni)

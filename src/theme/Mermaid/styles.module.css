@@ -1,0 +1,167 @@
+.preview {
+  position: relative;
+  margin: 1rem 0;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 0.5rem;
+  background: var(--ifm-background-surface-color);
+}
+
+.preview > :global(.docusaurus-mermaid-container) {
+  padding: 0.75rem;
+}
+
+.preview > :global(.docusaurus-mermaid-container) > svg {
+  display: block;
+  margin: 0 auto;
+}
+
+.openButton {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 0.4rem;
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-font-color-base);
+  font-size: 0.8rem;
+  line-height: 1.2;
+  cursor: zoom-in;
+  opacity: 0.9;
+}
+
+.openButton:hover,
+.openButton:focus-visible {
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+  opacity: 1;
+}
+
+.viewer {
+  position: fixed;
+  z-index: 2000;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ifm-background-color);
+  color: var(--ifm-font-color-base);
+}
+
+.toolbar {
+  z-index: 1;
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-background-surface-color);
+}
+
+.title {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.controls button {
+  min-height: 2rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 0.35rem;
+  background: var(--ifm-background-color);
+  color: var(--ifm-font-color-base);
+  cursor: pointer;
+}
+
+.controls button:hover,
+.controls button:focus-visible {
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+}
+
+.zoomLevel {
+  min-width: 3.25rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.8rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.viewport {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.viewport:active {
+  cursor: grabbing;
+}
+
+.canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.render,
+.render :global(.docusaurus-mermaid-container) {
+  width: max-content;
+  max-width: none;
+}
+
+.render :global(.docusaurus-mermaid-container) {
+  width: 100%;
+  height: 100%;
+}
+
+.render :global(.docusaurus-mermaid-container > svg) {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.help {
+  padding: 0.45rem 1rem;
+  border-top: 1px solid var(--ifm-color-emphasis-300);
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.6rem;
+  }
+
+  .controls {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.3rem;
+  }
+
+  .controls button {
+    padding-inline: 0.45rem;
+    font-size: 0.78rem;
+  }
+}

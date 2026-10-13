@@ -5,71 +5,15 @@ sidebar_position: 1
 
 # Object
 
-Object is the base class for all LVGL components in ElenixOS. This document describes the functionality, usage methods, and notes for the object component.
+`lv.obj` is the base class for most script controls. It requires a parent object:
 
-## Feature Introduction
-
-The Object component is the fundamental building block of all LVGL UI components. All other components (buttons, labels, images, etc.) inherit from Object. It provides basic functionality such as positioning, sizing, styling, and event handling.
-
-## Usage Methods
-
-### Creating Object
-
-Use the `new lv.obj()` constructor to create an object:
-
-```javascript
-// Create object
-const obj = new lv.obj(eos.view.active());
-```
-
-### Configuring Object
-
-Use the following methods to configure the object:
-
-```javascript
-// Set object size
-obj.setSize(100, 100);
-
-// Set object position
-obj.setPos(10, 10);
-
-// Set object background color
-obj.setStyleBgColor(lv.color_hex(0xFF0000), 0);
-
-// Set object border color
-obj.setStyleBorderColor(lv.color_hex(0x000000), 0);
-
-// Set object border width
-obj.setStyleBorderWidth(2, 0);
-
-// Center object
-obj.center();
-```
-
-### Event Handling
-
-Use the `addEventCb` method to bind events:
-
-```javascript
-// Bind click event
-obj.addEventCb((e) => {
-    eos.console.log("Object clicked");
-}, lv.EVENT_CLICKED, null);
-```
-
-### Example: Creating a Simple Object
-
-```javascript
-// Create object
+```js
 const obj = new lv.obj(eos.view.active());
 obj.setSize(100, 100);
 obj.align(lv.ALIGN_CENTER, 0, 0);
-
-// Set background color
-obj.setStyleBgColor(lv.color_hex(0xFF0000), 0);
-
-// Bind event
-obj.addEventCb((e) => {
-    eos.console.log("Object clicked");
-}, lv.EVENT_CLICKED, null);
+obj.addFlag(lv.OBJ_FLAG_CLICKABLE);
 ```
+
+The common interface covers position and size (`setPos`, `setSize`, `setX`, `setY`), layout (`align`, `alignTo`, flex/grid), parent-child relationships, flags, styles, events, and deletion. Deleting an object tree may cascade-delete child objects, so after deleting a parent object all child handles must be considered invalid.
+
+Events are registered via `addEventCb(callback, code, userData)`, can be canceled with `removeEventCb` or `removeEventCbWithUserData`, or sent with `sendEvent`. Callbacks execute synchronously in the LVGL context; blocking will delay other work in that context, and handles to deleted objects are already invalid.

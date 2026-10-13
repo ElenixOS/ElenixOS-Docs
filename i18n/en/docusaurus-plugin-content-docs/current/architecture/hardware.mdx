@@ -1,0 +1,13 @@
+---
+sidebar_position: 2
+title: Hardware Layer
+---
+
+
+# Hardware Layer
+
+The hardware layer is the display, input, sensor, storage, audio, and power hardware that device drivers actually control. ElenixOS's upper-layer APIs do not directly describe a specific chip; the platform provides available capabilities through drivers and device operation tables.
+
+Different platforms may provide different device implementations and capabilities; a software device implementation cannot prove that a certain feature is supported by specific hardware. Display dimensions, input methods, and device characteristics are defined by the corresponding platform and device.
+
+Porting to real hardware requires implementing the corresponding operations for the supported devices and registering them before service initialization. Unimplemented device capabilities should remain unavailable, and services should return errors or capability status; upper layers must not assume that functionality exists based on the hardware layer's intended design.

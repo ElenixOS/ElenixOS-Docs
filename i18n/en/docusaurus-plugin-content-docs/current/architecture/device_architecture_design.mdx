@@ -1,9 +1,46 @@
 ---
-sidebar_position: 3
-title: Device Architecture Design
+sidebar_position: 6
+title: Device Contract
 ---
 
-# Device Architecture Design
+# Device Contract
+
+The Device Layer is the typed boundary between Service/Core and the platform implementation. It provides a registerable implementation entry point, state, and operations specific to that device type; it does not own application semantics, sampling/power policies, page lifecycle, or JS callbacks.
+
+## Two Directions
+
+```mermaid
+flowchart LR
+    Service[OS Service] -->|Synchronous control request| Device[Device Contract]
+    Device -->|Call registered ops| Port[Platform Implementation]
+    Port -->|Sample / State / Sync result| Device
+    Device -->|Capabilities and results| Service
+    Service -->|Read / Subscribe / Event| Consumer[Framework / Application]
+```
+
+Control and data flow in different directions. The Service requests operations, and the Device invokes the platform through the registered operation table; for data-type devices, the platform pushes data or provides pull values according to its own protocol; the Service is then responsible for caching, arbitration, normalization, validity, and consumer-facing notification. The device layer does not automatically convert hardware callbacks into main loop tasks, nor does it automatically retry.
+
+## Registration and Availability
+
+The target platform registers the implementation of that type before the dependent Service is initialized. Successful registration only means the operation entry point has been registered; it does not mean the device is currently available, that every optional capability exists, or that future operations will succeed. Device state is used to represent the ready/busy/error defined by that type's contract; operation return codes describe the result of a single request, and the two cannot substitute for each other.
+
+Device types define their own operation tables, required items, optional items, and return semantics. Display, power, audio, vibration, time, battery, and sensors do not have a unified `init/read/notify/deinit` interface. Missing capabilities may only be represented by NULL when that type explicitly allows them to be optional; the Service/caller needs to check for unsupported or device-missing results.
+
+Currently, Sensor Device supports registering multiple instances by name, but Sensor Service binds one default device for each Sensor Type at initialization; registration order determines the default instance, and the Service has no dynamic selection, priority, or failover. Most other Devices are singletons. This model is not a general-purpose multi-provider framework, and the platform cannot assume that devices can be replaced or unregistered online.
+
+## Data, Memory, and Lifecycle
+
+- The Device Operation table is provided by the platform implementation, and Core holds a reference to it; the implementation and operation table must remain alive for the duration of the registration's validity.
+- Sensor data is reported by the platform to the Service; the Service copies samples and manages the FIFO/latest itself. Subscription callback pointers are borrowed until the end of the current synchronous callback.
+- Battery raw measurements are reported by the platform, and the Service copies them into service state; change Events are dispatched synchronously, and `param` is passed only as borrowed state.
+- The Microphone's shared DMA buffer is allocated by the Audio Service and passed to the device; Core may reclaim it only after the device has stopped. The ownership of the Speaker's borrow/enqueue buffer is currently not fully specified by the public operation table and should be treated as an unclosed contract.
+- Core currently has no unified device hotplug, registration revocation, or shutdown/deinit flow for all devices. The requests, subscribers, and caches owned by each Service must be managed by the lifecycle of the Service to which they belong.
+
+## Extension Rules
+
+When adding new hardware to an existing Device Type, register it before the initialization of the Service that consumes it, and follow the unit, context, state, and buffer contracts. If new application semantics or state policies are needed, extend/add a Service rather than stuffing business rules into the Device operation table. If what is being added is an entirely new Sensor Type, the public data type, units, coordinate/time semantics, caching, and sampling requirement behavior must also be defined at the same time.
+
+For specific Vendor startup order, data reporting, and ISR boundaries, see [Platform/Vendor Contract](./platform_contract); for how applications consume Services, see [Application Contract](./application_contract).
 
 ## Overview
 

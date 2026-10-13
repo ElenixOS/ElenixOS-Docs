@@ -1,269 +1,80 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 title: 音频服务
 ---
 
-ElenixOS 音频子系统采用四层分层架构，每层职责清晰、可通过接口替换：
+# 音频服务
+
+Audio Service 协调播放控制、格式解码、扬声器输出和麦克风录音。应用通过服务表达播放或录音意图；服务管理播放器状态和设备访问，不让应用直接控制 Codec 或平台音频端口。
+
+## 播放链与可替换解码器
 
 ```mermaid
-graph TB
-    APP["应用层<br/>Settings · Test App"]
-    SRV["音频服务层 eos_service_audio<br/>系统API · 配置持久化 · 单播放器实例"]
-    PLR["音频播放器 eos_audio_player<br/>状态机 · Feed 循环 · 保存/恢复"]
-    DEC["解码器流水线 eos_audio_decoder<br/>可插拔 Probe 注册表 · LVGL 链表"]
-    DEV["设备抽象层<br/>eos_dev_speaker (borrow→enqueue)<br/>eos_dev_microphone (ring buffer)"]
-
-    APP --> SRV --> PLR --> DEC --> DEV
+flowchart LR
+    Client[系统或应用] --> Service[Audio Service]
+    Service --> Player[Player]
+    Player -->|探测来源| Registry[Decoder 注册表]
+    Registry -->|已识别的解码器| Player
+    Player -->|PCM 缓冲与格式| Speaker[扬声器设备]
+    Speaker --> Port[平台输出实现]
 ```
 
-服务层只管理一个播放器实例，通过服务 API 控制。若需要同时操作播放器内部状态（如获取当前播放位置），通过 `eos_service_audio_get_player()` 拿到指针后直接操作；但建议优先使用服务层函数。
+Decoder 把输入来源解析为播放器可消费的 PCM 帧。注册项为播放器提供来源探测、打开、读取、关闭和可选定位能力；Player 管理通用播放状态，并将解码出的缓冲提交给扬声器设备。这样 Codec 的文件格式逻辑与暂停、恢复、定位和输出队列分离。
 
-## 扬声器: Borrow-Enqueue 零拷贝
+Decoder 注册表是格式扩展点；Player 的调度逻辑按注册顺序调用 probe，并使用首个接受来源的 Decoder。当前 WAV Decoder 在 Audio Service 初始化路径注册，重叠的 probe 会造成选择顺序依赖。打开的播放描述借用 Decoder 注册节点直到对应 close 完成；Core 当前没有活动引用计数或安全热卸载协议。
 
-我们设计了 borrow-enqueue 模式来消除层间拷贝。平台维护一个内部音频缓冲池，播放器写入解码后的 PCM 时不经过 memcpy：
+播放打开 Decoder 后，将其采样率、声道数和位深交给扬声器设备。Player 不承担 Codec 专属处理，Core 也没有通用 PCM 转码层；设备接受该格式时启动成功，不支持时返回失败。
 
-```mermaid
-sequenceDiagram
-    participant PLR as Audio Player
-    participant SPK as Speaker Device
-    participant HW as 音频硬件
+## Feed 与平台输出
 
-    PLR->>SPK: borrow(&buf, &capacity)
-    SPK-->>PLR: 返回 mAudioData 指针
-    Note over PLR: 直接写入解码后的 PCM
-    PLR->>SPK: enqueue(buf, size)
-    SPK->>HW: 提交给硬件播放
-    HW-->>SPK: 播放完毕，回调释放
-    SPK->>SPK: 缓冲区归还到空闲池
-```
+播放开始时不在调用方的启动路径中同步读完整音频；feed 时钟后续驱动缓冲填充。当前默认 feed 使用 LVGL timer，因此回调在 LVGL 主循环执行。平台可替换 feed 实现来接入 RTOS/DMA 时钟，替换不改变 Decoder 与 Player 之间的数据契约。Player 的供数回调会读取文件、解码并提交扬声器缓冲；采用 ISR feed 的实现需要把这些操作延后到可执行它们的上下文，或提供相应的中断安全能力。默认 feed 不是后台工作线程。
 
-`enqueue` 隐含一个关键行为：若扬声器处于 `DEV_STATE_READY`（已注册但未启动），首次 `enqueue` 会自动启动硬件，将状态推进到 `PLAYING`。移植时务必实现此语义。
+扬声器设备通过类型化操作提供打开格式、借用/提交缓冲、暂停/恢复、停止和播放进度等能力。设备和端口可能缺失或不支持特定操作，Audio Service 将相应失败返回调用方。播放实例由服务统一持有，调用方不拥有播放器内部状态。
 
-## ISR 安全: cqueue + 临界区
-
-播放完成回调（或 DMA 中断）运行在音频/中断线程上。使用 `eos_cqueue`（无锁循环队列）和 `eos_critical_enter/leave` 在音频线程和主 LVGL 线程之间传递缓冲区：
-
-```mermaid
-graph LR
-    subgraph "音频/中断线程"
-        AC["播放完成回调"] -->|cqueue_enqueue| CQ["eos_cqueue"]
-    end
-    subgraph "临界区保护"
-        CQ -->|eos_critical_enter/leave| MAIN
-    end
-    subgraph "LVGL 主线程 (30ms 定时器)"
-        MAIN["_feed_cb"] -->|cqueue_dequeue| DECODE["解码 PCM"]
-        DECODE -->|borrow+enqueue| HW["扬声器设备"]
-    end
-```
-
-不再区分"可选"与"必需"，移植时必须保证 `borrow`（消费者线程）和 `enqueue`（音频中断回调）之间的线程安全性。
-
-## 静音: 全零填充，而非 Volume 置零
-
-一个容易误解的设计：静音并不调用扬声器的 `set_volume(0)`。`eos_service_audio_set_mute` 只写入配置并设置播放器的 `muted` 标志。播放循环中：
-
-```c
-if (p->muted) {
-    memset(buf, 0, cap);
-    spk->ops->enqueue(buf, cap);
-    return true;
-}
-```
-
-这意味着静音状态下音量值保持不变，可以在静音时独立调整音量，取消静音后直接生效。
-
-## 音量: 二阶段提交
-
-我们将音量设置拆为两步，目的是支持淡入淡出等场景：
-
-- `eos_audio_player_set_volume(n)` — 仅写入 `p->volume`，不触及硬件
-- `eos_audio_player_apply_volume(p)` — 将内部值推送到扬声器的 `set_volume` 回调
-
-`eos_service_audio_set_volume` 封装了两步。若你需要在播放过程中逐帧调整音量而不频繁操作硬件，可以自己控制调用时机。
-
-音量值通过 `eos_config` 持久化到 `EOS_CONFIG_KEY_SPEAKER_VOLUME_NUMBER`（默认 50），静音状态持久化到 `EOS_CONFIG_KEY_MUTE_BOOL`。
-
-## 状态机与 Feed 循环
-
-```mermaid
-stateDiagram-v2
-    IDLE --> PLAYING: play()
-    PLAYING --> PAUSED: pause()<br/>保留队列供快速恢复
-    PAUSED --> PLAYING: resume()<br/>预填 8 缓冲区
-    PLAYING --> IDLE: stop() / 播放结束
-    PAUSED --> IDLE: stop()
-```
-
-`play()` 执行流水线：
-1. 自动 `stop` 任何正在进行的播放
-2. 打开解码器（遍历 probe 链表）
-3. 打开扬声器设备，应用当前音量
-4. 预填 8 个缓冲区（防止启动时欠载）
-5. 创建 Feed 定时器（周期 30ms）
-
-`_feed_cb` 在每次定时器滴答时用 `while` 循环尽可能多地填充缓冲区，直到 `borrow` 返回 -1（无空闲缓冲区）。这意味着一个 tick 可以填满多个缓冲区，取决于解码和硬件速度。`resume()` 也会先预填 8 个缓冲区再恢复硬件。
-
-## 解码器流水线
-
-解码器通过 LVGL 链表维护，按注册顺序探测。`eos_audio_decoder_open` 遍历链表依次调用 `probe_cb`，首个返回 `EOS_OK` 的胜出。
-
-内置解码器：
-
-| 解码器 | 支持格式 | 源码位置 |
-|--------|----------|---------|
-| WAV | 16-bit PCM RIFF/WAVE | `src/services/audio/decoders/eos_audio_decoder_wav.c` |
-
-`probe_cb` 只探测不持有资源——以 WAV 解码器为例：打开文件读取 RIFF 头，验证 `RIFF` + `WAVE`，扫描 `fmt`  chunk 解析格式，然后关闭文件。真正的资源分配在 `open_cb` 中。
-
-添加一个新解码器：
-
-```c
-eos_audio_decoder_t *dec = eos_audio_decoder_create();
-eos_audio_decoder_set_probe_cb(dec, my_probe);
-eos_audio_decoder_set_open_cb(dec, my_open);
-eos_audio_decoder_set_read_cb(dec, my_read);
-eos_audio_decoder_set_close_cb(dec, my_close);
-eos_audio_decoder_set_seek_cb(dec, my_seek);  // 可选
-dec->name = "MyDecoder";
-```
-
-seek 操作有两阶段回退：若解码器提供 `seek_cb`，直接调用；否则关闭重开解码器，以 512 帧对齐的 chunk（最小 1024 字节）读取并丢弃 `sample * bytes_per_frame` 字节。这确保了不支持随机访问的流式解码器也能 seek。
-
-## 录制: 双重环形缓冲区
-
-录制链路上有两个独立处理环形缓冲区回绕的逻辑：
-
-```mermaid
-graph LR
-    subgraph "平台层 (DMA / 中断)"
-        DMA["DMA 采集"] -->|set_buffer 缓冲区| RB["ring_buf"]
-    end
-    subgraph "服务层 (LVGL 50ms 定时器)"
-        RB -->|get_write_offset| TC["_recording_timer_cb"]
-        TC -->|处理 wrap| WAV["WAV 文件"]
-    end
-```
-
-录制参数固定为 16kHz、单声道、16-bit。输出为标准 RIFF/WAV，44 字节头部在开始时写入（size 字段占位为零），`stop_recording` 时回填正确值。
-
-## 设备抽象
-
-### 扬声器
-
-```c
-typedef struct {
-    int  (*init)(void);
-    int  (*deinit)(void);
-    int  (*open)(uint32_t sample_rate, uint8_t channels, uint8_t bits_per_sample);
-    int  (*borrow)(void **p_buf, uint32_t *p_capacity);
-    int  (*enqueue)(void *buf, uint32_t size);
-    int  (*stop)(void);
-    int  (*pause)(void);
-    int  (*resume)(void);
-    int  (*set_volume)(uint8_t volume);
-    bool (*is_available)(void);
-} eos_dev_speaker_ops_t;
-```
-
-`eos_dev_speaker_register` 仅校验 `open`、`borrow`、`enqueue`、`stop`、`set_volume`、`is_available` 六个必需指针；`init`/`deinit`/`pause`/`resume` 可选。仅可注册一次，重复返回 `EOS_ERR_ALREADY_EXISTS`。
-
-### 麦克风
-
-```c
-typedef struct {
-    int  (*init)(void);                                        // 可选
-    int  (*deinit)(void);                                      // 可选
-    int  (*open)(uint32_t sample_rate, uint8_t channels,
-                 uint8_t bits_per_sample);                     // 必需
-    int  (*close)(void);                                       // 必需
-    int  (*start)(void);                                       // 必需
-    int  (*stop)(void);                                        // 必需
-    int  (*set_gain)(uint8_t gain);                            // 可选
-    bool (*is_available)(void);                                // 必需
-    int  (*set_buffer)(uint8_t *buf, uint32_t size);           // 必需
-    uint32_t (*get_write_offset)(void);                        // 必需
-} eos_dev_microphone_ops_t;
-```
-
-`set_buffer` 注册一个由 DMA 写入的环形缓冲区（建议大小为 2 的幂）。`get_write_offset` 必须线程安全，可从任何上下文调用。
-
-### enqueue 对齐约束
-
-`enqueue` 的 `size` 应为帧对齐——平台层应在实现中校验 `size` 是否为 `bytes_per_frame` 的整数倍，不对齐时可选择静默截断或返回错误。各平台自行决定处理策略。
-
-## 保存/恢复（来电中断模式）
-
-用于电话呼入等场景的临时中断：
-
-```c
-// 中断——所有权转移给调用者
-void *saved_src;
-eos_audio_src_type_t saved_type;
-uint32_t saved_pos;
-eos_audio_player_save_state(&player, &saved_src, &saved_type, &saved_pos);
-// 此时 player 遗忘 saved_src，你负责在适当时 free 它
-
-// 恢复——player 必须在 IDLE 状态
-eos_audio_player_restore_state(&player, saved_src, saved_type, saved_pos);
-// 内部调用 play() 再 seek(position)
-```
-
-`save_state` 将 `p->cached_src`（`strdup` 得到的字符串）的所有权转移给你。实现假定 `cached_src` 是 `strdup` 出来的——若使用其他源类型，请自行验证。
-
-
-## 完整数据流: 播放
+## 请求、持续执行与停止
 
 ```mermaid
 sequenceDiagram
-    participant APP as 应用程序
-    participant SRV as 音频服务
-    participant PLR as 音频播放器
-    participant DEC as 解码器
-    participant SPK as 扬声器设备
+    participant App as 应用 / Framework
+    participant Service as Audio Service
+    participant Player
+    participant Decoder as Decoder
+    participant Speaker as Speaker Device
 
-    APP->>SRV: play("/fs/music.mp3")
-    SRV->>SRV: 检查扬声器 is_available()
-    SRV->>PLR: play(src, EOS_AUDIO_SRC_FILE)
-    
-    PLR->>DEC: eos_audio_decoder_open(&dsc, src, EOS_AUDIO_SRC_FILE)
-    DEC->>DEC: 遍历 probe 链表
-    Note over DEC: 各解码器 probe_cb 依次尝试，首个返回 EOS_OK 的胜出
-    
-    PLR->>SPK: open(sample_rate, channels, bits)
-    Note over SPK: 平台层分配硬件缓冲区
-    
-    PLR->>SPK: set_volume(volume)
-    
-    loop 预填 8 个缓冲区
-        PLR->>SPK: borrow(&buf, &cap)
-        PLR->>DEC: read(buf, cap)
-        PLR->>SPK: enqueue(buf, read)
-        Note over SPK: 首次 enqueue 自动启动硬件
+    App->>Service: play(path)
+    Service->>Speaker: 检查设备可用
+    Service->>Player: 探测并打开 Decoder
+    Player->>Decoder: probe / open
+    Player->>Speaker: open(format)
+    Service-->>App: 同步返回启动结果
+    loop 播放期间
+        Player->>Decoder: read PCM
+        Player->>Speaker: borrow / enqueue
     end
-    
-    Note over PLR: Feed 定时器启动 (30ms)
-    
-    loop 每 tick (while borrow 成功)
-        PLR->>SPK: borrow(&buf, &cap)
-        alt muted
-            PLR->>PLR: memset(buf, 0)
-        else
-            PLR->>DEC: read(buf, cap)
-        end
-        PLR->>SPK: enqueue(buf, read)
-    end
-    
-    Note over PLR: current_sample ≥ total_samples
-    PLR->>PLR: done_callback → stop_internal
-    SRV-->>APP: EOS_OK
+    App->>Service: pause / stop
+    Service->>Player: 停止供数或关闭播放
+    Player->>Player: 删除 feed，阻止后续供数
+    Player->>Speaker: pause / stop
+    Player->>Decoder: close
 ```
 
-## 注意
+`play` 的同步成功只表示 Decoder 和扬声器已接受启动；后续文件读取、解码和 PCM 消费仍在继续。默认 feed 在 LVGL timer 回调中供数，因此单次文件读取或 Decoder 阻塞会占用主循环。启动阶段找不到 Decoder、设备缺失、格式不接受或资源不足时返回失败；开始后的异步端口故障没有统一的播放错误事件合同。若扬声器提供 drain 查询，Player 会等待排队样本耗尽后自然结束；缺少该能力时 Core 不能证明最后一个样本已经物理输出。
 
-- 服务层目前只暴露一个播放器实例 `_player_media`。`eos_service_audio_get_player()` 返回内部指针供进阶使用，但头文件注释建议优先使用服务层 API，避免破坏内部状态机。
-- `eos_service_audio_play_tone` 尚未实现，目前返回 `EOS_ERR_DEV_OPS_NOT_SUPPORTED`。后续可考虑通过合成 PCM 数据直接推送到播放器。
-- 录制参数硬编码为 16kHz 单声道 16-bit，运行时不可修改。若需支持其他格式，需在服务层增加参数传递。
-- 播放器的 `save_state` / `restore_state` 假定 `cached_src` 源自 `strdup`。若传入其他类型的源，需要自行验证行为正确性。
-- 播放器额外提供了以下进阶 API：`eos_audio_player_seek(p, sample)` 在播放/暂停中跳转；`eos_audio_player_get_position(p)` / `eos_audio_player_get_duration(p)` 获取进度；`eos_audio_player_get_sample_rate(p)` 获取采样率；`eos_audio_player_set_done_callback(p, cb, ud)` 注册播放结束回调。这些函数通过 `eos_service_audio_get_player()` 拿到指针后使用。
-- 文件 I/O 有两套接口：**WAV 解码器** 使用 `eos_fs_*`（`eos_fs_port.h` 底层文件系统端口），而 **录制代码** 使用 `eos_storage_*`（`eos_service_storage.h` 存储服务封装）。两者最终都路由到 `eos_fs_port`，但存储服务层额外提供了路径验证和延迟写入器（DFW）功能。
+暂停会暂停供数并保留 Decoder/播放器状态；停止会删除 feed、停止扬声器并关闭 Decoder。服务持有的播放源路径副本用于 seek/reopen，但 Decoder descriptor 暴露的 `src` 指针在公共接口中没有说明借用期。当前 WAV 实现打开文件时建立自己的文件句柄；新增 Decoder 若需在 `open` 返回后继续使用来源数据，应自行复制/持有它，不能依赖调用方临时字符串继续有效。
+
+## 录音、音量与配置
+
+麦克风录音由 Audio Service 管理：服务创建 DMA 共享环形缓冲区并交给麦克风设备，周期性读取设备写入游标，处理缓冲区回绕后把新样本写入 WAV 文件。当前格式固定为 16 kHz、单声道、16-bit PCM。停止时服务再读取一次游标中的未读区间，然后停止并关闭麦克风、回填 WAV 长度并释放缓冲区。扬声器和录音输入是分开的设备能力，扬声器存在不代表麦克风也存在。
+
+音量与静音由服务保存并应用到扬声器；静音不会覆盖已保存的音量值。播放仍会读取和解码来源数据以推进播放位置和自然结束，只把本次提交的 PCM 缓冲区填为零；解除静音后，原音量继续生效。具体的音量控制粒度和硬件行为取决于设备能力。
+
+## 所有权与扩展约束
+
+- Decoder 注册项在服务初始化时建立并由注册表持有；播放打开后的 Decoder 描述及其源资源由 Player 在结束路径关闭。
+- 新格式通过 Decoder 注册扩展；格式探测与解码不在 Audio Service 或扬声器设备中实现。
+- 平台扬声器和麦克风实现设备操作，不持有应用播放策略或页面生命周期。
+- feed 实现可由平台替换；供数回调的执行上下文和缓冲所有权决定 LVGL、脚本运行时及扬声器操作的可调用范围。
+- 播放器实例由 Audio Service 持有，应用侧控制入口是 Audio Service API。
+- 公共设备头文件未完整定义 Speaker `borrow`/`enqueue` 之后的缓冲所有权和复用时点，因此这些操作尚无跨平台统一保证。
+
+上层启动/停止和异步完成语义见[Application 契约](../../application_contract)；设备注册及 Vendor PCM 责任见[Platform/Vendor 契约](../../platform_contract)。

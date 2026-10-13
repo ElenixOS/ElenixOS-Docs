@@ -1,0 +1,81 @@
+---
+sidebar_position: 4
+title: Core Development Contract
+---
+
+
+# Core Development Contract
+
+A Core change must first identify which kind of external behavior it changes: application capability, Vendor operation, lifecycle, data semantics, thread context, ownership, or failure outcome. As long as it is observable by the upper layers or the porting layer, it is an architectural contract change, and the corresponding Application or Platform contract and subsystem documentation should be updated at the same time.
+
+## Choosing the Extension Boundary
+
+| Capability to be added | Boundary to extend | Responsibilities Core should not be forced to take on |
+|---|---|---|
+| New SoC, chip, touch/knob/screen implementation | Platform port implements the existing Device/port contract and registers before dependent services start | Do not scatter chip registers, Vendor SDK types, or board-level conditions into Service, Framework, or Application |
+| New logical data service | Service owns semantics, state, demand arbitration, caching, and error mapping; when hardware is needed, go through the Device contract | Do not let Vendor maintain application permissions, caching, and application state |
+| New Sensor type/data semantics | Update the public unit/type/validity conventions, the Sensor Service's caching and demand model, and hook up the target device implementation | Do not add private fields only in a single board or JS wrapper |
+| New audio encoding format | Implement a Decoder and add it to Audio Service initialization registration; comply with the Player output contract | Do not add Codec-specific parsing branches in the playback scheduling layer or speaker driver |
+| New watch face semantic value | Extend the current static Metric name/source mapping, then decide whether to expose it via SNI/controls | Do not turn raw sensor types directly into stable semantics that all applications can understand |
+| New LVGL component or JS API | The component owns its internal objects; SNI describes the owner and invalidation points of handles, strings, buffers, and callbacks | Do not expose raw pointers, and do not bypass the Activity/View/SNI lifecycle |
+| Cross-thread deferred operation | Use the Dispatcher or the task queue already defined by that Service, and define the lifetime for user data | Do not treat the synchronous Event Bus as a queue, and do not enter JS/LVGL directly from an ISR |
+| Notification delivery and persistence | First define the service, identity, permissions, queue/persistence, and backend delivery contract, then connect the UI | Do not mistake the message list overlay or the notification permission enumeration for the notification system |
+
+Sensor, device type, and Metric currently do not define a general dynamic Provider selection or priority contract. Audio Decoder provides a registration extension boundary, but there is no secure hot-plug management yet. Each module should manage its lifecycle according to its actual extension contract, and they do not share one undefined Provider lifecycle.
+
+## Dependencies and Ownership
+
+- Framework/applications depend on the Service's semantic interface; Service depends on the Device type interface; Platform implements the Device/port contract. Dependencies cannot cross in reverse: Vendor does not depend on Activity, LVGL, SNI, or application objects.
+- Sensor Service owns the per-type FIFO/latest cache, demand, and Native subscriber nodes; each subscriber releases only its own demand.
+- Services such as Battery, Metric, and Config own their respective state snapshots; callers receive values/borrowed data or an agreed handle, and do not automatically gain ownership of the service's internal objects by reading.
+- SPM owns the script program/Realm/context; Activity Controller owns the page stack and View; an LVGL parent object owns its subtree. View destroy, program stop, and engine generation changes are different invalidation points.
+- The EPKG context owns package file handles and parse tables; preview values, manifest temporary results, and unpack targets are released by their respective agreed consumers. After the package context is closed, its borrowed pointers become invalid, and the installation flow will not continue to reference these pointers after closure.
+
+An asynchronous callback needs at least an owner, a cancellation/destruction path, and a determinable generation or object liveness check. If a callback may arrive after the owner is paused/destroyed, the Realm is reset, or the target object is deleted, it must be discarded before entering the upper layers, and cannot be remedied by dangling pointer checks.
+
+## Synchronous Broadcast and Deferred Work Are Not the Same Thing
+
+| Mechanism | What guarantee the caller gets | Applicable boundary |
+|---|---|---|
+| Service function/Device op | Return value or immediate state within the current call stack; may synchronously trigger lower-layer operations | Parameters and values are handled per the function contract; a synchronous call returning only means that call completed, and the semantics of background work completion are defined by the specific service |
+| Event Bus | Synchronously traverses subscribers on publish;`param`borrows the publisher's storage | State change broadcast; callbacks are short, and subscribers copy data that needs to be retained across callbacks |
+| Dispatcher | After successful enqueue, executed in order by the Core main loop | Hand off from ISR/platform threads to a GUI/script-safe context; submission does not mean reliable persistence, and queue expansion failure may drop tasks; callback user data must survive until execution |
+| SNI callback | Called into JS in the owner program's Realm after runtime checks | Must be constrained by program state, context pause, engine generation, and bound resource lifecycle |
+| Sensor data subscriber |`eos_sensor_notify`synchronously called after updating the cache | The execution context inherits from the publisher; publishing from an ISR is only applicable when it has been confirmed that the entire downstream path can run in interrupt context |
+
+When execution is deferred, the producer copies or queues the minimum necessary data, and then the target context reads or consumes it; data used by an asynchronous callback remains valid during execution. Interfaces that allow a callback to re-enter the same service define cancellation, nested broadcast, and deletion semantics; interfaces without defined reentrancy semantics do not support reentrancy.
+
+## State and Failure Propagation
+
+Device capability, device state, service state, and sample validity each express different semantics and are not merged into a single Boolean:
+
+- Not registered/not supported means a certain device capability does not exist.
+- READY/BUSY/ERROR are device-layer states, not directly equal to the service upper layer's authorization or business state.
+-`valid`/sample timestamp expresses whether data was obtained; a numeric zero can be a valid reading.
+- Synchronous operation failure is returned through that boundary's result; asynchronous sources report upward through readable state, invalid samples, or clearly defined events.
+
+The Device ops table is a type-specific contract; the required field checks also differ for different registrars. The Capability contract defines how absence of a capability is discovered, the call result, service degradation behavior, state changes, and retry semantics. An empty callback or a no-op success does not mean the capability is supported.
+
+The current Power/Display path does not provide unified hardware confirmation: PM first updates software state and then calls the platform power op, and some display ops are void. Core page state or events can only represent software state changes and cannot be elevated to proof of physical device success. When adding flows that require reliable confirmation, a contract that can return/report completion status should be explicitly introduced, rather than continuing to rely on the existing fire-and-forget assumption.
+
+## Lifecycle Boundaries Cannot Be Merged```mermaid
+stateDiagram-v2
+    [*] --> ACTIVE
+    ACTIVE --> SUSPENDED: Recent Apps 保留
+    SUSPENDED --> ACTIVE: 恢复同一 program instance
+    ACTIVE --> STOPPING: 驱逐 / 卸载 / 根替换 / fatal reset
+    SUSPENDED --> STOPPING: 驱逐 / 卸载 / fatal reset
+    STOPPING --> TERMINATED
+```The diagram above only describes the Script Program. Activity/View also has independent enter/pause/resume/destroy and transition exit policies; device registration is currently statically established during platform startup, and there is no system-wide unified deinit/unregister at the service level. When modifying one of these lifecycles, you must check whether the references, callbacks, snapshots, and buffers of other owners are still alive.
+
+## Core Change Self-Check
+
+- Who initiates the request, and who calls the implementation? Along which path is the response or sample returned?
+- Among Pull, Push, Subscribe, Event, or Stream, which models actually exist?
+- Which layer stores state; what the consumer sees is a cache, a borrowed value, or a transfer of ownership?
+- Is the callback synchronous, Dispatcher-deferred, or timer-dispatched? Is the execution context safe?
+- Are the stop and destroy of Service/Activity/Program/Device each explicit?
+- How are missing capability, initialization failure, device offline, invalid sample, and cancellation each manifested?
+- Should the new capability be connected through an existing extension point, or does it require changing the public contract? Which platform and application documents are updated accordingly?
+
+For related role boundaries, see [Application Contract](./application_contract)and [Platform/Vendor Contract](./platform_contract).

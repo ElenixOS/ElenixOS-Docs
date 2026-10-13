@@ -1,212 +1,44 @@
 ---
 sidebar_position: 2
-title: Native Simulator
+title: Native Simulator Runtime Model and Debugging
 ---
 
-# Native Simulator
+# Native Simulator Runtime Model and Debugging
 
-This page will introduce how to compile and run the ElenixOS simulator in a local environment.
+The Native simulator compiles ElenixOS into a desktop program on the host. In normal mode, SDL2 provides display and input; in headless mode, no SDL window is created—instead, the LVGL framebuffer is sent to a local WebSocket/IPC transport, and input is fed back into the same Simulator/LVGL main loop.
 
-## Development Environment Requirements
+This page applies only to the desktop Native target. Board-level firmware is built and flashed by the Board / Platform project; see [Platform and Board Integration](../integration/overview) and [Board-level Firmware Build Path](../getting_started/build) for entry points. For the applicable scope and limitations of the Simulator, see [Simulator Overview](./overview).
 
-### Hardware Requirements
+## Startup and Runtime Behavior
 
-- CPU: Any x86 / ARM
-- Memory: 512MB+
-- Graphics card: Supports basic 2D rendering
+For Native configuration, complete build commands, and `bin/main` startup steps, see [Simulator Build and Run](./build). This page focuses on the Native window, input, and headless debugging boundaries.
 
-### Software Requirements
+## Runtime Interaction
 
-- **Operating system**: Linux, macOS, or Windows
-- **Compilation toolchain**:
-  - GCC (for x86 simulation)
-  - Cross-compilation toolchain for the corresponding development board
-- **Dependency libraries**:
-  - SDL2
-  - CMake (3.13+)
-  - Python 3.7+
+The simulated screen is fixed at 390×450 pixels. The Native window provides simulated controls for the crown and side button; the crown can also be rotated via the mouse wheel to simulate encoder rotation. A short press of the crown and side button produces their respective click inputs, and a long press of the crown produces a long-press input.
 
-[Visual Studio Code](https://code.visualstudio.com/).
+The window is resizable, with the minimum size set by the simulator; resizing the window only changes the desktop display, not the system display size. Headless mode still uses a logical display size of 390×450, and the WebSocket endpoint and authentication token are provided to the debugging frontend via a startup handshake marker.
 
-## Install Python Dependency
+## Headless Control Plane
+
+Native headless can be started as follows:
 
 ```bash
-pip install -r requirements.txt
+./bin/main --headless --ipc-socket /tmp/elenixos-simulator.sock
 ```
 
-Installs `kconfiglib`, required for the build system to auto-generate kernel configuration headers. If not installed, the build proceeds using kernel defaults instead of Kconfig settings.
+WebSocket handles frames and touch/key/crown input for a single loopback Webview; local IPC handles the startup handshake, compatibility control, and exit status. Both transports use non-blocking polling, and input must be injected on the Simulator main thread; they are not general-purpose IPC for applications.
 
-## Obtain Code
+The transport only retains the latest complete RGB565 frame, and you cannot assume the existence of dirty rectangles, compressed images, or multi-client broadcast. ESH remains the Native diagnostic/control channel, separate from the framebuffer WebSocket; before using ESH commands, first confirm which commands are actually registered in the current build.
 
-```bash
-git clone --recursive https://github.com/ElenixOS/ElenixOS-Simulator.git
-```
+## Debug Configuration
 
-:::note
-Note: Use the `--recursive` parameter to ensure submodules are also cloned.
-If you didn't use `--recursive` when cloning, you can get the submodules with the following command:
+ASAN, FreeRTOS, drawing backend, image formats, FFmpeg, and FreeType are controlled via Simulator build options; for complete parameters and commands, see [Simulator Build and Run](./build). For Kconfig configuration of the portable Core, see [Kernel Configuration System](../development/kconfig).
 
-```bash
-git submodule update --init --recursive
-```
-:::
+## Architecture Boundaries
 
-## Install Dependencies
+- SDL, headless display, and the WASM page are platform display ports and do not change ElenixOS's Activity, service, and script model.
+- ESH, WebSocket, and IPC are observation/control boundaries and cannot replace UI screenshots, interaction, or hardware verification on the board.
+- Platform input must enter the unified input adaptation layer; the debugging frontend must not directly modify LVGL objects or Activity state.
 
-Install SDL2 and basic build tools according to your operating system.
-
-### Ubuntu / Debian
-
-```bash
-sudo apt-get update
-sudo apt-get install -y build-essential libsdl2-dev cmake
-```
-
-### Arch Linux
-
-```bash
-sudo pacman -Syu
-sudo pacman -S sdl2 base-devel gcc make cmake
-```
-
-### macOS
-
-```bash
-brew install sdl2 cmake llvm
-```
-
-:::tip
-The default clang on macOS does not support `-fsanitize=leak`. It is recommended to switch to Homebrew-installed LLVM clang in VSCode.
-:::
-
-### Windows
-
-It is recommended to use MSYS2 to install dependencies:
-
-#### MSYS2 Installation
-
-MSYS2 is a Unix-like environment on Windows that provides a package manager to install development tools and libraries.
-
-Official website: https://www.msys2.org/
-
-:::warning
-Do not modify the MSYS2 installation path unless necessary. If you modify it, you need to synchronously modify the path configuration in the `simulator.code-workspace` file in the root directory of `ElenixOS-Simulator`.
-:::
-
-After installing MSYS2, execute in **MSYS2 Shell**:
-
-```MSY32 Shell
-pacman -Syu
-```
-Update the MSYS2 system and all installed packages.
-
-#### Install Dependency Libraries
-
-```MSY32 Shell
-pacman -S mingw-w64-x86_64-toolchain
-# Select all toolchain components for installation
-pacman -S mingw-w64-x86_64-cmake
-pacman -S mingw-w64-x86_64-SDL2
-```
-
-## Run Simulator with VSCode
-
-1. Open the project with VSCode (it is recommended to directly open the workspace file `simulator.code-workspace`).
-2. Install the recommended extensions for the project.
-3. Open Run and Debug on the left side.
-4. Select the debug configuration `Debug LVGL demo with gdb`.
-5. Press `F5` to start debugging and running.
-
-If you are using Homebrew LLVM on macOS:
-
-1. `Cmd+Shift+P` -> `CMake: Select a Kit`
-2. Select `Scan for kits`
-3. Execute `CMake: Select a Kit` again, select the toolchain corresponding to `/opt/homebrew/opt/llvm/bin/clang`
-4. Execute `CMake: Configure`
-5. Press `F5` to run
-
-## Build with Command Line
-
-### Basic Build Steps
-
-The project root `Makefile` provides shortcut commands:
-
-```bash
-make          # Configure and build
-make run      # Build and run
-```
-
-Underlying equivalent: `cmake -B build && cmake --build build`.
-
-### Enable FreeRTOS Mode
-
-To enable FreeRTOS mode, pass `-DUSE_FREERTOS=ON` during CMake configuration:
-
-```bash
-cmake -B build -DUSE_FREERTOS=ON
-```
-
-### Custom Build Options
-
-The project provides the following CMake options:
-
-- `-DUSE_FREERTOS=ON/OFF`: Enable/disable FreeRTOS
-- `-DLV_USE_DRAW_SDL=ON/OFF`: Enable/disable SDL drawing unit
-- `-DLV_USE_LIBPNG=ON/OFF`: Enable/disable libpng support
-- `-DLV_USE_LIBJPEG_TURBO=ON/OFF`: Enable/disable libjpeg-turbo support
-- `-DLV_USE_FFMPEG=ON/OFF`: Enable/disable FFmpeg support
-- `-DLV_USE_FREETYPE=ON/OFF`: Enable/disable FreeType support
-
-### Notes for Different Operating Systems
-
-#### Linux
-
-- Ensure SDL2 development library and CMake are installed
-- Build commands are the same as the basic steps
-
-#### macOS
-
-- Ensure SDL2 and CMake are installed via Homebrew
-- If using Homebrew LLVM, you can specify the compiler during CMake configuration:
-
-```bash
-cmake -B build -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++
-```
-
-#### Windows (MSYS2)
-
-- Execute build commands using MSYS2 Shell
-- Ensure mingw-w64-x86_64-toolchain, mingw-w64-x86_64-cmake, and mingw-w64-x86_64-SDL2 are installed
-- Build commands are the same as the basic steps
-
-### Kconfig Configuration
-
-Kernel build options (memory allocation strategy, filesystem type, font source, etc.) are configurable via the Kconfig system. Refer to [Kernel Configuration System](../development/kconfig).
-
-```bash
-make menuconfig             # Edit build/.config
-```
-
-### Clean Build
-
-```bash
-rm -rf build
-```
-
-## Verify Successful Run
-
-- You can see the simulator window pop up normally
-- No SDL initialization failure errors in the log
-- You can normally set breakpoints and step through debugging in VSCode
-
-## Common Issues
-
-### SDL2 Not Found
-
-- Linux: Confirm `libsdl2-dev` or `sdl2` is installed
-- macOS: Re-execute `brew install sdl2`
-- Windows: Confirm `mingw-w64-x86_64-SDL2` is installed via MSYS2
-
-### macOS Compiler Incompatibility
-
-Please switch to Homebrew LLVM clang as described above and re-run `CMake: Configure`.
+Building Native requires the SDL2 development library; for host dependencies, see [Simulator Environment Preparation](../getting_started/environment).

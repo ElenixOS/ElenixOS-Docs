@@ -3,60 +3,12 @@ title: Image
 sidebar_position: 6
 ---
 
-# Image
+`lv.image` is used to display image resources:
 
-Image is a special API component in ElenixOS used to display images. This document describes the functionality, usage methods, and notes for the image component.
-
-## Feature Introduction
-
-The image component allows developers to display images in applications. It supports various image formats and provides methods for loading and displaying images from different sources.
-
-## Usage Methods
-
-### Creating Image
-
-Use the `new lv.image()` constructor to create an image object:
-
-```javascript
-// Create image object
+```js
 const image = new lv.image(eos.view.active());
+image.setSrc("/path/to/image.png");
+image.setScale(256);
 ```
 
-### Configuring Image
-
-Use the following methods to configure the image:
-
-```javascript
-// Set image size
-image.setSize(100, 100);
-
-// Set image position
-image.setPos(10, 10);
-
-// Set image source
-image.setSrc("A:image.png");
-
-// Set image scaling mode
-image.setScale(2);
-
-// Set image alignment
-image.center();
-```
-
-### Example: Creating a Simple Image
-
-```javascript
-// Create image
-const image = new lv.image(eos.view.active());
-image.setSize(100, 100);
-image.align(lv.ALIGN_CENTER, 0, 0);
-
-// Set image source
-image.setSrc("A:image.png");
-```
-
-### Notes
-
-- Image files should be placed in the application's assets directory
-- Supported image formats: PNG, JPG, BMP, etc.
-- Use `A:` prefix to reference assets directory
+The current binding provides interfaces such as `setSrc`, offset, rotation, pivot, scaling, blend mode, anti-aliasing, and internal alignment, as well as the corresponding read properties. The image source must be a resource path or data supported by the current port; path access is still subject to script package/storage boundaries. `setOpacity` is not a current `lv.image` method; object style interfaces should be used to set transparency.

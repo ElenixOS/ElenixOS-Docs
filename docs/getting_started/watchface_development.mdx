@@ -1,0 +1,107 @@
+---
+title: Watch Face 开发教程
+---
+
+# Watch Face 开发教程
+
+本教程手动创建一个显示 “My Watch Face” 的脚本表盘，构建 Watch Face 类型的 EPKG 安装包，并在运行中的 ElenixOS 上安装和切换表盘。表盘包不是设备固件。
+
+## 前置条件
+
+- 主机已安装 Visual Studio Code 1.136 或更高版本。
+- 已安装 [ElenixOS-Toolkit](../development/toolkit)，用于构建和分析 EPKG。当前 Toolkit 的 **Create** 工作区没有 Watch Face 模板，因此本教程手动建立项目文件。
+- 有一个已构建并运行的目标系统：Native Simulator，或提供 ESH、YMODEM 接收和 EPKG Installer 的板卡。Simulator 的主机依赖与构建步骤见[环境准备](./environment)和[Simulator 构建与运行](../simulator/build)；板级固件由目标 Platform / Board 工程负责。
+
+以下命令使用 `$HOME` 和 bash/zsh。Windows 用户可在 MSYS2/MinGW shell 中执行目录命令，并用编辑器创建文件。
+
+## 1. 创建项目文件
+
+在主机终端创建项目目录及包输出目录：
+
+```bash
+mkdir -p "$HOME/ElenixOS-Watchfaces/my-clock" "$HOME/ElenixOS-Watchfaces/build"
+```
+
+在 VS Code 选择 **File > Open Folder...**，打开 `$HOME/ElenixOS-Watchfaces/my-clock/`，新建根级 `manifest.json`，写入：
+
+```json
+{
+  "id": "com.example.clock",
+  "name": "Example Clock",
+  "version": "1.0.0",
+  "author": "Example",
+  "description": "Example watch face",
+  "minApiLevel": 0,
+  "targetApiLevel": 0
+}
+```
+
+`id` 是安装和运行时使用的稳定表盘身份。EPKG v1 要求 manifest 的身份、作者、版本和 API level 字段，具体语义见[安装包格式](../architecture/package_format)。
+
+在同一目录新建根级 `main.js`：
+
+```js
+const view = eos.view.active();
+const label = new lv.label(view);
+label.align(lv.ALIGN_CENTER, 0, 0);
+label.setText("My Watch Face");
+```
+
+`main.js` 是脚本表盘入口；`eos.view.active()` 返回当前表盘根页面的 View。表盘根 Activity、程序生命周期和可用组件见[表盘系统](../architecture/framework/watchface)。
+
+## 2. 构建并校验 Watch Face 包
+
+在 VS Code 命令面板运行 **ElenixOS: Open App Tools**，打开 **Build** 工作区并选择 **Select App project**，选择 `$HOME/ElenixOS-Watchfaces/my-clock/`。Package type 选 **Watch face**，点击 **Validate project**；校验通过后选择 **Build package**，输出保存为 `$HOME/ElenixOS-Watchfaces/build/my-clock.epk`。
+
+如果已将 `etk` CLI 加入主机 `PATH`，可在任意主机终端运行：
+
+```bash
+etk package build "$HOME/ElenixOS-Watchfaces/my-clock" \
+  --output "$HOME/ElenixOS-Watchfaces/build/my-clock.epk" \
+  --type watchface --compression auto
+etk validate "$HOME/ElenixOS-Watchfaces/build/my-clock.epk"
+```
+
+完整校验应识别包类型 `watchface`、ID `com.example.clock` 并显示 `Validation: full`。CLI 参数和工具获取方式见 [ElenixOS-Toolkit](../development/toolkit)。
+
+## 3. 安装并切换表盘
+
+选择与运行目标相符的路径。目标固件须支持 ESH 的 YMODEM 接收、EPKG 完整校验和 Watch Face 安装。
+
+### 在 Native Simulator 上运行
+
+先按 [Simulator 构建与运行](../simulator/build)生成 Native 程序。以下命令从 `ElenixOS-Simulator` 仓库根目录执行：
+
+```bash
+mkdir -p fs/tmp
+cp "$HOME/ElenixOS-Watchfaces/build/my-clock.epk" fs/tmp/my-clock.epk
+./bin/main
+```
+
+在同一终端的 ESH 提示符逐条执行：
+
+```text
+pkg validate /tmp/my-clock.epk
+pkg install /tmp/my-clock.epk
+```
+
+校验应返回 `pkg: valid EPKG v1`。安装完成后，从目标系统提供的 Watch Face 列表选择 **Example Clock**。在 Native Simulator 中可长按表冠控件打开列表；主页面应显示 **My Watch Face**。
+
+### 在已运行的板卡上安装
+
+在 VS Code 命令面板运行 **ElenixOS: Open ESH Terminal** 并选择设备 UART。Toolkit 默认串口格式为 8N1、关闭 RTS/CTS 流控，`elenixosToolkit.uartBaudRate` 默认 `921600`；主机速率必须与设备端匹配，可在 VS Code Settings 修改该配置项。
+
+运行 **ElenixOS: Send File or Folder with YMODEM (UART)**，选择 `$HOME/ElenixOS-Watchfaces/build/my-clock.epk`，将设备端目标路径设为 `/tmp/my-clock.epk`。传输完成后，在 ESH Terminal 执行：
+
+```text
+pkg validate /tmp/my-clock.epk
+pkg install /tmp/my-clock.epk
+```
+
+完整校验成功且安装完成后，长按当前表盘进入 Watch Face 列表并选择 **Example Clock**。如果目标板未配置该长按入口，使用其提供的表盘选择入口；串口部署和选择入口由 Platform / Board 集成决定。
+
+## 下一步
+
+- 表盘切换、根 Activity 与脚本程序生命周期：[表盘系统](../architecture/framework/watchface)。
+- Application 与 Watch Face 共用的包契约：[EPKG v1 安装包格式](../architecture/package_format)。
+- 脚本接口查询：[JavaScript API 参考](../architecture/script_engine/elenix_os)。

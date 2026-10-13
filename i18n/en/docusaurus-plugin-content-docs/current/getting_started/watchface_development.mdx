@@ -1,0 +1,80 @@
+---
+title: Watch Face Development Tutorial
+---
+
+
+# Watch Face Development Tutorial
+
+This tutorial manually creates a script watch face that displays "My Watch Face", builds a Watch Face type EPKG installation package, and installs and switches watch faces on a running ElenixOS. A watch face package is not device firmware.
+
+## Prerequisites
+
+- Visual Studio Code 1.136 or later is installed on the host.
+- [ElenixOS-Toolkit](../development/toolkit)is installed, used to build and analyze EPKG. The current Toolkit's **Create** workspace does not have a Watch Face template, so this tutorial manually creates the project files.
+- There is a built and running target system: Native Simulator, or a board that provides ESH, YMODEM reception, and EPKG Installer. For the Simulator's host dependencies and build steps, see [Environment Preparation](./environment)and [Simulator Build and Run](../simulator/build); board-level firmware is handled by the target Platform / Board project.
+
+The following commands use`$HOME`and bash/zsh. Windows users can execute directory commands in an MSYS2/MinGW shell and create files with an editor.
+
+## 1. Create Project Files
+
+Create the project directory and package output directory in the host terminal:```bash
+mkdir -p "$HOME/ElenixOS-Watchfaces/my-clock" "$HOME/ElenixOS-Watchfaces/build"
+```In VS Code, select **File > Open Folder...**, open`$HOME/ElenixOS-Watchfaces/my-clock/`, create a new root-level`manifest.json`, and write:```json
+{
+  "id": "com.example.clock",
+  "name": "Example Clock",
+  "version": "1.0.0",
+  "author": "Example",
+  "description": "Example watch face",
+  "minApiLevel": 0,
+  "targetApiLevel": 0
+}
+````id`is the stable watch face identity used during installation and at runtime. EPKG v1 requires the manifest's identity, author, version, and API level fields; for specific semantics, see [Installation Package Format](../architecture/package_format).
+
+Create a new root-level`main.js`in the same directory:```js
+const view = eos.view.active();
+const label = new lv.label(view);
+label.align(lv.ALIGN_CENTER, 0, 0);
+label.setText("My Watch Face");
+````main.js`is the script watch face entry point;`eos.view.active()`returns the View of the current watch face root page. For the watch face root Activity, program lifecycle, and available components, see [Watch Face System](../architecture/framework/watchface).
+
+## 2. Build and Validate the Watch Face Package
+
+In the VS Code command palette, run **ElenixOS: Open App Tools**, open the **Build** workspace and select **Select App project**, then select`$HOME/ElenixOS-Watchfaces/my-clock/`. For Package type, select **Watch face**, and click **Validate project**; after validation passes, select **Build package**, and the output is saved as`$HOME/ElenixOS-Watchfaces/build/my-clock.epk`.
+
+If you have added the`etk`CLI to the host`PATH`, you can run the following in any host terminal:```bash
+etk package build "$HOME/ElenixOS-Watchfaces/my-clock" \
+  --output "$HOME/ElenixOS-Watchfaces/build/my-clock.epk" \
+  --type watchface --compression auto
+etk validate "$HOME/ElenixOS-Watchfaces/build/my-clock.epk"
+```A complete validation should identify the package type`watchface`, ID`com.example.clock`, and display`Validation: full`. For CLI parameters and how to obtain the tools, see [ElenixOS-Toolkit](../development/toolkit).
+
+## 3. Install and Switch Watch Faces
+
+Choose the path that matches the running target. The target firmware must support ESH's YMODEM reception, full EPKG validation, and Watch Face installation.
+
+### Running on Native Simulator
+
+First generate the Native program according to [Simulator Build and Run](../simulator/build). The following commands are executed from the`ElenixOS-Simulator`repository root:```bash
+mkdir -p fs/tmp
+cp "$HOME/ElenixOS-Watchfaces/build/my-clock.epk" fs/tmp/my-clock.epk
+./bin/main
+```Execute the following one by one at the ESH prompt in the same terminal:```text
+pkg validate /tmp/my-clock.epk
+pkg install /tmp/my-clock.epk
+```Validation should return`pkg: valid EPKG v1`. After installation is complete, select **Example Clock** from the Watch Face list provided by the target system. In Native Simulator, you can long-press the crown control to open the list; the main page should display **My Watch Face**.
+
+### Installing on a Running Board
+
+In the VS Code command palette, run **ElenixOS: Open ESH Terminal** and select the device UART. The Toolkit's default serial format is 8N1, with RTS/CTS flow control disabled, and`elenixosToolkit.uartBaudRate`defaults to`921600`; the host rate must match the device side, and this configuration item can be modified in VS Code Settings.
+
+Run **ElenixOS: Send File or Folder with YMODEM (UART)**, select`$HOME/ElenixOS-Watchfaces/build/my-clock.epk`, and set the device-side target path to`/tmp/my-clock.epk`. After the transfer is complete, execute the following in the ESH Terminal:```text
+pkg validate /tmp/my-clock.epk
+pkg install /tmp/my-clock.epk
+```After full validation succeeds and installation is complete, long-press the current watch face to enter the Watch Face list and select **Example Clock**. If the target board does not have this long-press entry configured, use the watch face selection entry it provides; serial deployment and selection entries are determined by the Platform / Board integration.
+
+## Next Steps
+
+- Watch face switching, root Activity, and script program lifecycle: [Watch Face System](../architecture/framework/watchface).
+- Package contract shared by Application and Watch Face: [EPKG v1 Installation Package Format](../architecture/package_format).
+- Script interface reference: [JavaScript API Reference](../architecture/script_engine/elenix_os).

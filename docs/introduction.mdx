@@ -6,42 +6,23 @@ title: ElenixOS 介绍
 
 # ElenixOS 介绍
 
-ElenixOS 是一个面向智能手表与其他资源受限可穿戴设备的开源操作系统。它把 UI、应用逻辑和系统服务组织在统一的脚本运行时之上，让表盘、系统应用和第三方应用能够以更一致的方式运行，同时保留对底层硬件的高效访问能力。
+ElenixOS 是面向智能手表和其他资源受限可穿戴设备的开源嵌入式操作系统。系统 Core 提供应用模型、运行时、Framework、系统服务和设备抽象；Platform / BSP 工程把 Core 接到具体 SoC、Board、显示、输入、存储和其他外设。
 
-## 核心特性
+ElenixOS-Simulator 和 ElenixOS-Toolkit 是生态中的辅助开发工具：Simulator 帮助快速迭代 UI、Application / Watch Face 及部分平台无关逻辑；Toolkit 初始化应用项目并构建、分析 EPKG 安装包。Simulator 的桌面运行行为不代表具体 Board 的驱动与硬件能力。
 
-### 脚本驱动的应用模型
+PSoC Edge E84 移植仍处于开发阶段，尚未形成稳定移植。开发者也可以自行创建 Platform / BSP 工程并移植到自有 SoC 或 Board。
 
-ElenixOS 的表盘和应用程序统一由脚本引擎驱动。脚本负责描述界面和业务逻辑，底层原生代码负责调度、渲染与资源管理。这种分层方式让应用更容易迭代，也便于在不同硬件平台间迁移。
+## 系统模型
 
-### LVGL + JerryScript 运行时
+- **Application / Package：** 脚本应用和表盘以 EPKG 安装包交付，安装后由 Framework 按稳定身份管理。
+- **Program / Runtime：** SPM 管理脚本 Program、Realm 和运行时资源；JavaScript 通过 SNI 暴露的接口进入 Native 系统。
+- **Activity / View：** Activity Controller 管页面关系和生命周期；Activity 持有自己的 LVGL View。页面和脚本 Program 是两个相关但独立的生命周期。
+- **Framework / Service：** Framework 提供面向应用的模型，Service 管系统共享能力、状态和策略；Storage、Sensor、Audio 等属于具体系统服务。
+- **Device / Platform：** Core 定义设备与平台契约；Board / BSP 集成实现这些边界，并接入目标硬件。
 
-图形层基于 LVGL，脚本执行则由 JerryScript 提供支持。前者负责界面绘制和交互，后者负责在资源受限设备上执行 JavaScript 逻辑。两者结合后，ElenixOS 能在可穿戴设备上提供相对一致的 UI 体验和脚本化扩展能力。
+详细关系见[系统架构](./architecture/arch)。系统入口页不预设读者的开发角色，也不要求所有人先建立 Application 项目。
 
-### 分层架构
+## 继续阅读
 
-项目把系统能力拆分为应用层、内核层、可移植接口层和硬件层。这样做的好处是：上层应用可以稳定依赖统一 API，而底层实现可以针对不同芯片、传感器和外设进行替换。
-
-### 面向开发者的工具链
-
-除了运行时本身，ElenixOS 还提供了应用打包、绑定层生成等开发工具，帮助你把脚本、资源和原生接口组合成可部署的应用包。
-
-### 丰富的核心模块
-
-ElenixOS 提供了一系列核心模块，包括：
-
-- **应用管理**：支持应用的安装、卸载、管理和运行
-- **系统服务**：提供电池管理、传感器管理等系统级服务
-- **UI组件**：基于 LVGL 提供丰富的用户界面组件
-- **文件系统**：支持文件和目录的操作
-- **脚本引擎**：基于 JerryScript 提供 JavaScript 执行环境
-
-## 适合先读什么
-
-如果你只想快速建立整体印象，建议按这个顺序阅读：
-
-1. 先看 [系统架构](/docs/architecture/arch)，了解 ElenixOS 的分层方式。
-2. 再看 [脚本引擎](/docs/architecture/script_engine_overview)，理解应用和表盘是如何运行的。
-3. 接着看 [快速开始](/docs/getting_started/quick_start)，确认项目的基本入口。
-4. 需要开发或调试时，再查看 [开发工具](/docs/development/dev_tools) 和 [构建与使用](/docs/getting_started/build)。
-5. 想了解核心模块的详细实现，可查看 [核心模块](./architecture/framework/app) 相关文档。
+- **选择开发目标：** [快速开始](./getting_started/quick_start)列出 Application、Watch Face、Platform / BSP、Core、Simulator 与系统认知路径。
+- **理解系统边界：** 阅读[系统架构](./architecture/arch)，再按需进入 Application、Platform、Core 或具体子系统契约。

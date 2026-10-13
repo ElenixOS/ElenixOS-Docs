@@ -1,43 +1,39 @@
 ---
-sidebar_position: 2
 title: Quick Start
 ---
 
 # Quick Start
 
-This guide will help you quickly get started with the ElenixOS project, including code acquisition, environment setup, compilation and running, and basic usage.
+ElenixOS is an open-source embedded operating system for smartwatches and resource-constrained wearable devices. ElenixOS Core provides the Framework, script runtime, system services, and device abstraction; Platform / BSP projects connect these system capabilities to specific SoCs, Boards, and peripherals. Application packages, board-level firmware, and the Simulator desktop program are distinct deliverables.
 
-[ElenixOS-Simulator](https://github.com/ElenixOS/ElenixOS-Simulator) is based on [lv_port_pc_vscode](https://github.com/lvgl/lv_port_pc_vscode) and ported to ElenixOS,
-allowing you to compile and run ElenixOS simulation on any PC for rapid iteration and debugging.
+```mermaid
+flowchart LR
+    App["Application / Watch Face"] -->|Public system interfaces| Core["ElenixOS Core"]
+    Core -->|Defines Device / port contracts| Platform["Platform / BSP"]
+    Platform -.->|Implements and registers devices| Core
+    Platform -->|Integrates| Board["SoC / Board"]
+    Board -->|Device data and status| Platform
+```
 
-## Choose Your Starting Method
+Development tools and the Simulator are auxiliary environments chosen per task, not part of the system runtime.
 
-Based on your needs and environment, choose one of the following methods to start using ElenixOS:
+The currently public PSoC Edge E84 integration is still under development and has not yet formed a stable port. The Simulator is suitable for desktop UI and some platform-independent logic iteration, but does not replace board-level driver, power consumption, timing, and flashing verification.
 
-### 1. Online Experience
+## Choose Your Development Path
 
-If you want to quickly experience ElenixOS without installing any software, you can use the online simulator:
+| Goal | Where to Start | What This Path Involves |
+|---|---|---|
+| **Application Development** | [Application Development Tutorial](./application_development) | Application model, project entry point, EPKG build, installation, and running. The official VS Code project and package workflow use [ElenixOS-Toolkit](../development/toolkit); the Toolkit is not a unified prerequisite for system operation. |
+| **Watch Face Development** | [Watch Face Development Tutorial](./watchface_development) | Watch face root page, Watch Face type EPKG, installation, and switching. The Toolkit does not currently provide a watch face project template; the tutorial explains the steps to manually prepare the entry file. |
+| **Platform / BSP / Vendor Integration** | [Platform and Board Integration](../integration/overview) | Core's device and port contracts, target BSP, board-level firmware, boot, and hardware integration. Choose a specific Board first, then use that project's own toolchain and build process. |
+| **Core Development** | [System Architecture](../architecture/arch) and [Core Development Contract](../architecture/core_development_contract) | Core's dependency boundaries are described on the architecture page; the source code is in the [main repository](https://github.com/ElenixOS/ElenixOS/tree/main/src), and the testing and contribution process is described in the [Testing Guide](../development/testing/overview) and [Contributing Guide](../contributing). When you need a runnable target, use the [Simulator path](../simulator/overview) or the corresponding [Platform / Board project](../integration/overview). |
+| **Simulator Rapid Iteration** | [Simulator Guide](../simulator/overview) | Environment, build, and run for Native / WASM desktop targets. It is an optional development auxiliary environment, not the default deployment target or board-level firmware builder. |
+| **Understand the System First** | [System Architecture](../architecture/arch) | The main relationships among Core, Platform, Application, Runtime, Service, and Device. |
 
-- [Online Simulator](https://simulator.elenixos.com/wasm/latest/main.html) - Experience ElenixOS directly in your browser without installing any software
+## Three Different Build Artifacts
 
-### 2. Local Development
+- **Board-level firmware** is built and flashed by Platform / BSP projects for a specific SoC and Board. The project, toolchain, configuration, and download method are defined by the specific platform project; choose a target from the [Board-level Firmware Build Path](./build).
+- **Application / Watch Face installation packages** are generated as `.epk` by the development workflow, then installed onto a system already running ElenixOS; they are not firmware images.
+- **The Simulator** is built by the host toolchain as a desktop program or WASM page for auxiliary development; it does not generate Board firmware.
 
-If you plan to develop ElenixOS applications or customize the system, it is recommended to set up a local development environment:
-
-1. **Environment Setup** - Install necessary development tools and dependencies
-   - [Environment Setup](./environment) - Detailed environment setup guide
-
-2. **Build Project** - Compile and run the ElenixOS simulator
-   - [Build Guide](./build) - Complete build process and command instructions
-
-3. **Develop Applications** - Understand ElenixOS core concepts and APIs
-   - [File System Module](../architecture/services/storage) - File operations and directory management
-   - [Activity and View](../architecture/framework/activity) - Page management and lifecycle
-   - [JavaScript API](../architecture/script_engine/elenix_os) - System API reference
-
-## Next Steps
-
-- Check the [Environment Setup](./environment) page to learn how to set up a development environment
-- Check the [Build Guide](./build) page to learn how to compile and run the ElenixOS simulator
-- Explore the [Core Modules](../architecture/framework/app) documentation to understand ElenixOS core functionality
-- Check the [JavaScript API](../architecture/script_engine/) documentation to learn how to develop ElenixOS applications
+The public entry point ends here. The complete commands, code, configuration, deployment, and expected results for each role are located in the corresponding task tutorials; for interface queries, see the [JavaScript API Reference](../architecture/script_engine/elenix_os).

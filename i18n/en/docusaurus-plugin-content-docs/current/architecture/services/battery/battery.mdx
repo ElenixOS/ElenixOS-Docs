@@ -3,156 +3,39 @@ sidebar_position: 5
 title: Battery Service
 ---
 
-The battery service is responsible for managing battery status, including battery level, voltage, current, charging status and other information. The service receives raw data from the battery hardware device, processes it, and provides it to upper-layer applications.
+# Battery Service
 
-## Battery Data Structures
+The battery service is a combination of pull requests and push reports: the Service calls the device's `request_update` according to initialization/timer policy, and the Vendor reports data after obtaining it; the Service validates the percentage, updates the state snapshot/history, and synchronously publishes events on meaningful changes. The percentage reported by the platform device is the primary source of battery level; Core does not derive battery level from voltage on behalf of the Vendor at the application layer or in the Service.
 
-### Raw Battery Data
-
-Raw measurement data reported by the battery hardware device:
-
-```c
-typedef struct {
-    int8_t percent;                   // Battery percentage (0-100), -1 if unavailable
-    int16_t voltage_mv;              // Battery voltage in millivolts, -1 if unavailable
-    int16_t current_ma;              // Battery current in milliamps, positive for discharge, negative for charge
-    bool charging;                   // true if charging
-} eos_battery_raw_t;
+```mermaid
+sequenceDiagram
+    participant Service as Battery Service
+    participant Vendor as Battery Port
+    participant App as Framework Consumer
+    Service->>Vendor: request_update
+    Note right of Vendor: Read hardware, may complete asynchronously
+    Vendor-->>Service: report raw state
+    Service->>Service: Validate and update valid state/history
+    Service-->>App: State change event (synchronous)
+    App->>Service: pull current state
 ```
 
-### Battery State Data
+## Sampling Policy
 
-Processed battery state with timestamp:
+The service automatically selects normal, low power, and charging modes based on the battery level when not charging and the charging status. The default policies are as follows:
 
-```c
-typedef struct {
-    int8_t percent;                   // Battery percentage (0-100)
-    int16_t voltage_mv;               // Battery voltage in millivolts
-    int16_t current_ma;               // Battery current in milliamps
-    bool charging;                    // true if charging
-    uint32_t ts;                      // Timestamp when this state was recorded
-    bool valid;                       // Validity flag
-} eos_battery_state_t;
-```
+| Mode | Entry Condition | Request Interval | Battery Event Threshold |
+|---|---|---:|---:|
+| Normal | Not charging and battery level above 20% | 60 seconds | 1 percentage point |
+| Low Power | Not charging and battery level at or below 20% | 300 seconds | 2 percentage points |
+| Charging | Charging | 5 seconds | 1 percentage point |
 
-## Battery Modes
+The Service requests an update immediately upon initialization, after which an LVGL timer requests periodically according to the current mode. The device's `request_update` has no synchronous read return value; the state is only updated after the device reports. Events are triggered according to the thresholds in the table above or on charging status changes, and are not broadcast on every poll. The mode intervals and thresholds are currently fixed in the Battery Service implementation and are not Kconfig options.
 
-The battery service supports multiple operating modes, each with different polling strategies:
+## State and Notifications
 
-```c
-typedef enum {
-    EOS_BATTERY_MODE_NORMAL = 0,    // Normal mode
-    EOS_BATTERY_MODE_LOW_POWER,     // Low power mode
-    EOS_BATTERY_MODE_CHARGING,     // Charging mode
-    EOS_BATTERY_MODE_ACTIVE,        // Active mode
-    EOS_BATTERY_MODE_COUNT,
-} eos_battery_mode_t;
-```
+Consumers can pull the current snapshot or subscribe to battery level/charging changes. Service events are triggered by change thresholds rather than broadcast on every sample. When there is no valid device reading yet, the state remains invalid, and default values do not represent real measurements. The device request entry point does not return sampling results; a successful initialization also does not mean the first valid value has been received.
 
-### Battery Policy
+The service also aggregates capacity, cycle count, and battery level change history; the change history stores up to 128 entries, overwriting the oldest entry when full, and identical consecutive battery level/charging states are not recorded repeatedly. The history count and entries are read via the service API, and consumers should not directly modify the internal records.
 
-Each mode has a corresponding policy:
-
-```c
-typedef struct {
-    uint32_t interval_ms;            // Polling interval in milliseconds
-    uint8_t threshold_percent;      // Battery threshold
-} eos_battery_policy_t;
-```
-
-## Service Initialization
-
-Initialize the battery service and register battery update events:
-
-```c
-eos_result_t eos_service_battery_init(void);
-```
-
-## Get Battery Information
-
-### Get Battery Percentage
-
-```c
-int8_t eos_battery_get_percent(void);
-```
-
-Returns battery percentage (0-100), or -1 if unavailable.
-
-### Get Battery Voltage
-
-```c
-int16_t eos_battery_get_voltage_mv(void);
-```
-
-Returns battery voltage in millivolts, or -1 if unavailable.
-
-### Get Charging Status
-
-```c
-bool eos_battery_is_charging(void);
-```
-
-Returns true if charging.
-
-### Get Complete Battery State
-
-```c
-bool eos_battery_get_state(eos_battery_state_t *state);
-```
-
-Returns true on success, false if service not initialized or state invalid.
-
-### Get Battery Capacity Information
-
-```c
-uint32_t eos_battery_get_design_capacity(void);     // Design capacity in mAh
-uint32_t eos_battery_get_current_capacity(void);     // Current estimated capacity in mAh
-uint32_t eos_battery_get_cycle_count(void);         // Battery cycle count
-```
-
-## Battery Events
-
-Use the event ID to register for battery state change notifications. When battery percentage or charging state changes, the event is broadcast:
-
-```c
-eos_event_id_t eos_battery_get_event_id(void);
-```
-
-## Custom Battery Calculation
-
-By default, a linear interpolation algorithm converts voltage to percentage. To use a custom algorithm:
-
-```c
-void eos_battery_set_calc_fn(eos_battery_calc_fn_t fn);
-```
-
-Callback function type:
-
-```c
-typedef int (*eos_battery_calc_fn_t)(int voltage_mv);
-```
-
-Pass in voltage (millivolts), return calculated percentage (0-100), or negative on error. Pass NULL to use the default algorithm.
-
-## Policy Management
-
-### Set Mode Policy
-
-```c
-eos_result_t eos_battery_set_policy(eos_battery_mode_t mode, const eos_battery_policy_t *policy);
-```
-
-### Get Mode Policy
-
-```c
-eos_result_t eos_battery_get_policy(eos_battery_mode_t mode, eos_battery_policy_t *policy);
-```
-
-## State Persistence Keys
-
-State persistence keys used by the battery service:
-
-```c
-#define EOS_STATE_KEY_CAPACITY             "battery_capacity"      // Battery capacity
-#define EOS_STATE_KEY_CYCLE_COUNT          "cycle_count"           // Cycle count
-```
+Device registration and `request_update` are part of the platform-side contract; after the update report completes, events execute synchronously in the context of the report call. When the platform reports from an ISR, all battery event subscribers also run synchronously in that ISR context, so this path is only suitable when the entire downstream callback chain has been confirmed to be executable in interrupt context; in other cases, the platform defers to an appropriate task/Core context first. For general responsibilities, see [Platform/Vendor Contract](../../platform_contract) and [Application Contract](../../application_contract).

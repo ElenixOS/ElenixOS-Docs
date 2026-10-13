@@ -3,54 +3,10 @@ sidebar_position: 8
 title: 触觉服务
 ---
 
-触觉服务负责管理设备振动功能，提供不同强度的触觉反馈。
+# 触觉服务
 
-## 振动强度预设
+触觉服务把系统反馈请求映射到平台振动设备。设备缺失或操作不受支持时，服务按设备能力和操作结果报告；静默无效果不构成成功确认。
 
-```c
-typedef enum {
-    EOS_HAPTIC_STRENGTH_OFF = 0,       // 关闭
-    EOS_HAPTIC_STRENGTH_NORMAL = 128,   // 正常强度
-    EOS_HAPTIC_STRENGTH_INTENSE = 255,  // 强烈强度
-} eos_haptic_strength_t;
-```
+服务提供关闭、普通和增强三档全局强度，以及短促、较强和长时等反馈语义。具体波形与持续时间由平台实现决定；调用方表达反馈意图，不直接控制振动硬件。
 
-## 触觉反馈模式
-
-### 短促轻振动
-
-用于轻微的触觉反馈提示：
-
-```c
-void eos_haptic_tick(void);
-```
-
-### 较强较长振动
-
-用于需要更强触觉反馈的场景：
-
-```c
-void eos_haptic_buzz(void);
-```
-
-### 最强最长振动
-
-用于重要通知或警报：
-
-```c
-void eos_haptic_vibrate_long(void);
-```
-
-## 服务管理
-
-### 初始化
-
-```c
-void eos_service_haptic_init(void);
-```
-
-### 设置全局振动强度
-
-```c
-void eos_haptic_set_strength(eos_haptic_strength_t s);
-```
+Core 按反馈意图同步调用 Vibrator 的 on/off 操作；Vendor 决定实际波形和设备强度。操作没有返回值，当前 Service 不提供逐次振动完成或硬件成功事件，因此应用不能依赖某次请求一定产生可感知振动。平台边界见[Platform/Vendor 契约](../../platform_contract)。

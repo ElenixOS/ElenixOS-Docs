@@ -1,0 +1,38 @@
+---
+title: E84 Development Project Build and Flashing
+---
+
+
+# PSoC Edge E84 Development Project Build and Flashing
+
+This tutorial targets the current [ElenixOS-PSoC-E84 project](https://github.com/ElenixOS/ElenixOS-PSoC-E84) and the `APP_KIT_PSE84_AI` default target. This integration is still under development and has not yet formed a stable port; a successful command only indicates that the current project completed the corresponding build or download step.
+
+## Prerequisites
+
+- ModusToolbox is installed, along with the BSP, Middleware, and GNU Arm Toolchain used by this project.
+- You have a development board and KitProg3 matching `TARGET`. Prepare board jumpers, display devices, and connection methods according to the target project instructions.
+- The build environment can locate the ModusToolbox tools. The default installation path is detected by the project build files; if installed in a custom location, you need to set `CY_TOOLS_PATHS` to point to the corresponding `tools_<version>` directory.
+- `CY_GETLIBS_SHARED_PATH` points to the parent directory of the shared dependency directory. The example below uses `$HOME/ModusToolbox`, and dependencies will be placed under `mtb_shared/`.
+
+## Obtaining the Project and Building
+
+In the host's bash/zsh shell, run the following from the parent directory where the source code is stored: ```bash
+git clone --recursive https://github.com/ElenixOS/ElenixOS-PSoC-E84.git
+cd ElenixOS-PSoC-E84
+mkdir -p "$HOME/ModusToolbox"
+make getlibs CY_GETLIBS_SHARED_PATH="$HOME/ModusToolbox"
+CY_SECONDSTAGE=1 make build -j2 TARGET=APP_KIT_PSE84_AI TOOLCHAIN=GCC_ARM CONFIG=Debug \
+  CY_GETLIBS_SHARED_PATH="$HOME/ModusToolbox"
+``` The command is run from the root directory of the `ElenixOS-PSoC-E84` repository. Currently, `common.mk` defaults to selecting `APP_KIT_PSE84_AI`, `GCC_ARM`, and `Debug`; the command above explicitly writes out these values to make it easier to confirm the build target. The project's top-level Makefile combines the CM33 Secure, CM33 Non-secure, and CM55 projects, and a successful build should generate `build/app_combined.hex`.
+
+When changing the Evaluation Kit, toolchain, or display module, first confirm the target values and hardware requirements in the project `common.mk`, the corresponding Board configuration, and the README. You cannot simply replace the board name in the command.
+
+## Flashing and Booting
+
+After confirming that the KitProg3 and development board matching the target configuration are connected, run the following in the repository root directory: ```bash
+CY_SECONDSTAGE=1 make program \
+  TARGET=APP_KIT_PSE84_AI TOOLCHAIN=GCC_ARM CONFIG=Debug \
+  CY_GETLIBS_SHARED_PATH="$HOME/ModusToolbox"
+``` This project invokes the ModusToolbox download configuration to write to the target board. Success is determined by the downloader and the target project output; then set the boot state, external display, and cables according to the board instructions. You can also open `ElenixOS-PSoC-E84.code-workspace` in VS Code and run **Terminal > Run Task > Build** and **Program Application (KitProg3)**.
+
+The board-level project's `TARGET`, BSP, Linker Script, firmware layout, and downloader together determine the actual supported scope. The build or flashing result of this development project does not mean that E84 has become a stable port; firmware download and EPKG installation are different processes. For application-side entry points, see [Application Development](../getting_started/application_development) and [Watch Face Development](../getting_started/watchface_development).

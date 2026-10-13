@@ -1,25 +1,30 @@
 ---
 sidebar_position: 1
-title: 项目集成
+title: Platform 与 Board 集成
 ---
 
-## 项目获取
+# Platform 与 Board 集成
 
-### 克隆代码库
+ElenixOS Core 提供可移植的 Framework、Runtime、Service、Device 和 port 契约；板级工程实现这些契约，并组合 SoC / BSP、外设驱动、启动流程、配置和工具链，产出板级固件。不同集成工程拥有独立的构建、配置和下载流程，不共享一套通用命令。
 
-使用 Git 克隆 ElenixOS 代码库：
+## 选择现有板级工程
 
-```bash
-git clone --recursive https://github.com/ElenixOS/ElenixOS.git
-```
+| 集成工程 | 目标硬件 | 开发与构建入口 |
+|---|---|---|
+| [ElenixOS-PSoC-E84](https://github.com/ElenixOS/ElenixOS-PSoC-E84)（开发中） | PSoC Edge E84 Evaluation / AI / HMI kits；工程包含 CM33 Secure、CM33 Non-secure 和 CM55 多核项目。 | 使用 ModusToolbox 与对应 BSP / Toolchain；仓库 README 和 `ElenixOS-PSoC-E84.code-workspace`说明当前工程的 Build、Program 和板卡设置。该移植尚未稳定。 |
 
-:::note
-注意：使用 `--recursive` 参数确保同时克隆子模块。
-如果没有使用 `--recursive` 克隆，可以通过以下命令获取子模块：
+E84 集成仍处于开发阶段，尚未实现稳定移植。目标板、SDK / Toolchain 版本、显示配置、Linker Script、构建变体、Flash 布局和下载工具以对应板级工程为准；当前命令见 [E84 开发工程构建与烧录](./psoc_edge_e84_build)。其他目标的工程由各 Platform / Board 项目定义。构建目标选择见[板级固件构建路径](../getting_started/build)；移植职责和注册顺序见 [Platform / Vendor 契约](../architecture/platform_contract)，设备接口模型见[设备架构](../architecture/device_architecture_design)。
 
-```bash
-git submodule update --init --recursive
-```
-:::
+## 自建 Platform / Board 移植
 
-<todo />
+现有集成工程不是唯一的目标选择。开发者可以为自有 SoC 或自建板卡创建新的 Platform / BSP 工程，将 ElenixOS Core 接到目标硬件；不要求复制现有工程的构建系统或板卡结构。
+
+移植工程负责实现适用的 port 与 Device 契约、组合 BSP 和外设、准备系统启动与服务注册，并定义自己的配置、Toolchain、固件产物和烧录流程。实现边界见 [Platform / Vendor 契约](../architecture/platform_contract)，整体系统关系见[系统架构](../architecture/arch)。
+
+## 固件与应用包的边界
+
+固件镜像由板级工程构建并烧录到芯片；Application / Watch Face 的 `.epk` 则是已运行系统安装的 Package，不属于板级固件产物。应用侧的项目与部署任务见 [Application 开发](../getting_started/application_development)和 [Watch Face 开发](../getting_started/watchface_development)。Platform 接入边界仍由 Core 的 Device 与 port 契约定义，不因包类型改变。
+
+## 可选桌面辅助环境
+
+[ElenixOS-Simulator](../simulator/overview)可用于快速验证界面、Application / Watch Face 和部分平台无关逻辑。Native / WASM 目标由独立 Simulator 工程构建；模拟显示、输入、设备和文件系统行为不能代替目标 Board 的驱动、功耗、时序和烧录验证。

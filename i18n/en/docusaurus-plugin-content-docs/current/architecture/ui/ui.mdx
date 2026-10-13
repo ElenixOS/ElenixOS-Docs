@@ -5,90 +5,45 @@ title: UI Components Module
 
 # UI Components Module
 
-The UI components module is one of the core components of ElenixOS, providing a series of user interface components and interaction functions, built based on the LVGL graphics library. This module provides a unified UI components and interaction methods for applications, ensuring the consistency and aesthetics of the system interface.
+ElenixOS UI is built on LVGL, but UI ownership and hierarchy are jointly constrained by Activity, the top-layer registry, and the system UI manager. Components are not an arbitrary collection of LVGL objects.
 
-## Core Features
+## UI Model
 
-### Basic Components
+Activity owns the application page View; system-level components use semantic top-layer slots. A slot corresponds to a permanent container and expresses the hierarchical relationship of application content, page snapshots, application headers, global interaction, system UI, modal UI, secure UI, and debug UI. Slot numbers are ordering semantics, not LVGL child indices, and cannot be persisted.
 
-Basic components include buttons, labels, input fields and other basic UI elements, providing basic user interaction functions for applications.
+The message list, control center, and other sibling overlays share the interaction slot. Foreground objects and touch objects within a slot are reordered through a unified focus mechanism, avoiding each component separately seizing the top layer. Modal, lock screen, error, and permission UI reside at specified higher layers.
 
-### Advanced Components
+## Responsibilities
 
-Advanced components include card pagers, bubble grids, swipe panels and other complex UI elements, providing rich interaction methods for applications.
+- Activity manages page Views, page transitions, and page destruction.
+- The Overlay layer manages system-level containers and stable visual hierarchy.
+- The Interaction slot manages the current focus and input objects of sibling interactive overlays.
+- Components are responsible for their own internal objects and callbacks, but not for deleting shared slots, Activity Views, or the root objects of other components.
+- Scripts create objects through the registered `lv`/`eos` APIs; script handles remain bound by the owning View and program lifecycle.
 
-### Animation System
+## Input and Rendering Flow
 
-The animation system provides rich animation effects, including fade in/out, slide, scale, etc., enhancing the visual effects and interactive experience of the user interface.
+Input devices do not share a single event queue that can make decisions on behalf of all inputs. Platform touch is handed to the touch input layer via the LVGL pointer indev, and then hit-testing and widget event dispatch are performed by the LVGL object tree. The crown knob is bound to the currently scrollable object; the crown button and side button are first converted into system actions, then dispatched by the main loop to Chrome or power management. The foreground relationship of pages and overlays is managed by Activity/Chrome, not inferred by drivers.
 
-### Activity Controller
+Therefore platform ports should report standardized touch, knob, or button states; page navigation, wake-up, opening the control center, and widget interaction are still handled by the system layer. UI callbacks execute in the LVGL/runtime main loop; rendering output is carried by the platform display port.
 
-The activity controller is responsible for managing the activity lifecycle of applications, including activity creation, switching, destruction, etc.
+## Message List and Notification Boundary
 
-## Key Interfaces
+The message list is a UI component placed in the shared interaction slot, responsible for displaying list items and details. The current implementation has no general notification broker, notification persistence service, or JS-facing notification delivery API. The `notification` permission category and its settings entry do not by themselves constitute a notification sending/storage contract; this list UI should not be regarded as the owner of a notification service.
 
-### Standard Components Interfaces
+## Architecture Constraints
 
-```c
-lv_obj_t *eos_std_info_create(lv_obj_t *scr,
-                              lv_color_t icon_bg_color,
-                              const char *icon,
-                              const char *title_txt,
-                              const char *txt);
+- System components must use semantic top-layer slots and must not rely on the current child index or privately reorder the shared top layer.
+- Sibling overlays must obtain focus through the interaction slot; system modal layers, lock screen, and error layers must not be covered by ordinary application overlays.
+- Cascading invalidation caused by parent object deletion must be treated by components and script handles as a normal lifecycle outcome.
+- Objects managed by Activity/Recent Apps/system overlays can only be released by the corresponding owner; components must not delete root objects across owners.
+- UI and SNI callbacks must return quickly and must not block or directly operate LVGL from non-UI threads.
 
-void eos_std_title_comment_create(lv_obj_t *parent,
-                                  const char *title,
-                                  const char *comment);
-```
+## Related Pages
 
-- `eos_std_info_create`：Create message page, including icon, title and text
-- `eos_std_title_comment_create`：Create title and comment combination
-
-### Animation Interfaces
-
-The animation system provides rich animation effect interfaces. For details, please refer to the `eos_anim.h` file.
-
-### Activity Controller Interfaces
-
-The activity controller provides activity management interfaces. For details, please refer to the `eos_activity.h` file.
-
-## Implementation Details
-
-The core implementation of the UI components module includes:
-
-1. **Component encapsulation**：Encapsulate LVGL basic components to provide more advanced components and functions
-2. **Style management**：Unified management of component styles to ensure consistent interface style
-3. **Animation effects**：Implement various animation effects to enhance user experience
-4. **Interaction processing**：Handle user input and interaction events
-
-This module is based on the LVGL graphics library, providing rich UI components and interaction functions for ElenixOS.
-
-## Usage Examples
-
-### Create Message Page
-
-```c
-lv_obj_t *info_page = eos_std_info_create(lv_scr_act(),
-                                         lv_color_hex(0x007AFF),
-                                         "icon_info",
-                                         "Notification",
-                                         "This is a notification message");
-```
-
-### Create Title and Comment
-
-```c
-eos_std_title_comment_create(parent,
-                           "Title",
-                           "This is comment content");
-```
-
-## UI Architecture
-
-The UI components module adopts a layered architecture:
-
-1. **Basic component layer**：Based on LVGL-provided basic components
-2. **Advanced component layer**：Encapsulate and extend basic components to provide more advanced functions
-3. **Application component layer**：Components for specific application scenarios
-
-This architectural design allows UI components to maintain consistent style and interaction methods across different application scenarios, while providing sufficient flexibility and scalability.
+- [Activity](../framework/activity)
+- [Script Resource Lifecycle](../script_engine/sni)
+- [Panel](./page)
+- [CardPager](./widgets/card_pager)
+- [Slide Widget](./widgets/slide_widget)
+- [Swipe Panel](./widgets/swipe_panel)

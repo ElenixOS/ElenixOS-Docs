@@ -1,0 +1,86 @@
+---
+sidebar_position: 2
+title: Simulator 构建与运行
+---
+
+# Simulator 构建与运行
+
+本页只介绍 ElenixOS-Simulator 的桌面目标。Simulator 在主机上构建 ElenixOS Core，并以 Native 或 WASM 方式运行；它不是面向具体 Board 的固件构建。首次获取代码时应初始化子模块：
+
+```bash
+git clone --recursive https://github.com/ElenixOS/ElenixOS-Simulator.git
+cd ElenixOS-Simulator
+```
+
+已有工作区可运行：
+
+```bash
+git submodule update --init --recursive
+```
+
+Native 依赖见[Simulator 环境准备](../getting_started/environment)。如需构建板级固件，请从[板级固件构建路径](../getting_started/build)选择目标 Board。
+
+## Native
+
+Native 构建需要 SDL2 开发库。使用 Debug 构建并运行：
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --parallel
+./bin/main
+```
+
+如果 `build/` 已配置，也可使用根目录 Makefile：
+
+```bash
+make
+make run
+```
+
+Native 模拟屏幕为 390×450 像素，窗口提供表冠和侧键输入控件；调整窗口大小不会改变系统逻辑显示尺寸。
+
+## WASM
+
+WASM 构建需要已激活的 Emscripten 工具链：
+
+```bash
+emcmake cmake -S . -B build-wasm -DEOS_PLATFORM=WASM -DCMAKE_BUILD_TYPE=Release
+cmake --build build-wasm --parallel
+```
+
+产物位于 `build-wasm/bin/`，包括 `main.html`、`main.js`、`main.wasm` 和预加载数据文件。通过 HTTP 服务器访问：
+
+```bash
+cd build-wasm/bin
+python3 -m http.server 8000
+```
+
+然后打开 [http://localhost:8000/main.html](http://localhost:8000/main.html)；不能直接用 `file://` 打开。
+
+## 构建选项
+
+| 选项 | 默认值 | 作用 |
+|---|---:|---|
+| `EOS_PLATFORM` | `Native` | 选择 `Native` 或 `WASM` |
+| `USE_FREERTOS` | `OFF` | Native 下启用 FreeRTOS；WASM 下会被禁用 |
+| `LV_USE_DRAW_SDL` | `OFF` | 启用 SDL 绘制后端，需要对应 SDL2_image 依赖 |
+| `LV_USE_LIBPNG` / `LV_USE_LIBJPEG_TURBO` | `OFF` | 启用 PNG / JPEG 解码支持 |
+| `LV_USE_FFMPEG` / `LV_USE_FREETYPE` | `OFF` | 启用 FFmpeg / FreeType 支持 |
+| `ASAN` | `OFF` | Debug 构建启用 Address / Leak / Undefined sanitizer |
+
+可选后端只有在依赖库可被 CMake 找到时才能启用。
+
+## Kconfig
+
+内存策略、字体、显示参数、日志和 Recent Apps 等配置通过 Kconfig 管理：
+
+```bash
+cmake -B build
+cmake --build build --target menuconfig
+```
+
+配置保存在当前构建目录 `.config` 中，生成头文件位于 `build/generated/`。`menuconfig` 保存时会同时刷新该目录的 `generated/eos_config_gen.h`；如果直接编辑 `.config`，先运行 `cmake -B build` 重新生成配置头文件。完整的优先级和配置值见[内核配置系统](../development/kconfig)。
+
+## 日志与故障排查
+
+Native 当前日志写入 Simulator 仓库 `tmp/latest.log`，旧日志按时间归档。若配置阶段找不到 SDL2，先安装 SDL2 开发包；若出现子模块缺失或链接错误，确认执行了递归子模块更新，再使用新的构建目录重新配置。

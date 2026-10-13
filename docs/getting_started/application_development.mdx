@@ -1,0 +1,116 @@
+---
+title: Application 开发教程
+---
+
+# Application 开发教程
+
+本教程创建一个显示 “Hello, ElenixOS!” 的脚本 Application，构建 EPKG 安装包，并在 Native Simulator 或已运行 ElenixOS 的板卡上安装和启动它。应用包不是设备固件；板级固件由目标 Platform / Board 工程构建和烧录。
+
+## 前置条件
+
+- 主机已安装 Visual Studio Code 1.136 或更高版本。
+- 已从 VS Code Extensions 搜索并安装 [ElenixOS-Toolkit](../development/toolkit)，或在安装了 `code` 命令的终端执行 `code --install-extension ElenixOS.elenixos-toolkit`。
+- 有一个已构建并运行的目标系统：Native Simulator，或提供 ESH、YMODEM 接收和 EPKG Installer 的板卡。Simulator 的主机依赖和构建步骤见[环境准备](./environment)与[Simulator 构建与运行](../simulator/build)。板级固件路径见[板级固件构建路径](./build)。
+
+以下路径使用 `$HOME` 和 bash/zsh 命令。Windows 用户可使用项目支持的 MSYS2/MinGW shell，或在 VS Code 图形界面完成项目与包构建。
+
+## 1. 创建 Application 项目
+
+在主机终端创建项目父目录：
+
+```bash
+mkdir -p "$HOME/ElenixOS-Apps"
+```
+
+在 VS Code 命令面板运行 **ElenixOS: Open App Tools**，进入 **Create** 工作区，填写以下信息：
+
+| 字段 | 示例值 |
+|---|---|
+| App name | `Hello ElenixOS` |
+| App ID | `com.example.hello` |
+| Version | `1.0.0` |
+| Author | `Example` |
+| Description | `A first ElenixOS application` |
+| Project location | `$HOME/ElenixOS-Apps` |
+
+选择 **Create App project**。该 App ID 在 `$HOME/ElenixOS-Apps/` 下应尚未存在。Toolkit 会创建 `$HOME/ElenixOS-Apps/com.example.hello/`，其中包含根级 `manifest.json` 和入口脚本 `main.js`。
+
+## 2. 编写入口脚本
+
+打开 `$HOME/ElenixOS-Apps/com.example.hello/main.js`，用下面的页面代码替换默认入口注释并保存：
+
+```js
+const view = eos.view.active();
+const button = new lv.button(view);
+button.align(lv.ALIGN_CENTER, 0, 0);
+
+const label = new lv.label(button);
+label.setText("Hello, ElenixOS!");
+```
+
+`manifest.json` 中的 `id` 是安装和运行时使用的稳定身份。Toolkit 生成的字段可直接用于本例；EPKG v1 的必需字段和 API level 语义见[安装包格式](../architecture/package_format)。Application 的 Program、Activity、View 与 SNI 生命周期见 [Application 与 Framework 契约](../architecture/application_contract)。
+
+## 3. 构建并校验安装包
+
+先创建输出目录：
+
+```bash
+mkdir -p "$HOME/ElenixOS-Apps/build"
+```
+
+在 App Package Studio 的 **Build** 工作区选择 **Select App project**，打开 `$HOME/ElenixOS-Apps/com.example.hello/`。Package type 选 **Application**，点击 **Validate project**；校验通过后点击 **Build package**，将输出保存为 `$HOME/ElenixOS-Apps/build/hello.epk`。构建完成后，Toolkit 显示包路径；**Analyze** 工作区可查看包身份、类型和文件表。
+
+自动化构建可使用 `etk` CLI。Marketplace 扩展安装不等同于主机 `PATH` 中已有 `etk` 命令；CLI 的构建和安装方式见 [Toolkit 文档](../development/toolkit)。在已有 `etk` 命令的终端执行：
+
+```bash
+etk package build "$HOME/ElenixOS-Apps/com.example.hello" \
+  --output "$HOME/ElenixOS-Apps/build/hello.epk" --type app --compression auto
+etk validate "$HOME/ElenixOS-Apps/build/hello.epk"
+```
+
+完整校验应显示 EPKG v1、包 ID `com.example.hello` 和 `Validation: full`。`inspect` 是结构预览，不代替完整 payload 校验。
+
+## 4. 安装并启动
+
+选择与当前运行目标对应的一种部署路径。
+
+### 在 Native Simulator 上运行
+
+先按 [Simulator 构建与运行](../simulator/build)生成 Native 程序。以下命令从 `ElenixOS-Simulator` 仓库根目录执行：
+
+```bash
+mkdir -p fs/tmp
+cp "$HOME/ElenixOS-Apps/build/hello.epk" fs/tmp/hello.epk
+./bin/main
+```
+
+Simulator 启动后，在同一个终端的 ESH 提示符逐条执行：
+
+```text
+pkg validate /tmp/hello.epk
+pkg install /tmp/hello.epk
+apps
+app start com.example.hello
+```
+
+`pkg validate` 应返回 `pkg: valid EPKG v1`，`apps` 应列出 `com.example.hello`。启动后，模拟屏幕显示居中的 **Hello, ElenixOS!** 按钮。
+
+### 在已运行的板卡上安装
+
+目标固件需要注册 ESH 的 YMODEM 接收、`pkg validate`、`pkg install` 与 Application 管理能力。在 VS Code 命令面板运行 **ElenixOS: Open ESH Terminal** 并选择设备 UART。Toolkit 默认串口格式为 8N1、关闭 RTS/CTS 流控，`elenixosToolkit.uartBaudRate` 默认 `921600`；主机速率必须与设备端匹配，可在 VS Code Settings 修改该配置项。
+
+随后运行 **ElenixOS: Send File or Folder with YMODEM (UART)**，选择 `$HOME/ElenixOS-Apps/build/hello.epk`，并把设备端路径设为 `/tmp/hello.epk`。传输完成后，在 ESH Terminal 执行：
+
+```text
+pkg validate /tmp/hello.epk
+pkg install /tmp/hello.epk
+```
+
+完整校验成功并安装后，从目标系统的 Application 列表打开 **Hello ElenixOS**。如果 Board 使用自有部署工具或不同的 ESH 命令，以对应 Platform / Board 工程为准；Simulator 和当前开发中的 E84 集成不代表所有板卡均已提供相同安装能力。
+
+## 下一步
+
+- Framework、Program、Activity 和 View 生命周期：[Application 与 Framework 契约](../architecture/application_contract)。
+- 脚本接口查询：[JavaScript API 参考](../architecture/script_engine/elenix_os)。
+- Package 字段、校验和类型定义：[EPKG v1 安装包格式](../architecture/package_format)。
+- 桌面调试与板级目标的差异：[Simulator 概述](../simulator/overview)与[Platform / Board 集成](../integration/overview)。

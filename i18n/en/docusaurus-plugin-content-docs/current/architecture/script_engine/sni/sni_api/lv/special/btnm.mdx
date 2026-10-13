@@ -5,73 +5,12 @@ sidebar_position: 2
 
 # Button Matrix
 
-Button Matrix is a special API component in ElenixOS used to create button matrices. This document describes the functionality, usage methods, and notes for the button matrix component.
-
-## Feature Introduction
-
-The button matrix allows developers to create a matrix containing multiple buttons organized in rows and columns. Button matrices are typically used to create keyboards, numeric keypads, function button groups, etc.
-
-## Usage Methods
-
-### Creating Button Matrix
-
-Use the `new lv.btnm()` constructor to create a button matrix object:
-
-```javascript
-// Create button matrix object
-const btnm = new lv.btnm(eos.view.active());
-```
-
-### Configuring Button Matrix
-
-Use the following methods to configure the button matrix:
-
-```javascript
-// Set button matrix size
-btnm.setSize(200, 150);
-
-// Set button matrix position
-btnm.setPos(10, 10);
-
-// Set button matrix button text
-// Use "\n" to separate rows, use " " to separate buttons in the same row
-const buttons = "1 2 3\n4 5 6\n7 8 9\n* 0 #";
-btnm.setMap(buttons);
-
-// Set button matrix button size
-btnm.setBtnSize(60, 40);
-
-// Set button matrix button spacing
-btnm.setBtnSpacing(5);
-```
-
-### Binding Events
-
-Use the `addEventCb` method to bind events:
-
-```javascript
-// Bind button click event
-btnm.addEventCb((e) => {
-    const btnId = btnm.getPressedBtn();
-    eos.console.log("Button clicked:", btnId);
+```js
+const btnm = new lv.buttonmatrix(eos.view.active());
+btnm.setMap(["一", "二", "三", ""]);
+btnm.addEventCb(() => {
+    eos.console.log(btnm.getSelectedButton());
 }, lv.EVENT_VALUE_CHANGED, null);
 ```
 
-### Example: Creating a Numeric Keypad
-
-```javascript
-// Create button matrix
-const btnm = new lv.btnm(eos.view.active());
-btnm.setSize(240, 200);
-btnm.align(lv.ALIGN_CENTER, 0, 0);
-
-// Set button text
-const buttons = "1 2 3\n4 5 6\n7 8 9\n* 0 #";
-btnm.setMap(buttons);
-
-// Bind event
-btnm.addEventCb((e) => {
-    const btnId = btnm.getPressedBtn();
-    eos.console.log("Button clicked:", btnId);
-}, lv.EVENT_VALUE_CHANGED, null);
-```
+Button Matrix inherits from `lv.obj`. The current binding provides interfaces for the button map, button control properties, selected button, layout, and selection state; the specific map format follows LVGL button matrix rules. It does not have an independent system event bus; interactions are handled through object event callbacks.

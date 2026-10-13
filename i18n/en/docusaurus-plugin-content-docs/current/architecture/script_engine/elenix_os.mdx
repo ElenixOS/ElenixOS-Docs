@@ -1,785 +1,155 @@
 ---
-title: ElenixOS System API
-sidebar_position: 1
+sidebar_position: 2
+title: ElenixOS JavaScript API Reference
 ---
 
-# ElenixOS System API
+# ElenixOS JavaScript API Reference
 
-The `eos` namespace is the core system API provided by ElenixOS for JavaScript script runtime. Through this API, applications and watchfaces can access system services, page navigation, time information, configuration storage, console logging, and other functions.
+Scripts use the system APIs provided by ElenixOS through the global object `eos`. The names below come from the interfaces actually mounted by the current runtime; C APIs that are not listed do not automatically appear in JS just because a corresponding native function exists.
 
-## Namespace Structure
+## `eos.view`
 
-```
-eos
-├── eos.console      — Console Logging
-│   ├── .log()
-│   ├── .info()
-│   ├── .warn()
-│   ├── .error()
-│   └── .debug()
-├── eos.view         — View Management
-│   └── .active()
-├── eos.activity     — Activity Management
-│   ├── .current()
-│   ├── .visible()
-│   ├── .bottom()
-│   ├── .watchface()
-│   ├── .rootScreen()
-│   ├── .getView()
-│   ├── .setView()
-│   ├── .getTitle()
-│   ├── .setTitle()
-│   ├── .getType()
-│   ├── .setType()
-│   ├── .setAppHeaderVisible()
-│   ├── .isAppHeaderVisible()
-│   ├── .enter()
-│   ├── .back()
-│   └── .isTransitionInProgress()
-├── eos.config       — Configuration Storage
-│   ├── .setStr()
-│   ├── .setBool()
-│   ├── .setNumber()
-│   ├── .getStr()
-│   ├── .getBool()
-│   └── .getNumber()
-├── eos.time         — Time Service
-│   └── .getNow()
-├── eos.appHeader    — App Header
-│   ├── .setTitle()
-│   ├── .hide()
-│   └── .show()
-├── eos.clockHand    — Clock Hands
-│   ├── .create()
-│   ├── .center()
-│   └── .placePivot()
-├── Constants
-│   ├── eos.FONT_SIZE_*
-│   ├── eos.DISPLAY_*
-│   ├── eos.CLOCK_HAND_*
-│   └── eos.ACTIVITY_TYPE_*
-```
-
-## Console Logging (eos.console)
-
-Provides different levels of log output for debugging and information recording.
-
-### Methods
-
-```javascript
-eos.console.log(message)
-eos.console.info(message)
-eos.console.warn(message)
-eos.console.error(message)
-eos.console.debug(message)
-```
-
-**Parameters**:
-- `message`: String, the log message to output
-
-**Returns**: None
-
-**Description**: All logging methods accept a string parameter and output it to the system log. The current script ID is automatically added as a prefix for easy differentiation between logs from different applications.
-
-### Example
-
-```javascript
-eos.console.log("Application started");
-eos.console.info("User logged in");
-eos.console.warn("Low battery");
-eos.console.error("Failed to load resource");
-eos.console.debug("Position: x=" + x + ", y=" + y);
-```
-
-## View Management (eos.view)
-
-Used to get the active View object of the current Activity, which is the foundation for creating UI components.
-
-### eos.view.active()
-
-```javascript
+```js
 const view = eos.view.active();
 ```
 
-**Parameters**: None
+`active()` returns a handle to the currently active View.
 
-**Returns**: LVGL object of type `lv_obj_t`, the View of the current Activity
+## `eos.console`
 
-**Description**: This method returns the LVGL object associated with the current Activity. All UI components should be created with this as the parent object. Equivalent to `eos_view_active()` in the C layer.
-
-### Example
-
-```javascript
-// Get current View and create UI components
-const view = eos.view.active();
-const label = new lv.label(view);
-label.setText("Hello, ElenixOS!");
-label.center();
-
-const button = new lv.button(view);
-button.setSize(100, 50);
-button.align(lv.ALIGN_CENTER, 0, 40);
+```js
+eos.console.log("message");
+eos.console.info("info");
+eos.console.warn("warning");
+eos.console.error("error");
+eos.console.debug("debug");
 ```
 
-## Activity Management (eos.activity)
+Each method requires at least one string argument; the current implementation only processes the first argument. Logs are prefixed with the current script ID.
 
-Provides page navigation and Activity query functions. Activity is the page management unit of ElenixOS.
+## `eos.config`
 
-### Query Methods
+```js
+eos.config.setStr("key", "value");
+eos.config.setBool("enabled", true);
+eos.config.setNumber("count", 3);
 
-#### eos.activity.current()
-
-```javascript
-const activity = eos.activity.current();
+const s = eos.config.getStr("key");
+const b = eos.config.getBool("enabled");
+const n = eos.config.getNumber("count");
 ```
 
-Get the current Activity (top of the stack).
+Configuration is isolated by script ID: apps and watchfaces each write to `config.json` in their own data directory. Write methods have no useful return value; on read, a missing or type-mismatched string is `undefined`, a boolean is `false`, and a number is `0`. An exception is thrown when the configuration file cannot be loaded.
 
-**Parameters**: None
+## `eos.time`
 
-**Returns**: Activity object of type `eos_activity_t`, returns `undefined` on failure
-
-#### eos.activity.visible()
-
-```javascript
-const activity = eos.activity.visible();
+```js
+const now = eos.time.getNow();
 ```
 
-Get the currently fully displayed Activity (transition animation complete).
+Returns an object containing the numeric fields `year`, `month`, `day`, `hour`, `min`, `sec`, `ms`, and `day_of_week`. The field value conventions match the system `eos_datetime_t`.
 
-**Parameters**: None
+## `eos.appHeader`
 
-**Returns**: Activity object of type `eos_activity_t`, returns `undefined` on failure
-
-#### eos.activity.bottom()
-
-```javascript
-const activity = eos.activity.bottom();
+```js
+eos.appHeader.setTitle(view, "标题");
+eos.appHeader.show();
+eos.appHeader.hide();
 ```
 
-Get the bottom Activity (usually the watchface Activity).
+The first argument of `setTitle` can be a View handle or `null`, and the title must be a string; passing `null`/`undefined` clears the title. `show` and `hide` operate on the app header of the current page.
 
-**Parameters**: None
+## `eos.activity`
 
-**Returns**: Activity object of type `eos_activity_t`, returns `undefined` on failure
-
-#### eos.activity.watchface()
-
-```javascript
-const activity = eos.activity.watchface();
-```
-
-Get the watchface Activity.
-
-**Parameters**: None
-
-**Returns**: Activity object of type `eos_activity_t`, returns `undefined` on failure
-
-#### eos.activity.rootScreen()
-
-```javascript
-const screen = eos.activity.rootScreen();
-```
-
-Get the root screen object.
-
-**Parameters**: None
-
-**Returns**: Root screen object of type `lv_obj_t`
-
-#### eos.activity.isTransitionInProgress()
-
-```javascript
-const isTransitioning = eos.activity.isTransitionInProgress();
-```
-
-Check if Activity transition animation is in progress.
-
-**Parameters**: None
-
-**Returns**: `boolean` — `true` if transition is in progress, `false` if idle
-
-### View Management
-
-#### eos.activity.getView(activity)
-
-```javascript
-const view = eos.activity.getView(activity);
-```
-
-Get the View object of the specified Activity.
-
-**Parameters**:
-- `activity`: Activity object (returned by methods like `eos.activity.current()`)
-
-**Returns**: View object of type `lv_obj_t`, returns `undefined` on failure
-
-#### eos.activity.setView(activity, view)
-
-```javascript
-eos.activity.setView(activity, view);
-```
-
-Set the View object of the specified Activity.
-
-**Parameters**:
-- `activity`: Activity object
-- `view`: LVGL object to be used as the Activity's View
-
-**Returns**: None
-
-### Title Management
-
-#### eos.activity.getTitle(activity)
-
-```javascript
-const title = eos.activity.getTitle(activity);
-```
-
-Get the title of an Activity.
-
-**Parameters**:
-- `activity`: Activity object
-
-**Returns**: `string`, returns `undefined` on failure
-
-#### eos.activity.setTitle(activity, title)
-
-```javascript
-eos.activity.setTitle(activity, title);
-```
-
-Set the title of an Activity.
-
-**Parameters**:
-- `activity`: Activity object
-- `title`: String title
-
-**Returns**: None
-
-### Type Management
-
-#### eos.activity.getType(activity)
-
-```javascript
-const type = eos.activity.getType(activity);
-```
-
-Get the type of an Activity.
-
-**Parameters**:
-- `activity`: Activity object
-
-**Returns**: Number, corresponding to `eos.ACTIVITY_TYPE_*` constants
-
-#### eos.activity.setType(activity, type)
-
-```javascript
-eos.activity.setType(activity, type);
-```
-
-Set the type of an Activity.
-
-**Parameters**:
-- `activity`: Activity object
-- `type`: Number, use `eos.ACTIVITY_TYPE_*` constants
-
-**Returns**: None
-
-### AppHeader Visibility
-
-#### eos.activity.setAppHeaderVisible(activity, visible)
-
-```javascript
-eos.activity.setAppHeaderVisible(activity, visible);
-```
-
-Set AppHeader visibility for an Activity.
-
-**Parameters**:
-- `activity`: Activity object
-- `visible`: Boolean value
-
-**Returns**: None
-
-#### eos.activity.isAppHeaderVisible(activity)
-
-```javascript
-const visible = eos.activity.isAppHeaderVisible(activity);
-```
-
-Check if Activity's AppHeader is visible.
-
-**Parameters**:
-- `activity`: Activity object
-
-**Returns**: `boolean`
-
-### Navigation Methods
-
-#### eos.activity.enter(activity)
-
-```javascript
+```js
+const activity = eos.activity.create();
+eos.activity.setType(activity, eos.ACTIVITY_TYPE_APP);
+eos.activity.setTitle(activity, "详情");
 eos.activity.enter(activity);
+
+const current = eos.activity.current();
+const visible = eos.activity.visible();
+const view = eos.activity.getView(current);
+const ok = eos.activity.back();
 ```
 
-Enter the specified Activity (push Activity to top of stack and display).
+Currently available methods:
 
-**Parameters**:
-- `activity`: Activity object to enter
+| Method | Behavior |
+|---|---|
+| `create()` | Creates a normal Activity and returns a handle |
+| `destroy(activity)` | Destroys an Activity that is not on the stack and not visible |
+| `current()` / `visible()` / `bottom()` / `watchface()` | Gets the corresponding Activity handle |
+| `getView(activity)` / `setView(activity, view)` | Reads or sets the View |
+| `getTitle(activity)` / `setTitle(activity, title)` | Reads or sets the title |
+| `getType(activity)` / `setType(activity, type)` | Reads or sets the type |
+| `setAppHeaderVisible(activity, visible)` / `isAppHeaderVisible(activity)` | Manages the app header |
+| `enter(activity)` | Pushes the Activity onto the page stack and enters it |
+| `back()` | Returns to the previous page, returning a boolean indicating the call result |
+| `isTransitionInProgress()` | Queries whether a page transition is in progress |
 
-**Returns**: None
+`setView` only takes effect at the timing allowed by the Activity entry flow; system-managed Views are controlled by the Activity lifecycle. Although `rootScreen()` appears in the `eos.activity` name table, calling it in JS throws an "unavailable" exception, so it does not constitute an API for scripts to obtain the root screen.
 
-#### eos.activity.back()
+The Activity type constants visible to scripts are `ACTIVITY_TYPE_NULL`, `ACTIVITY_TYPE_APP`, `ACTIVITY_TYPE_APP_LIST`, `ACTIVITY_TYPE_WATCHFACE`, and `ACTIVITY_TYPE_WATCHFACE_LIST`. C-layer types such as `INPUT_PAGE`, `LOCK_SCREEN`, and `RECENT_APPS` are currently not exported as JS root constants.
 
-```javascript
-eos.activity.back();
+## `eos.permission`
+
+```js
+eos.permission.request("sensor", result => {
+  // granted_once、granted_foreground、granted_always 或 denied
+});
+
+const state = eos.permission.check("sensor");
 ```
 
-Return to the previous Activity (destroy current top Activity, restore previous Activity).
+The request must use a permission name already declared in the manifest. Requests are asynchronous and will display an authorization panel when needed; when long-term or foreground authorization is already held, the callback is also asynchronous. `check` returns `once`, `foreground`, `always`, or `denied`, and returns `unknown` for unknown permissions. When a request for the same permission category is already being processed or queued, duplicate requests are dropped.
 
-**Parameters**: None
+## `eos.sensor`
 
-**Returns**: `boolean` — `true` if operation succeeded, `false` if failed
-
-## Configuration Storage (eos.config)
-
-Provides JSON file-based persistent key-value storage. Each application/watchface has its own independent storage space.
-
-**Storage Path**:
-- Application: `<EOS_SYS_DIR>/app/app_data/<app_id>/config.json`
-- Watchface: `<EOS_SYS_DIR>/app/watchface_data/<wf_id>/config.json`
-
-### Write Methods
-
-#### eos.config.setStr(key, value)
-
-```javascript
-eos.config.setStr("username", "Alice");
+```js
+const data = eos.sensor.readLatest(eos.SENSOR_ACCE);
+const changed = eos.sensor.setSamplePeriod(eos.SENSOR_ACCE, 100);
+const period = eos.sensor.getSamplePeriod(eos.SENSOR_ACCE);
 ```
 
-Store a string value.
+For an initialized and valid type, `readLatest` returns a cached object; when the driver has not yet reported data, `timestamp` and the data fields are still zero, so the returned object itself does not indicate that a sample exists. It returns `null` only for an invalid type or when the underlying call fails. The returned object always has `timestamp`; accelerometer, gyroscope, and magnetometer use `x/y/z`, while other types use the corresponding fields: `heart_rate`, `spo2`, `lux`, `temp`, `pressure`, `steps`, `distance_mm`, `ecg`, or `cap`. The JS API has no raw Sensor subscription interface; for semantic subscriptions, see `eos.metric` below.
 
-**Parameters**:
-- `key`: String, key name
-- `value`: String, value to store
+## `eos.metric`
 
-**Returns**: None
-
-#### eos.config.setBool(key, value)
-
-```javascript
-eos.config.setBool("dark_mode", true);
+```js
+const sample = eos.metric.get("battery.percent");
+const handle = eos.metric.subscribe("health.heart_rate", sample => {
+  // sample contains metric, value, unit, timestamp, valid, stale
+});
+eos.metric.unsubscribe(handle);
 ```
 
-Store a boolean value.
-
-**Parameters**:
-- `key`: String, key name
-- `value`: Boolean
-
-**Returns**: None
-
-#### eos.config.setNumber(key, value)
-
-```javascript
-eos.config.setNumber("volume", 75);
-```
-
-Store a number value.
-
-**Parameters**:
-- `key`: String, key name
-- `value`: Number
-
-**Returns**: None
-
-### Read Methods
-
-#### eos.config.getStr(key)
-
-```javascript
-const username = eos.config.getStr("username");
-```
-
-Read a string value. Returns `undefined` if key doesn't exist.
-
-**Parameters**:
-- `key`: String, key name
-
-**Returns**: `string` or `undefined`
-
-#### eos.config.getBool(key)
-
-```javascript
-const darkMode = eos.config.getBool("dark_mode");
-```
-
-Read a boolean value. Returns `false` if key doesn't exist.
-
-**Parameters**:
-- `key`: String, key name
-
-**Returns**: `boolean`
-
-#### eos.config.getNumber(key)
-
-```javascript
-const volume = eos.config.getNumber("volume");
-```
-
-Read a number value. Returns `0` if key doesn't exist.
-
-**Parameters**:
-- `key`: String, key name
-
-**Returns**: `number`
-
-### Complete Example
-
-```javascript
-// Save user settings
-eos.config.setStr("username", "Alice");
-eos.config.setBool("dark_mode", true);
-eos.config.setNumber("volume", 75);
-
-// Read user settings
-const username = eos.config.getStr("username");
-const darkMode = eos.config.getBool("dark_mode");
-const volume = eos.config.getNumber("volume");
-
-eos.console.log("User: " + username + ", Dark Mode: " + darkMode + ", Volume: " + volume);
-```
-
-## Time Service (eos.time)
-
-Provides functionality to get the current system time.
-
-### eos.time.getNow()
-
-```javascript
-const now = eos.time.getNow();
-```
-
-**Parameters**: None
-
-**Returns**: Time object containing the following fields:
-
-| Field | Type | Description | Range |
-|-------|------|-------------|-------|
-| `year` | number | Year | e.g. 2026 |
-| `month` | number | Month | 1-12 |
-| `day` | number | Day | 1-31 |
-| `hour` | number | Hour | 0-23 |
-| `min` | number | Minute | 0-59 |
-| `sec` | number | Second | 0-59 |
-| `ms` | number | Millisecond | 0-999 |
-| `day_of_week` | number | Day of week | 0-6 (0=Sunday) |
-
-### Example
-
-```javascript
-const now = eos.time.getNow();
-eos.console.log("Current time: " + now.year + "-" + now.month + "-" + now.day + " " + now.hour + ":" + now.min + ":" + now.sec);
-
-// Display time on watchface
-const view = eos.view.active();
-const timeLabel = new lv.label(view);
-
-function updateTime() {
-    const t = eos.time.getNow();
-    const timeStr = String(t.hour).padStart(2, '0') + ":" + String(t.min).padStart(2, '0');
-    timeLabel.setText(timeStr);
-    timeLabel.center();
-}
-```
-
-## App Header (eos.appHeader)
-
-Controls the application's top navigation bar (AppHeader).
-
-### eos.appHeader.setTitle(view, title)
-
-```javascript
-eos.appHeader.setTitle(view, "Settings");
-```
-
-Set the app header title for the current Activity.
-
-**Parameters**:
-- `view`: View object or `null`
-- `title`: Title string or `null`/`undefined`
-
-**Returns**: None
-
-### eos.appHeader.hide()
-
-```javascript
-eos.appHeader.hide();
-```
-
-Hide the app header.
-
-**Parameters**: None
-
-**Returns**: None
-
-### eos.appHeader.show()
-
-```javascript
-eos.appHeader.show();
-```
-
-Show the app header and refresh the current Activity's title.
-
-**Parameters**: None
-
-**Returns**: None
-
-### Example
-
-```javascript
-// Set title
-eos.appHeader.setTitle(null, "My App");
-
-// Hide header
-eos.appHeader.hide();
-
-// Show header
-eos.appHeader.show();
-```
-
-## Clock Hands (eos.clockHand)
-
-Create and manage clock hands (hour, minute, second) for watchfaces.
-
-### eos.clockHand.create(obj, src, type, cx, cy)
-
-```javascript
-const hand = eos.clockHand.create(parent, "path/to/hand.png", eos.CLOCK_HAND_HOUR, cx, cy);
-```
-
-Create a clock hand image.
-
-**Parameters**:
-- `obj`: Parent LVGL object
-- `src`: String, path to the hand image resource (relative to app/watchface assets directory)
-- `type`: Hand type, use `eos.CLOCK_HAND_*` constants
-- `cx`: Rotation center X coordinate (relative to top-left of image)
-- `cy`: Rotation center Y coordinate (relative to top-left of image)
-
-**Returns**: Hand object of type `lv_obj_t`
-
-### eos.clockHand.center(obj)
-
-```javascript
+Metric is a semantic data interface for scripts and is not equivalent to the raw sensor API. Reads return a standard sample; subscriptions invoke the callback at intervals, and the handle belongs to the current script context and becomes invalid upon unsubscribe or context cleanup. Samples may be invalid or stale; callers should use `valid`, `stale`, and `value` together to determine the sample state.
+
+## `eos.clockHand`
+
+```js
+const hand = eos.clockHand.create(parent, "hour.png", eos.CLOCK_HAND_HOUR, 0, 0);
+eos.clockHand.placePivot(hand, 10, 20);
+eos.clockHand.centerStyle(hand, 10, 20);
+eos.clockHand.attach(hand, eos.CLOCK_HAND_HOUR);
 eos.clockHand.center(hand);
 ```
 
-Align the hand object's center to its parent's center.
+The image path for `create` is relative to the `assets/` directory of the current app or watchface, and the file must exist. The type uses `CLOCK_HAND_HOUR`, `CLOCK_HAND_MINUTE`, or `CLOCK_HAND_SECOND`. An exception is thrown when the arguments of any method do not match or the resource does not exist.
 
-**Parameters**:
-- `obj`: Hand LVGL object
+## `eos.ww`
 
-**Returns**: None
+`eos.ww` provides native LVGL component factories dedicated to watchfaces. The main components currently exposed include analog dials, compass dials, radial gauges, Metric rings, trend charts, and calendar grids; some components can be bound to `eos.metric` semantic names, and values or data can also be set directly by scripts. Component handles belong to the parent View passed in. The specific methods and options are subject to what SNI currently exports; this namespace is not a runtime dynamic plugin registry.
 
-### eos.clockHand.placePivot(obj, x, y)
+## Constants
 
-```javascript
-eos.clockHand.placePivot(hand, cx, cy);
-```
+The root object currently exports:
 
-Set the rotation center position of the hand object.
+- Fonts: `FONT_SIZE_LARGE`, `FONT_SIZE_MEDIUM`, `FONT_SIZE_SMALL`
+- Display: `DISPLAY_WIDTH`, `DISPLAY_HEIGHT` (depends on the platform display configuration)
+- Clock hand: `CLOCK_HAND_HOUR`, `CLOCK_HAND_MINUTE`, `CLOCK_HAND_SECOND`
+- Activity: the five `ACTIVITY_TYPE_*` listed above
+- Sensors: `SENSOR_ACCE`, `SENSOR_GYRO`, `SENSOR_MAG`, `SENSOR_HR`, `SENSOR_SPO2`, `SENSOR_LIGHT`, `SENSOR_TEMP`, `SENSOR_BARO`, `SENSOR_STEP`, `SENSOR_PROXIMITY`, `SENSOR_ECG`, `SENSOR_CAP`
 
-**Parameters**:
-- `obj`: Hand LVGL object
-- `x`: Rotation center X coordinate
-- `y`: Rotation center Y coordinate
-
-**Returns**: None
-
-### Complete Example
-
-```javascript
-// Get current View
-const view = eos.view.active();
-
-// Create watchface background
-const bg = new lv.image(view);
-bg.setSrc("A:background.png");
-bg.center();
-
-// Create hour hand
-const hourHand = eos.clockHand.create(view, "hour_hand.png", eos.CLOCK_HAND_HOUR, 5, 50);
-eos.clockHand.center(hourHand);
-
-// Create minute hand
-const minHand = eos.clockHand.create(view, "min_hand.png", eos.CLOCK_HAND_MINUTE, 5, 65);
-eos.clockHand.center(minHand);
-
-// Create second hand
-const secHand = eos.clockHand.create(view, "sec_hand.png", eos.CLOCK_HAND_SECOND, 3, 70);
-eos.clockHand.center(secHand);
-```
-
-## System Constants
-
-ElenixOS defines the following constants under the `eos` namespace for use in JavaScript scripts.
-
-### Font Sizes
-
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `eos.FONT_SIZE_LARGE` | 30 | Large font size |
-| `eos.FONT_SIZE_MEDIUM` | 26 | Medium font size |
-| `eos.FONT_SIZE_SMALL` | 22 | Small font size |
-
-### Display Dimensions
-
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `eos.DISPLAY_WIDTH` | 240 | Screen width (pixels) |
-| `eos.DISPLAY_HEIGHT` | 240 | Screen height (pixels) |
-
-### Hand Types
-
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `eos.CLOCK_HAND_HOUR` | 0 | Hour hand |
-| `eos.CLOCK_HAND_MINUTE` | 1 | Minute hand |
-| `eos.CLOCK_HAND_SECOND` | 2 | Second hand |
-
-### Activity Types
-
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `eos.ACTIVITY_TYPE_NULL` | 0 | Null type |
-| `eos.ACTIVITY_TYPE_APP` | 1 | Application page |
-| `eos.ACTIVITY_TYPE_APP_LIST` | 2 | Application list |
-| `eos.ACTIVITY_TYPE_WATCHFACE` | 3 | Watchface page |
-| `eos.ACTIVITY_TYPE_WATCHFACE_LIST` | 4 | Watchface list |
-
-## Error Handling
-
-### Error Types
-
-Errors are thrown when API call parameters are incorrect. Common error causes:
-
-| Error Message | Cause |
-|---------------|-------|
-| `Invalid argument count` | Incorrect number of arguments |
-| `Invalid argument type` | Incorrect argument type |
-| `Usage: xxx(key, value)` | Usage hint showing correct calling method |
-| `Can't load config` | Configuration storage loading failed |
-| `No current activity` | No active Activity |
-
-### Error Handling Example
-
-```javascript
-try {
-    const view = eos.view.active();
-    if (view) {
-        const label = new lv.label(view);
-        label.setText("Hello!");
-    }
-} catch (err) {
-    eos.console.error("Error: " + err);
-}
-```
-
-## Complete Example: Counter App
-
-```javascript
-// Get current View
-const view = eos.view.active();
-
-// Set title
-eos.appHeader.setTitle(null, "Counter");
-
-// Read saved count
-let count = eos.config.getNumber("count");
-
-// Create display label
-const countLabel = new lv.label(view);
-countLabel.setStyleTextFont(eos.FONT_SIZE_LARGE, 0);
-countLabel.setText(String(count));
-countLabel.align(lv.ALIGN_CENTER, 0, -30);
-
-// Create increment button
-const incBtn = new lv.button(view);
-incBtn.setSize(80, 50);
-incBtn.align(lv.ALIGN_CENTER, -50, 30);
-incBtn.addEventCb(function() {
-    count++;
-    countLabel.setText(String(count));
-    eos.config.setNumber("count", count);
-}, lv.EVENT_CLICKED, null);
-
-const incLabel = new lv.label(incBtn);
-incLabel.setText("+1");
-
-// Create decrement button
-const decBtn = new lv.button(view);
-decBtn.setSize(80, 50);
-decBtn.align(lv.ALIGN_CENTER, 50, 30);
-decBtn.addEventCb(function() {
-    count--;
-    countLabel.setText(String(count));
-    eos.config.setNumber("count", count);
-}, lv.EVENT_CLICKED, null);
-
-const decLabel = new lv.label(decBtn);
-decLabel.setText("-1");
-```
-
-## Complete Example: Digital Watchface
-
-```javascript
-function updateWatchface() {
-    const now = eos.time.getNow();
-
-    // Format time
-    const timeStr = String(now.hour).padStart(2, '0') + ":" +
-                    String(now.min).padStart(2, '0');
-
-    // Format date
-    const dateStr = now.year + "-" +
-                    String(now.month).padStart(2, '0') + "-" +
-                    String(now.day).padStart(2, '0');
-
-    // Update UI
-    timeLabel.setText(timeStr);
-    dateLabel.setText(dateStr);
-
-    // Update hand angles
-    const hourAngle = (now.hour % 12) * 30 + now.min * 0.5;
-    const minAngle = now.min * 6 + now.sec * 0.1;
-    const secAngle = now.sec * 6;
-}
-
-// Get View and create UI
-const view = eos.view.active();
-eos.appHeader.hide();
-
-// Create time label
-const timeLabel = new lv.label(view);
-timeLabel.setStyleTextFont(eos.FONT_SIZE_LARGE, 0);
-timeLabel.align(lv.ALIGN_CENTER, 0, -20);
-
-// Create date label
-const dateLabel = new lv.label(view);
-dateLabel.setStyleTextFont(eos.FONT_SIZE_SMALL, 0);
-dateLabel.align(lv.ALIGN_CENTER, 0, 10);
-
-// Update every second
-const timer = new lv.timer(function() {
-    updateWatchface();
-}, 1000, null);
-updateWatchface();
-```
-
-## Related Documentation
-
-- [JS API General Usage](/docs/architecture/script_engine/) — Understand JS API conventions
-- [LVGL UI API](/docs/architecture/script_engine/lvgl) — Detailed LVGL UI component documentation
-- [Activity and View](../framework/activity) — Activity system details
+For the LVGL object API, see [LV API](./lvgl). For lifecycle constraints on handles and callbacks, see [SNI Architecture and Lifecycle](./sni).

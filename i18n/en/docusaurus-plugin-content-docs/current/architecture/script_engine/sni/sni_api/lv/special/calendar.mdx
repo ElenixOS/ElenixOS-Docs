@@ -5,74 +5,12 @@ sidebar_position: 3
 
 # Calendar
 
-Calendar is a special API component in ElenixOS used to display and select dates. This document describes the functionality, usage methods, and notes for the calendar component.
-
-## Feature Introduction
-
-The calendar component allows developers to create a calendar interface for displaying and selecting dates. Calendar components are typically used in date selection, schedule management, and similar scenarios.
-
-## Usage Methods
-
-### Creating Calendar
-
-Use the `new lv.calendar()` constructor to create a calendar object:
-
-```javascript
-// Create calendar object
+```js
 const calendar = new lv.calendar(eos.view.active());
+calendar.setTodayDate(2026, 9, 1);
+calendar.setShowedDate(2026, 9);
+const dates = [{year: 2026, month: 9, day: 5}];
+calendar.setHighlightedDates(dates, dates.length);
 ```
 
-### Configuring Calendar
-
-Use the following methods to configure the calendar:
-
-```javascript
-// Set calendar size
-calendar.setSize(200, 200);
-
-// Set calendar position
-calendar.setPos(10, 10);
-
-// Set current date
-const date = { year: 2024, month: 1, day: 1 };
-calendar.setDate(date);
-
-// Set marked dates
-const markedDates = [
-    { year: 2024, month: 1, day: 5 },
-    { year: 2024, month: 1, day: 10 },
-    { year: 2024, month: 1, day: 15 }
-];
-calendar.setMarkedDates(markedDates);
-```
-
-### Binding Events
-
-Use the `addEventCb` method to bind events:
-
-```javascript
-// Bind date selection event
-calendar.addEventCb((e) => {
-    const date = calendar.getDate();
-    eos.console.log("Selected date:", date);
-}, lv.EVENT_VALUE_CHANGED, null);
-```
-
-### Example: Creating a Simple Calendar
-
-```javascript
-// Create calendar
-const calendar = new lv.calendar(eos.view.active());
-calendar.setSize(200, 200);
-calendar.align(lv.ALIGN_CENTER, 0, 0);
-
-// Set current date
-const date = { year: 2024, month: 1, day: 1 };
-calendar.setDate(date);
-
-// Bind event
-calendar.addEventCb((e) => {
-    const date = calendar.getDate();
-    eos.console.log("Selected date:", date);
-}, lv.EVENT_VALUE_CHANGED, null);
-```
+The current bindings use `setTodayDate`, `setShowedDate`, `setHighlightedDates`, `setDayNames`, and `getBtnmatrix`, and provide the corresponding properties. The older `setDate`, `setMarkedDates`, and `getDate` are not part of the currently exported calendar method names.

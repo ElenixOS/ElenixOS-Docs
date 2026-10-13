@@ -17,7 +17,7 @@ This guide will help you understand the contribution process, coding standards, 
 - **Function names**: Use lowercase letters and underscores, e.g., `eos_app_install`
 - **Variable names**: Use lowercase letters and underscores, e.g., `app_id`
 - **Constants and macros**: Use uppercase letters and underscores, e.g., `EOS_APP_DIR`
-- **Type names**: Use camel case, e.g., `script_pkg_t`
+- **Type names**: Use lowercase letters and underscores, e.g., `script_pkg_t`
 - **Static variable names**: Use leading underscore + lowercase letters and underscores, e.g., `static int _app_count = 0;`
 
 #### Code Style
@@ -43,10 +43,10 @@ For detailed rules, see the `.clang-format` file in the project root.
 ```c
 /**
  * @brief Install application
- * @param eapk_path eapk installation package path
+ * @param pkg_path EPK installation package path
  * @return eos_result_t Installation result
  */
-eos_result_t eos_app_install(const char *eapk_path)
+eos_result_t eos_app_install(const char *pkg_path)
 {
     // Function implementation
     return EOS_OK;
@@ -74,10 +74,10 @@ eos_result_t eos_app_install(const char *eapk_path)
 ```javascript
 /**
  * Install application
- * @param {string} eapkPath - Application package path
+ * @param {string} pkgPath - EPK package path
  * @returns {number} Installation result
  */
-function installApp(eapkPath)
+function installApp(pkgPath)
 {
     // Function implementation
     return 0;
@@ -86,7 +86,7 @@ function installApp(eapkPath)
 
 ## Code Quality Checks
 
-ElenixOS provides a unified code quality check framework via `scripts/check.py` to ensure code meets project standards.
+ElenixOS provides a unified code quality check framework via `ElenixOS/scripts/check.py` to ensure code meets project standards.
 
 ### Check Types
 
@@ -146,30 +146,30 @@ brew install cppcheck              # macOS
 
 ```bash
 # Run all checks (project integrity check)
-python3 scripts/check.py
+python3 ElenixOS/scripts/check.py
 
 # Run specific checks (e.g., formatting and architecture only)
-python3 scripts/check.py --check fmt,arch
+python3 ElenixOS/scripts/check.py --check fmt,arch
 
 # Run formatting check only
-python3 scripts/check.py --check fmt
+python3 ElenixOS/scripts/check.py --check fmt
 
 # Auto-fix formatting issues
-python3 scripts/check.py --check fmt --fix
+python3 ElenixOS/scripts/check.py --check fmt --fix
 
 # JSON output (CI mode)
-python3 scripts/check.py --json
+python3 ElenixOS/scripts/check.py --json
 
 # List available checkers
-python3 scripts/check.py --list-checks
+python3 ElenixOS/scripts/check.py --list-checks
 
 # Specify clang-format path
-python3 scripts/check.py --clang-format /usr/bin/clang-format-20
+python3 ElenixOS/scripts/check.py --clang-format /usr/bin/clang-format-20
 ```
 
 ### Project Integrity Check
 
-Running `scripts/check.py` without arguments executes all four checkers as a comprehensive project integrity verification. Please run it before submitting new code to ensure all checks pass.
+Running `ElenixOS/scripts/check.py` without arguments executes all four checkers as a comprehensive project integrity verification. Please run it before submitting new code to ensure all checks pass.
 
 ### CI Automation
 
@@ -177,7 +177,7 @@ The project automatically runs code quality checks via GitHub Actions, configure
 
 - **Trigger**: Automatically runs on `push` or `PR` to `main` or `dev` branches
 - **Environment**: Ubuntu latest
-- **Command**: `python3 scripts/check.py --json --clang-format clang-format-20`
+- **Command**: `python3 ElenixOS/scripts/check.py --json --clang-format clang-format-20`
 - **On failure**: PRs will be blocked from merging; fix issues based on CI logs
 
 ## Development Process
@@ -322,8 +322,8 @@ ElenixOS documentation uses **MDX** (Markdown + JSX, Docusaurus framework) forma
 
 ## Next Steps
 
-- Check [Core Modules](./architecture/framework/app) documentation to understand the core features of the system
-- Check [API Documentation](./architecture/script_engine/elenix_os) to understand how to use system APIs
-- Check [Development Tools](/docs/development/dev_tools) documentation to understand the use of development tools
+- Check [Application Management](./architecture/framework/app) documentation to understand installed application identity, discovery, and launch coordination
+- Check [JavaScript API Reference](./architecture/script_engine/elenix_os) to look up the system interfaces available to scripts
+- Check [ElenixOS-Toolkit](./development/toolkit) to understand the project initialization, installation package build, and analysis workflow
 
 Welcome to join the ElenixOS development community and contribute your strength to the project!

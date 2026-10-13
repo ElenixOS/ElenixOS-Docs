@@ -1,186 +1,41 @@
 ---
-sidebar_position: 5
 title: Slide Widget
+sidebar_position: 5
 ---
 
 # Slide Widget
 
-## Overview
+Slide Widget is a horizontal or vertical slide controller. It makes a target object follow a touch object and, on release, automatically opens or returns to the base position based on a threshold.
 
-This component is the most basic sliding component, used to slide the target object from base to target. When the touch length (vertical or horizontal direction) / (target-base) exceeds the threshold, a sliding animation is triggered and it automatically slides to the target, otherwise it automatically slides to the base.
-
-Slide Widget provides an intuitive interaction method suitable for scenarios that require controlling object position through gestures, such as drawer menus, sliding panels, etc.
-
-## Core Features
-
-- **Direction Support**: Supports sliding in both horizontal and vertical directions
-- **Threshold Determination**: Determines whether to trigger sliding animation based on the ratio of touch distance to target distance
-- **Bidirectional Sliding**: Optionally supports bidirectional sliding for more flexible interaction
-- **State Management**: Provides a complete state machine, including idle, dragging, threshold, reverting, animating, and open states
-- **Event Mechanism**: Provides rich event callbacks for applications to respond to various sliding states
-- **Animation Effects**: Built-in smooth sliding animations to enhance user experience
-
-## Tips
-
-You can achieve the effect of disabling target object movement while still allowing it to follow touch sliding by setting `threshold` to `EOS_THRESHOLD_INFINITE`. This mode is suitable for scenarios that require real-time feedback without triggering state changes.
-
-## Notes
-
-All events are sent to the target object, i.e., `target_obj`. When listening to events, make sure to register the callback function on the target object.
-
-Example:
-```c
-lv_obj_add_event_cb(sw->target_obj, my_callback, EOS_EVENT_SLIDE_WIDGET_DONE, NULL);
-```
-
-Do not use `lv_obj_center` on the target object, otherwise it will cause coordinate movement confusion.
-
-## Example
+## Creation and Control
 
 ```c
-// Create slide widget
 eos_slide_widget_t *sw = eos_slide_widget_create(
-    parent, 
-    target_obj, 
-    EOS_SLIDE_DIR_HOR, 
-    100, 
-    EOS_THRESHOLD_50
-);
+    parent, target_obj, EOS_SLIDE_DIR_HOR, 100, EOS_THRESHOLD_50);
 
-// Listen for slide completion event
-lv_obj_add_event_cb(sw->target_obj, my_callback, EOS_EVENT_SLIDE_WIDGET_DONE, NULL);
+eos_slide_widget_move(sw, 0, 100, 200);
+eos_slide_widget_set_bidirectional(sw, true);
+eos_slide_widget_reverse(sw);
+eos_slide_widget_delete(sw);
 ```
 
-## API Reference
+If a touch object already exists, use `eos_slide_widget_create_with_touch`. `target` is the target coordinate of the target object on the selected axis; thresholds use the 0–255 scale from `EOS_THRESHOLD_0` to `EOS_THRESHOLD_100`, and `EOS_THRESHOLD_INFINITE` disables threshold triggering.
 
-### Direction Definition
+Slide Widget continuously manages the coordinate range of the target object; calling `lv_obj_center` on that object overrides the coordinates maintained by the component.
+
+## States and Callbacks
+
+States include `IDLE`, `DRAGGING`, `THRESHOLD`, `REVERTING`, `ANIMATING`, and `OPEN`. You can read the state, displacement, current position, base/target positions, direction, and touch/target objects.
+
+Callbacks are bound through the registration functions provided by the component, not through the event bus:
 
 ```c
-typedef enum
-{
-    EOS_SLIDE_DIR_VER,    // Vertical direction
-    EOS_SLIDE_DIR_HOR     // Horizontal direction
-} eos_slide_widget_dir_t;
+eos_slide_widget_add_event_cb_reached_threshold(sw, cb, user_data);
+eos_slide_widget_add_event_cb_reverted(sw, cb, user_data);
+eos_slide_widget_add_event_cb_moving(sw, cb, user_data);
+eos_slide_widget_add_event_cb_done(sw, cb, user_data);
+eos_slide_widget_add_event_cb_opened(sw, cb, user_data);
+eos_slide_widget_add_event_cb_closed(sw, cb, user_data);
 ```
 
-### State Definition
-
-```c
-typedef enum
-{
-    EOS_SLIDE_WIDGET_STATE_IDLE = 0,      // Idle, not sliding
-    EOS_SLIDE_WIDGET_STATE_DRAGGING,      // Sliding (gesture dragging)
-    EOS_SLIDE_WIDGET_STATE_THRESHOLD,     // Threshold exceeded, sliding confirmed (execute expand/trigger operation)
-    EOS_SLIDE_WIDGET_STATE_REVERTING,     // Reverting (automatically return when threshold not exceeded)
-    EOS_SLIDE_WIDGET_STATE_ANIMATING,      // Manually triggered animation
-    EOS_SLIDE_WIDGET_STATE_OPEN,           // Panel fully opened
-} eos_slide_widget_state_t;
-```
-
-### Threshold Definition
-
-```c
-enum{
-    EOS_THRESHOLD_0      = 0,
-    EOS_THRESHOLD_10     = 25,
-    EOS_THRESHOLD_20     = 51,
-    EOS_THRESHOLD_30     = 76,
-    EOS_THRESHOLD_40     = 102,
-    EOS_THRESHOLD_50     = 127,
-    EOS_THRESHOLD_60     = 153,
-    EOS_THRESHOLD_70     = 178,
-    EOS_THRESHOLD_80     = 204,
-    EOS_THRESHOLD_100    = 255,
-    EOS_THRESHOLD_INFINITE = INT_MAX,     // Infinite threshold, disable automatic sliding
-};
-```
-
-### Structures
-
-- **`eos_slide_widget_t`**: Slide widget structure containing all state and configuration information of the component
-
-### Functions
-
-- **`eos_slide_widget_create(lv_obj_t *parent, lv_obj_t *target_obj, eos_slide_widget_dir_t dir, lv_coord_t target, eos_threshold_t threshold)`**: Create slide widget
-  - Parameters:
-    - `parent`: Parent object of the touch object
-    - `target_obj`: Target object (will follow the touch area to slide)
-    - `dir`: Sliding direction (only supports vertical direction `EOS_SLIDE_DIR_VER` and horizontal direction `EOS_SLIDE_DIR_HOR`)
-    - `target`: Target coordinate point (when `dir` is vertical, target refers to the y-axis coordinate; when horizontal, refers to the x-axis coordinate)
-    - `threshold`: Threshold (0～255) see `EOS_THRESHOLD_XXX`
-  - Return value: Returns slide panel object on success, otherwise NULL
-
-- **`eos_slide_widget_create_with_touch(lv_obj_t *touch_obj, lv_obj_t *target_obj, eos_slide_widget_dir_t dir, lv_coord_t target, eos_threshold_t threshold)`**: Create slide widget (does not create touch object internally)
-  - Parameters:
-    - `touch_obj`: Touch object
-    - `target_obj`: Target object
-    - `dir`: Sliding direction
-    - `target`: Target coordinate point
-    - `threshold`: Threshold
-  - Return value: Returns slide panel object on success, otherwise NULL
-
-- **`eos_slide_widget_move(eos_slide_widget_t *sw, lv_coord_t start, lv_coord_t end, uint32_t duration)`**: Move from start position to end position
-  - Parameters:
-    - `sw`: Target slide widget
-    - `start`: Start coordinate
-    - `end`: End coordinate
-    - `duration`: Duration, set to 0 for no animation
-
-- **`eos_slide_widget_reverse(eos_slide_widget_t *sw)`**: Reverse the `target` and `base` positions of the target object
-  - Parameters:
-    - `sw`: Target slide widget
-
-- **`eos_slide_widget_set_bidirectional(eos_slide_widget_t *sw, bool enable)`**: Set whether to support bidirectional sliding
-  - Parameters:
-    - `sw`: Target slide widget
-    - `enable`: true to enable bidirectional sliding, false to disable bidirectional sliding
-
-- **`eos_slide_widget_set_move_foreground_on_pressed(eos_slide_widget_t *sw, bool enable)`**: Set whether to move to foreground when pressed
-  - Parameters:
-    - `sw`: Target slide widget
-    - `enable`: true to enable foreground movement, false to disable foreground movement
-
-- **`eos_slide_widget_set_anim_transition(eos_slide_widget_t *sw, eos_slide_widget_state_t transit_state, eos_slide_widget_state_t settle_state)`**: Set animation transition state
-  - Parameters:
-    - `sw`: Target slide widget
-    - `transit_state`: Transition state
-    - `settle_state`: Settle state
-
-- **`eos_slide_widget_delete(eos_slide_widget_t *sw)`**: Delete slide widget
-  - Parameters:
-    - `sw`: Target slide widget
-
-## Events
-
-- **`EOS_EVENT_SLIDE_WIDGET_MOVING`**: Triggered continuously during sliding
-- **`EOS_EVENT_SLIDE_WIDGET_DONE`**: Triggered when sliding animation completes
-- **`EOS_EVENT_SLIDE_WIDGET_REACHED_THRESHOLD`**: Triggered when threshold is reached
-- **`EOS_EVENT_SLIDE_WIDGET_REVERTED`**: Triggered when reversion completes
-- **`EOS_EVENT_SLIDE_WIDGET_OPENED`**: Triggered when panel is fully opened (broadcast event)
-- **`EOS_EVENT_SLIDE_WIDGET_CLOSED`**: Triggered when panel is fully closed (broadcast event)
-
-## Working Principle
-
-1. **Touch Detection**: Listen for press, drag, and release events on the touch object
-2. **Position Calculation**: Calculate the new position of the target object based on touch movement distance
-3. **Threshold Determination**: Calculate the ratio of touch distance to target distance when released, determine if threshold is exceeded
-4. **Animation Execution**: Execute corresponding sliding animation based on determination result
-5. **State Update**: Update component state during animation, trigger corresponding events
-
-## Usage
-
-1. **Create Component**: Use `eos_slide_widget_create` or `eos_slide_widget_create_with_touch` to create slide widget
-2. **Configure Parameters**: Set sliding direction, target position, threshold and other parameters
-3. **Listen to Events**: Register event callbacks on the target object to respond to various sliding states
-4. **Control Behavior**: Enable bidirectional sliding, foreground movement and other functions as needed
-5. **Manual Control**: Use `eos_slide_widget_move` to manually trigger sliding animation
-6. **Clean Up Resources**: Delete component using `eos_slide_widget_delete` when no longer needed
-
-## Notes
-
-- **Coordinate Management**: Do not use `lv_obj_center` on the target object, otherwise it will cause coordinate movement confusion
-- **Event Listening**: All events are sent to the target object, please register callback functions on the target object
-- **Memory Management**: Created components occupy memory and should be deleted in time when no longer needed
-- **Parent Object**: When the parent object is `lv_list_class`, the foreground movement function will be automatically disabled
-- **Threshold Selection**: Choose an appropriate threshold according to actual needs. Too large may make it difficult to trigger, too small may cause false triggers
-- **Bidirectional Sliding**: When enabling bidirectional sliding, ensure there is enough space to support sliding in both directions
+Callbacks receive an LVGL event object, and the touch object is the event target. Event types are initialized by the system before the component is created; event IDs are runtime values and do not constitute fixed global constants.

@@ -1,0 +1,57 @@
+---
+sidebar_position: 12
+title: Metric Service
+---
+
+
+# Metric Service
+
+The Metric Service provides stable semantic data names for watch faces and scripts, mapping different sources such as time, battery, and sensors into unified data samples. It separates "what the data is" from "which device the data comes from," so watch face components do not need to depend directly on sensor types or board-level interfaces.
+
+## Data Path```mermaid
+flowchart LR
+    Time[时间服务] --> Metric[Metric 语义映射]
+    Battery[电池服务] --> Metric
+    Sensor[传感器服务与算法] --> Metric
+    Metric -->|read / subscribe| SNI[SNI: eos.metric]
+    Metric -->|绑定的语义值| Widget[eos.ww 组件]
+    SNI --> Script[脚本应用或表盘]
+```The service returns to consumers the value, unit, sample timestamp, validity, and stale status corresponding to a semantic name. It typically reads data from existing services or derives values from time; it does not copy underlying sensor caches, nor is it responsible for device drivers, raw sampling, or historical databases.
+
+## Current Metric Names and Units
+
+| Name | Value and Unit | Validity Rule on First Read |
+|---|---|---|
+|`time.now`| Seconds elapsed in the current day, in`s`; does not include the date. | The current implementation always marks it`valid=true`. When the time device is not registered, the time service returns a zero value, so the Metric displays`0 s`and is still a valid sample. |
+|`battery.percent`| Battery percentage, in`%`, valid range 0–100. | Valid after a valid Battery report is received; otherwise`valid=false`. |
+|`battery.charging`| Charging state, in`bool`;`value`is 0 or 1. | The current implementation returns`valid=true`and`false`even when Battery has no valid report yet; when you need to determine whether battery data is available, also check`battery.percent.valid`. |
+|`health.heart_rate`| Heart rate, in`bpm`. | Requires a non-zero timestamp and a non-zero heart rate sample; marked`stale=true`after 30 seconds. |
+|`health.spo2`| Blood oxygen saturation, in`%`, typically 0–100. | Requires a non-zero timestamp and a non-zero SpO₂ sample; marked stale after 30 seconds. |
+|`activity.steps`| Monotonically accumulated step count, in`steps`. | Requires a sensor sample timestamp; marked stale after 10 seconds. |
+|`environment.temperature`| Temperature, in`degC`. | Derived by dividing the raw milli-°C by 1000; marked stale after 10 seconds. |
+|`environment.pressure`| Absolute barometric pressure, in`Pa`. | Directly uses the Pa field from BARO; marked stale after 10 seconds. |
+|`orientation.heading`| Azimuth, in`deg`, range`[0, 360)`, increasing clockwise. | Comes from the compass algorithm; marked stale after 10 seconds. Subscribing to this Metric acquires the compass sensor requirement. |
+|`moon.phase`| Lunar phase cycle ratio, in`phase`, with one synodic month normalized to`[0, 1)`. | Calculated from the platform's current date; valid and not stale. |
+|`moon.illumination`| Estimated illumination ratio, in`%`, range 0–100. | Calculated from the platform's current date; valid and not stale. |
+
+The Metric's`timestamp`for sensor sources is the monotonic millisecond timestamp since boot of the collected sample; for time, battery, and date-derived values, it is the monotonic millisecond timestamp since boot at the time of reading. It is not the unit of the value itself described by the`unit`field.
+
+Scripts can read a Metric once synchronously or establish a periodic subscription. The subscription callback is bound to the SNI program context that created it and executes when that context is runnable; unsubscribing or destroying the context releases the subscription. When the data comes from a sensor, the subscribed value still represents the latest cache of the Sensor Service and does not mean that each callback triggers a hardware sample. Sampling freshness is determined jointly by sensor requirement arbitration, device capabilities, and the Metric's valid/stale flags.
+
+Watch face components can bind directly to known Metrics, or scripts can read Metrics and then control components themselves. Components are responsible for display and their own LVGL resources, while the Metric Service is responsible for the semantics of values and source mapping; neither components nor Metrics depend directly on device operation tables.
+
+## Extension Boundaries
+
+The current Metric names and source mappings are defined by a static set within the service; there is no dynamic Provider registry or priority selection mechanism. When adding a new hardware source, first extend the corresponding device/service contract; only values that need to be expressed stably across applications are added to the Metric semantic mapping. Only afterward does the script boundary or watch face component choose whether to expose and present that value.
+
+Therefore, new consumers or watch face components that use existing Metrics do not need to change the data source; adding a new Metric requires extending the service mapping and the corresponding SNI boundary. The mere existence of an underlying sensor does not mean that a corresponding Metric already exists on the script side, nor does it mean that a general-purpose registerable Provider exists.
+
+## Current Implementation Boundaries
+
+- Common sources are read through time, battery, and the Sensor Service; some semantic values are derived by the service.
+- Sensor Metric reads use the service cache and do not replace the raw sensor subscription and sampling requirement APIs.
+- Currently only subscriptions to`orientation.heading`acquire the corresponding compass algorithm request; the subscription period of other Metrics itself does not guarantee that underlying hardware sampling is started.
+- Currently`battery.charging`still returns`false`and`valid=true`when there is no valid Battery Service report; when determining whether battery data is available, JS also checks`battery.percent.valid`. This behavior is specific semantics of this Metric and does not apply to all boolean Metrics.
+- Metric is a semantic adaptation layer for display and scripts, not a general-purpose data warehouse for all system data.
+
+For related boundaries, see [Application Contract](../../application_contract), [Sensor Service](../sensor), [SNI Architecture and Lifecycle](../../script_engine/sni), and [Watch Face System](../../framework/watchface).

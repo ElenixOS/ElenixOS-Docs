@@ -1,216 +1,30 @@
 ---
 sidebar_position: 7
-title: Development Tools
+title: Simulator Build Tools and Logging
 ---
 
-# Development Tools
+# Simulator Build Tools and Logging
 
-ElenixOS uses many scripting tools during development to assist development. Below, we will introduce the usage of these tools in detail.
+This page describes the CMake / Makefile, Kconfig, and Native logging entry points in the ElenixOS-Simulator repository. These are host-side tools for the desktop Simulator, not a unified build interface for each Board's firmware. Application / Watch Face projects, EPKG builds, and analysis are handled by [ElenixOS-Toolkit](./toolkit); board-level firmware is built according to [Platform and Board Integration](../integration/overview) and the documentation of the corresponding project.
 
-## Environment Preparation
-
-Before using development tools, you need to prepare the Python environment:
-
-### Create Virtual Environment
+## Build and Configuration
 
 ```bash
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment
-source venv/bin/activate
-
-# Install dependency packages
-pip install -r scripts/requirements.txt
+cmake -S . -B build
+cmake --build build --parallel
+cmake --build build --target menuconfig
 ```
 
-## Kernel Configuration Tool (Kconfig)
+`menuconfig` uses `kconfiglib` to generate the `.config` and generated configuration header in the build directory. For the configuration override order and available options, see [Kernel Configuration System](./kconfig).
 
-Kconfig is ElenixOS's kernel build configuration system. Originating from the Linux kernel, it manages build options in a structured way, enabling the same kernel codebase to adapt to different hardware platforms and product requirements.
+## Application / Watchface Development
 
-### Core Concepts
+Project initialization, EPKG package building, and analysis of existing packages are provided by the official VS Code extension [ElenixOS-Toolkit](./toolkit). The package format itself is defined by [EPKG v1 Package Format](../architecture/package_format).
 
-Configuration merges through three layers:
-- **Kernel definitions** (`Kconfig`): Declares all configurable items, their types, constraints, and defaults
-- **Project defaults** (`defaults.conf`): Version-controlled baseline configuration for this project
-- **Local overrides** (`.config`): Per-build-directory overrides, excluded from version control
+The `ElenixOS/scripts/eos_pkg_builder.py` in the simulator repository is the legacy standalone packaging tool, currently in a deprecated / legacy state, and is no longer the recommended build entry point for new Application or Watchface projects.
 
-Refer to [Kernel Configuration System](./kconfig).
+## Running and Logging
 
-### Install Dependency
+The Native build artifact is `bin/main` in the repository root; runtime logs are written to `tmp/latest.log` and archived by time. The WASM build artifact is in the build directory's `bin/`, and requires an HTTP server to serve it to the browser.
 
-```bash
-pip install kconfiglib
-```
-
-### Usage
-
-```bash
-make menuconfig              # Edit build/.config
-```
-
-Rebuild after changes:
-
-```bash
-make build
-```
-
-## Application Packaging Tool
-
-The application packaging tool (`eos_pkg_builder.py`) is used to package applications into .eapk or .ewpk files, containing all resources required by the application, such as icons, scripts, resource files, etc.
-
-### Features
-
-- Package applications as .eapk files
-- Package watchfaces as .ewpk files
-- Include all resource files of the application
-- Verify application configuration files
-
-### Usage
-
-```bash
-python scripts/eos_pkg_builder.py --input <input_path> --output <output_file> --type <type>
-```
-
-### Parameter Description
-
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `--input` | Input directory path | `app/` |
-| `--output` | Output file path | `app.eapk` |
-| `--type` | Packaging type | `app` or `watchface` |
-| `--compress` | Compression level (0-9) | `9` |
-| `--verbose` | Verbose output | `--verbose` |
-
-### Examples
-
-```bash
-# Package application
-python scripts/eos_pkg_builder.py --input app/ --output app.eapk --type app
-
-# Package watchface
-python scripts/eos_pkg_builder.py --input watchface/ --output watchface.ewpk --type watchface
-
-# Package with compression
-python scripts/eos_pkg_builder.py --input app/ --output app.eapk --type app --compress 9
-```
-
-## Binding Layer Generation Tool
-
-The binding layer generation tool is used to automatically generate binding code between JavaScript and native code, mainly including SNI (Script Native Interface) and LVGL binding layer.
-
-### Tool List
-
-- `extract_lvgl_types.py`: Extract LVGL types
-- `gen_lvgl_desc.py`: Generate LVGL description
-- `gen_sni_lv_types.py`: Generate SNI LVGL types
-
-### Usage
-
-```bash
-# Extract LVGL types
-python scripts/sni/extract_lvgl_types.py --input include/lvgl.h --output scripts/sni/config/lv_types.json
-
-# Generate LVGL description
-python scripts/sni/gen_lvgl_desc.py --input scripts/sni/config/lv_types.json --output scripts/sni/config/lv_desc.json
-
-# Generate SNI LVGL types
-python scripts/sni/gen_sni_lv_types.py --input scripts/sni/config/lv_desc.json --output src/script_engine/sni/sni_gen/sni_lv_types.c
-```
-
-## Icon Generation Tool
-
-The icon generation tool is used to convert SVG icons to C code for use in ElenixOS.
-
-### Tool List
-
-- `gen_icon_def.py`: Generate icon definitions
-- `ttf_mgr.py`: Font management tool
-
-### Usage
-
-```bash
-# Generate icon definitions
-python scripts/icon/gen_icon_def.py --input icons/ --output src/core/lang/eos_icon.c
-
-# Font management
-python scripts/icon/ttf_mgr.py --input font.ttf --output font.c --size 24
-```
-
-## Build Tools
-
-ElenixOS provides build scripts to simplify the build process:
-
-### Tool List
-
-- `build.sh`: Build script
-- `clean.sh`: Clean build
-
-### Usage
-
-```bash
-# Build embedded version
-./scripts/build.sh --platform stm32
-
-# Clean build
-./scripts/clean.sh
-```
-
-## Debugging Tools
-
-### Logging Tool
-
-ElenixOS provides logging tools for debugging and troubleshooting:
-
-```c
-// Output logs
-eos_log_i("Module", "Message: %d", value);
-eos_log_e("Module", "Error: %s", error);
-eos_log_w("Module", "Warning: %s", warning);
-eos_log_d("Module", "Debug: %s", debug);
-```
-
-## Development Tools Best Practices
-
-1. **Environment isolation**: Use virtual environments to isolate the development environment and avoid dependency conflicts
-2. **Automation**: Use build scripts to automate the build process
-3. **Version control**: Include generated code in version control to ensure code consistency
-4. **Testing**: Use embedded devices to test applications
-5. **Documentation**: Record tool usage and parameters for future reference
-
-## Common Issues and Solutions
-
-### Dependency Installation Failure
-
-**Issue**: Dependency installation failed
-
-**Solution**:
-1. Check if the network connection is normal
-2. Check if the Python version meets the requirements
-3. Try using `pip install --upgrade pip` to upgrade pip
-
-### Tool Execution Failure
-
-**Issue**: Tool execution failed
-
-**Solution**:
-1. Check if input parameters are correct
-2. Check if dependencies are fully installed
-3. Check if file paths exist
-
-### Generated Code Error
-
-**Issue**: Generated code compilation error
-
-**Solution**:
-1. Check if input files are correct
-2. Check if tool versions are compatible
-3. Check if generation parameters are reasonable
-
-## Summary
-
-ElenixOS provides a series of development tools to help developers develop and deploy applications more efficiently. These tools include application packaging tools, binding layer generation tools, icon generation tools, and build tools.
-
-By using these tools, developers can simplify the development process, improve development efficiency, and ensure code quality. At the same time, these tools also provide support for ElenixOS's continuous integration and continuous deployment.
-
-This document introduces the usage and best practices of ElenixOS development tools, hoping to help developers better use these tools and develop high-quality applications.
+The repository does not have the generic `build.sh`, `clean.sh`, `eos_log_i`, and other tool interfaces referred to as legacy in the documentation; for logging, use `EOS_LOG_D/I/W/E` or the script-side `eos.console.*`.

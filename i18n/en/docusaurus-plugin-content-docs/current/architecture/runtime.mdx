@@ -1,155 +1,57 @@
 ---
-sidebar_position: 4
-title: Runtime Overview
+sidebar_position: 3
+title: Runtime
 ---
 
-# Runtime Overview
+# Runtime
 
-ElenixOS's runtime system is based on the JerryScript engine, responsible for managing script execution, scheduling, and resource allocation. This document will detail ElenixOS's runtime mechanisms, scheduler, state management, and Realm lifecycle.
+The runtime combines platform initialization, system services, Activity pages, and script programs. It is not a thin wrapper for "scripts calling C functions," but rather a lifecycle coordination layer for programs, Realms, pages, and native resources.
 
-## Script Lifecycle
+## Runtime Model
 
-Scripts (applications and watchfaces) in ElenixOS have a complete lifecycle, from loading to execution to destruction:
+At startup, platform display/input and device registration are established first, then system services are initialized, and finally the root Activity, script runtime, and applications/watchfaces are started. When platform capabilities are insufficient, this is expressed upward through device state, capability queries, or service return codes; the startup process must not assume that all platforms provide the same capabilities.
 
-### 1. Loading Phase
+Script programs, Activities, and Views are three distinct ownership layers:
 
-1. **Script Loading**: Load application or watchface script files from the file system
-2. **Manifest Parsing**: Parse the `manifest.json` file to get application information
-3. **Create Realm**: Create an independent ECMAScript Realm for the script
-4. **Register API**: Register system APIs into the Realm
+- SPM owns script programs, JavaScript Realms, SNI contexts, and script callbacks.
+- The Activity controller owns the page stack, root Activity, page Views, and transitions.
+- LVGL owns child controls in the object tree; deleting a parent object may cascade-delete them.
 
-### 2. Execution Phase
+SPM is the sole entry point for the script program lifecycle. Upper-layer application/watchface managers **are prohibited from directly calling `script_engine` to start applications or watchfaces**, and must not bypass SPM to operate the Script Engine Core; starting, resuming, suspending, and stopping must all be done through SPM's application/watchface management interfaces. Only one unterminated program instance is allowed per application ID; the instance ID links the program, Activity, and Recent Apps record together.
 
-1. **Initialization**: Execute the script's initialization code
-2. **Running**: Execute the script's main logic
-3. **Event Handling**: Handle user input and system events
-4. **UI Update**: Update the user interface
+## Program and Page States
 
-### 3. Destruction Phase
+Program states are `ACTIVE`, `SUSPENDED`, `STOPPING`, or `TERMINATED`. Suspension means the program can still be resumed, typically preserving the Realm, page sub-stack, and Recent Apps snapshot; only eviction, uninstallation, root watchface replacement, or a fatal engine error leads to a full stop.
 
-1. **Resource Cleanup**: Release resources used by the script
-2. **Destroy Realm**: Destroy the script's Realm environment
-3. **Memory Release**: Release allocated memory
+Activities use their own page states and exit policies. Page transitions explicitly choose to preserve, destroy, or park, rather than letting the caller modify a long-lived destroy/suspend flag. Ordinary Activities cannot be directly destroyed by arbitrary callers; the root Activity is managed by the root replacement process.
 
-## Scheduling and Event Flow
+## Callbacks, Execution Context, and Engine Reset
 
-ElenixOS uses an event-driven scheduling mechanism to handle user input, system events, and script execution:
+SNI callbacks record the owner program and engine generation. Before entering a callback, it must be confirmed that the program is still active, the context is not suspended, and the generation has not changed; the owner Realm is entered before calling JS. After an LVGL object is deleted or the engine is reset, old callbacks, old handles, and old native pointers all become invalid.
 
-### Scheduler
+A fatal engine error saves the error context, destroys the affected SPM program and cleans up the Recent Apps entry, and then the Script Engine Core rebuilds the JerryScript heap within the current OS process. A Core rebuild does not mean that all crashed programs automatically restart: Applications and JavaScript Watchfaces enter the error-handling/user-restart path; Console fatal automatically rebuilds the Watchface and restarts the previous script application according to recovery conditions. Old pages, Views, and JS objects become invalid with the old engine generation; for the capture and rebuild order and the recovery paths for each type, see [Script Engine Overview](./script_engine_overview).
 
-The scheduler is responsible for managing script execution and event distribution, ensuring system responsiveness and stability:
+## Threading and Invocation Constraints
 
-1. **Event Queue**: Maintain an event queue, process events by priority
-2. **Time Management**: Manage timers and timed events
-3. **Resource Scheduling**: Reasonably allocate system resources
+The runtime main loop executes Activity/LVGL operations, LVGL timers, and the SNI/JS callbacks dispatched by those timers. The `main.js` of a newly started application is executed synchronously by SPM, which occupies the main loop call that initiated the start; the loading screen does not let the script run in parallel.
 
-### Event Flow
+The Event Bus itself does not switch threads or queue: `eos_event_post` synchronously invokes subscribers in the publisher's context. Sensor `eos_sensor_notify` also synchronously invokes Native subscribers in the publisher's context; Battery data changes emit events synchronously within the `eos_battery_report_raw` call stack. They cannot all be treated as GUI main loop callbacks. If a platform ISR/device thread wants to trigger a chain that may access LVGL, the file system, or scripts, it should first defer to the appropriate context through the Dispatcher or the target Service's thread-safe entry point; data passed across threads must be copied or kept valid before being queued.
 
-1. **Event Generation**: User input, system state changes, etc. generate events
-2. **Event Distribution**: The event system distributes events to corresponding handlers
-3. **Script Response**: Scripts execute corresponding logic based on events
-4. **UI Update**: Update the user interface
+Even if a callback is dispatched by a timer/Dispatcher, it still executes synchronously within the Core call stack and should be short and non-blocking. Only the callback's explicit scheduling boundary can indicate which context it runs in; asynchronous or thread-safe behavior cannot be inferred from the name `callback`.
 
-```mermaid
-flowchart TD
-    A[Event Generation] --> B[Event Queue]
-    B --> C[Event Distribution]
-    C --> D[Script Response]
-    D --> E[UI Update]
-    E --> F[Event Completion]
-```
+## Runtime Constraints
 
-## Resource Management Strategy
+- After an Activity/View is destroyed, all related C pointers and script handles must be considered invalid.
+- Script resource release must be performed by the owning SPM/SNI context; applications cannot bypass system resource lifecycle through JS reference counting.
+- When a program is suspended, its timers, animations, and script callbacks are paused or resumed according to the Recent Apps recovery policy; no arbitrary JS continues to execute while suspended.
+- New callbacks must be bound to an explicit owner, generation, and cancellation/deletion path; ownership cannot be guessed from a global current-program.
 
-ElenixOS runs in resource-constrained environments and adopts the following resource management strategies:
+## Related Mechanisms
 
-### Memory Management
-
-1. **Memory Allocation**: Use dynamic memory allocation, allocate memory on demand
-2. **Memory Recycling**: Regularly recycle unused memory
-3. **Memory Limit**: Set memory usage limits for each script
-
-### CPU Resource Management
-
-1. **Time Slice Allocation**: Allocate time slices for each script
-2. **Priority Scheduling**: Allocate CPU time based on script importance
-3. **Sleep Mechanism**: Enter sleep state when there are no events to reduce power consumption
-
-### Storage Management
-
-1. **File System**: Use file system to store applications and data
-2. **Cache Strategy**: Use cache reasonably to improve access speed
-3. **Storage Limit**: Set storage usage limits for each application
-
-## Runtime Error Handling
-
-ElenixOS adopts a multi-layer error handling mechanism to ensure system stability:
-
-### Error Capture
-
-1. **Script Errors**: Capture errors during script execution
-2. **System Errors**: Capture system-level errors
-3. **Hardware Errors**: Capture hardware-related errors
-
-### Error Handling Strategy
-
-1. **Error Isolation**: Ensure errors in one script do not affect other scripts
-2. **Error Recovery**: Attempt to recover system state after an error occurs
-3. **Error Logging**: Record error information for debugging
-
-### Error Types
-
-| Error Type | Description | Handling Method |
-|------------|-------------|------------------|
-| Script syntax error | Script code has incorrect syntax | Stop script execution, display error information |
-| Script runtime error | Error occurs during script execution | Capture error, attempt recovery |
-| System resource error | Insufficient system resources | Release resources, attempt to continue execution |
-| Hardware error | Hardware operation failure | Record error, attempt degraded operation |
-
-## Realm Lifecycle
-
-Realm is a concept in the ECMAScript language specification used to implement JavaScript's multi-threaded execution environment. In ElenixOS, each script runs in an independent Realm:
-
-### Realm Creation
-
-1. **Initialization**: Initialize the JerryScript engine
-2. **Create Realm**: Create a new Realm instance
-3. **Register API**: Register system APIs into the Realm
-4. **Load Script**: Load script code into the Realm
-
-### Realm Running
-
-1. **Execute Script**: Execute script code in the Realm
-2. **Handle Events**: Handle events generated by the script
-3. **Manage State**: Manage the script's running state
-
-### Realm Destruction
-
-1. **Stop Execution**: Stop script execution
-2. **Cleanup Resources**: Clean up resources used by the script
-3. **Destroy Realm**: Destroy the Realm instance
-4. **Release Memory**: Release allocated memory
-
-## Runtime Optimization
-
-ElenixOS adopts multiple optimization strategies to improve runtime performance:
-
-1. **Bytecode Caching**: Cache compiled bytecode to reduce repeated compilation
-2. **Lazy Loading**: Load scripts and resources on demand
-3. **Precompilation**: Precompile common scripts to improve startup speed
-4. **Memory Pool**: Use memory pool to manage memory allocation, reduce memory fragmentation
-
-## Runtime Security
-
-ElenixOS values runtime security and has taken the following measures:
-
-1. **Sandbox Isolation**: Each script runs in an independent sandbox
-2. **Permission Control**: Strictly control script permissions
-3. **Resource Limitation**: Limit script resource usage
-4. **Input Validation**: Validate user input to prevent malicious input
-
-## Summary
-
-ElenixOS's runtime system is a complex and efficient system that ensures system stability and responsiveness through reasonable scheduling mechanisms, resource management strategies, and error handling mechanisms. At the same time, it provides a safe and efficient runtime environment for application development.
-
-By understanding ElenixOS's runtime mechanisms, developers can better understand how the system works, thereby developing more efficient and stable applications.
+- [Application and Framework Contract](./application_contract): application startup blocking points, service consumption model, and page/program resource release rules
+- [Platform / Vendor Porting Contract](./platform_contract): context requirements for device operations and data reporting
+- [Activity](./framework/activity): page stack, root Activity, and exit policies
+- [Application Management](./framework/app): installation identity, single instance, and Recent Apps coordination
+- [Script Engine](./script_engine_overview): script packages and program behavior
+- [SNI Architecture and Lifecycle](./script_engine/sni): script handles, Realms, and native object boundaries
+- [Event Bus](./kernel/event/events): synchronous events and subscription lifecycle

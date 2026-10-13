@@ -1,0 +1,93 @@
+---
+sidebar_position: 3
+title: ElenixOS-Toolkit
+---
+
+
+# ElenixOS-Toolkit
+
+**ElenixOS-Toolkit is a VS Code extension for the ElenixOS development workflow.** It provides project initialization, package building and analysis, simulator debugging, and device serial port functionality through the editor workspace. EPKG is the system-level Package Contract for ElenixOS; the Toolkit Builder and Analyzer generate and read packages according to this contract, and the format semantics are defined by the system contract.```mermaid
+flowchart TB
+    VSCode["VS Code"] --> Toolkit["ElenixOS-Toolkit extension"]
+    subgraph Features["Toolkit capabilities"]
+        Studio["App Package Studio"]
+        Create["Application project initialization"]
+        Build["Package Build"]
+        Analyze["Package Analysis / Extract"]
+        SimDebug["Native Simulator debug and Webview"]
+        Serial["ESH serial terminal and YMODEM transfer"]
+        CLI["etk CLI"]
+        Core["Shared EPKG Core"]
+        Studio --> Create
+        Studio --> Build
+        Studio --> Analyze
+        CLI --> Core
+        Build --> Core
+        Analyze --> Core
+    end
+    Toolkit --> Studio
+    Toolkit --> SimDebug
+    Toolkit --> Serial
+    Toolkit --> CLI
+```The EPKG Package Contract independently defines the format accepted by the OS, constrains the Builder's output, and guides how the Analyzer and the OS Installer / Loader read the same`.epk`file. Package Build and Package Analysis share the Toolkit's EPKG TypeScript Core. For the formal semantics of the package header, FPMA, manifest, File Table, data region, checksums, and signature reservation, see [EPKG v1 Package Format](../architecture/package_format).
+
+## Obtaining and Installing
+
+- **Extension name:** ElenixOS-Toolkit
+- **Editor:** Visual Studio Code; the VS Code Engine requirement declared by the extension is`^1.136.0`.
+- **Marketplace identifier:**`ElenixOS.elenixos-toolkit`. Search for this name or identifier in VS Code Extensions and select **Install**; you can also install via the VS Code command line:```bash
+  code --install-extension ElenixOS.elenixos-toolkit
+  ```- **Marketplace page:** [ElenixOS-Toolkit](https://marketplace.visualstudio.com/items?itemName=ElenixOS.elenixos-toolkit)- **Source repository:** [ElenixOS/ElenixOS-Toolkit](https://github.com/ElenixOS/ElenixOS-Toolkit)The extension's`publisher`and`name`are`ElenixOS`and`elenixos-toolkit`respectively; the project release workflow publishes a matching version of the VSIX to the Visual Studio Marketplace. The current project has no Open VSX publishing configuration, and the GitHub Releases page has no standalone VSIX download item, so the Marketplace is the configured official installation channel.
+
+### Optional: Installing the`etk`CLI
+
+The Marketplace extension provides the VS Code workspace and does not add the`etk`command to the host shell's`PATH`. To use the CLI in a terminal, script, or CI, the host needs Node.js and npm; build and register the command from the Toolkit repository root:```bash
+git clone https://github.com/ElenixOS/ElenixOS-Toolkit.git
+cd ElenixOS-Toolkit
+npm install
+npm run package
+npm link
+etk --help
+````npm run package`generates`dist/cli.js`; the repository's`bin`declares a mapping of`etk`to this file. After success,`etk --help`should list the package build, inspect, validate, extract, and install subcommands. If the shell cannot find the command, confirm that npm's global executable directory is in`PATH`.
+
+## Application and Watch Face Projects
+
+Run **ElenixOS: Open App Tools** in the VS Code command palette to open App Package Studio. The **Create** workspace currently provides Application project initialization: it generates a project directory based on the project name, App ID, version, author, and description, containing`manifest.json`and`main.js`; the initial API level is`0`and can be modified in the project. After creation, you can go directly to the Build workspace.
+
+App Package Studio does not currently provide Watchface project initialization or Watchface templates. It can build an existing Watchface project into a watch face package: in the Build workspace, select the project directory containing a root-level`manifest.json`, and set Package type to **Watch face**. The project must still conform to the runtime's entry point and manifest requirements.
+
+A package project uses the root-level`manifest.json`as the source of identity and metadata. This manifest is subsequently interpreted jointly by the Builder, Analyzer, and system installation flow. For the complete project, build, and deployment tutorial for Applications, see [Application Development](../getting_started/application_development); for manually creating a Watch Face project and installing/running it, see [Watch Face Development](../getting_started/watchface_development). These two tutorials target different development goals.
+
+Simulator debugging uses the VS Code workspace / debug configuration provided by the Simulator repository: when Native debug starts, the extension automatically opens the simulator Webview. When the simulator is not in the current workspace, you can specify the executable path via`elenixosToolkit.simulatorPath`.
+
+## Package Build
+
+The Build workspace of App Package Studio reads the manifest and files from the project directory, displays preview information, performs project validation, and then builds the`.epk`package. The project type can be Application or Watch Face; compression options are`auto`,`none`, and`lz4`. After building, you can go directly to Analyze to view the output package. The Toolkit is responsible for converting the project into the EPKG v1 layout permitted by the contract, without changing the package's identity, metadata, or region definitions.
+
+The Toolkit project also declares a`etk`CLI entry point, using the same Shared EPKG Core, which can be used in terminals, scripts, and automated workflows. In an environment where it has been built and the CLI command has been added to`PATH`, you can use:```bash
+etk package build ./my-app --output ./build/my-app.epk --type app --compression auto
+etk package build ./my-watchface --output ./build/my-watchface.epk --type watchface
+````etk`also provides the`inspect`,`validate`,`extract`, and`install`commands. The CLI build input format follows the same Package Contract as the VS Code Build workspace.
+
+## Package Analysis
+
+The Analyze workspace or`etk inspect`opens an existing EPKG and reads the Header, FPMA, manifest, icon metadata, and File Table. The workspace displays the package type, identity, API range, icons, file paths, entry types, codec, stored / raw lengths, as well as the Header CRC and manifest CRC;`etk inspect --json`also returns the parsed Header / FPMA / File Table fields, including each file entry's CRC and offset. The analyzer reads packages according to the Package Contract; for the format definition, see [EPKG v1 Package Format](../architecture/package_format).
+
+Preview-style inspect reads the structure and quickly previews the content, without decoding ordinary payloads item by item; therefore, a damaged payload may still pass the preview stage.`validate`fully processes`NONE`and`LZ4_BLOCK`file entries, verifying the decoded length and file CRC.`extract`performs full validation before writing out. For the current unsigned EPKG v1, the signature offset / size must be zero; the Toolkit does not yet generate signatures or verify the signature region.```mermaid
+flowchart LR
+    Project["Project"] -->|Build with Toolkit| Package["EPKG package"]
+    Package -->|Analyze with Toolkit| Metadata["Package structure / metadata"]
+    Package -->|Install| Installer["OS Installer / Loader"]
+```The Builder and Analyzer are symmetric consumers of the contract: the Builder produces valid packages, and the Analyzer parses packages according to the same contract. What the Analyzer displays cannot retroactively narrow the regions already defined in the contract; even if the signature region is already reserved at the format level, it does not thereby become a capability supported by the current analyzer.
+
+## Other ElenixOS Development Workflows
+
+- **Native Simulator and F5 debugging:** The Toolkit works with the ElenixOS Native Simulator, driving the LVGL display in a VS Code Webview with a headless (no local window) simulator process, and forwarding touch and hardware key input. When using the workspace and debug configuration provided by the Simulator repository, pressing F5 automatically connects to the Webview; a normal non-debug session can also run **ElenixOS: Open Simulator**. The current simulator workflow supports macOS, Linux, and Windows.
+- **ESH serial terminal:** **ElenixOS: Open ESH Terminal** connects to the device ESH in the VS Code Terminal. On first connection, it selects a port from the serial ports detected by the host; the Toolkit does not set a universal default port path. The default serial format is 8 data bits, no parity, 1 stop bit (8N1), with RTS/CTS hardware flow control disabled.`elenixosToolkit.uartBaudRate`defaults to`921600`, setting only the Toolkit host-side rate; the device-side UART must match.`elenixosToolkit.uartMemoryMode`defaults to`window`, and the selected port and rate are retained until the current VS Code window / extension host ends; after changing to`persistent`, they are saved across restarts and workspaces. All settings can be modified in the **ElenixOS Toolkit** group in VS Code Settings.
+- **YMODEM file transfer:** **ElenixOS: Send File or Folder with YMODEM (UART)** can transfer files or directories over the device UART, sharing a single serial session with the ESH terminal. Toolkit YMODEM waits 30 seconds per response by default, with a maximum of 10 retries; during transfer, avoid having other serial tools simultaneously read from or write to that port. After the device receives the data, it can continue processing the package using ESH commands such as`pkg validate`and`pkg install`.
+- **Platform serial rate (PSoC-E84 development project):** E84 integration is still in the development stage and has not yet achieved a stable port; the following values correspond to this development project and do not represent an interface commitment for a stable port. The Simulator's virtual ESH does not use a physical serial port. The E84 project's ESH and YMODEM use the BSP`CYBSP_DEBUG_UART`, and the device-side baud rate is`921600`, consistent with the Toolkit default; the receive buffer is 8192 bytes, and`uartstats`in ESH can query the RX overflow count. When connecting to a physical device, the host and device UART rates need to match, and`elenixosToolkit.uartBaudRate`must be set.
+- **CLI device installation:**`etk install`transfers a local package to the device via YMODEM, then requests the device to validate, install, and read the package information to confirm the installation result. It uses the device-side Installer and does not bypass the Package Contract.
+
+These features enable the Toolkit to cover the daily workflow from project preparation to package delivery, simulator debugging, and device serial operations. The device results of each workflow are still returned by the ElenixOS side; merely building or previewing does not equal a successful device-side installation.
+
+## Legacy Standalone Packaging Script`eos_pkg_builder.py`is a legacy standalone packaging tool; the current ElenixOS-Toolkit has taken over the new Application and Watch Face project build and package analysis workflows. It is retained only as a historical implementation of the old toolchain. For Application and Watch Face project and Package workflows, start from the corresponding tutorials; the Toolkit is one of the tools used by these two development paths.

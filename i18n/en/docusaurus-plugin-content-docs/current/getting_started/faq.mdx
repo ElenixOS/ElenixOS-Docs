@@ -1,9 +1,11 @@
 ---
-sidebar_position: 5
-title: Common Issues and Troubleshooting
+sidebar_position: 6
+title: Simulator Performance Troubleshooting: Memory Integrity Assert
 ---
 
-# Common Issues and Troubleshooting
+# Simulator Performance Troubleshooting: Memory Integrity Assert
+
+This troubleshooting note applies to LVGL-based Simulator test runs, and is not a general performance conclusion for all ElenixOS Boards. The default configuration and performance of the target platform are determined by its BSP and build configuration.
 
 ## Frame rate drops after opening and returning from an app
 
@@ -15,7 +17,7 @@ When scrolling the app list to test frame rate, the FPS after opening a JS app a
 
 `LV_USE_ASSERT_MEM_INTEGRITY` is set to `1` in `lv_conf.h`.
 
-When enabled, LVGL calls `lv_mem_test()` after **every** timer callback (`lv_timer.c`), object-tree operation (`lv_obj_tree.c`), and draw operation (`lv_draw_rect.c`, `lv_draw_label.c`). `lv_mem_test()` walks the entire TLSF memory pool checking every block header. With the built-in TLSF allocator (`LV_STDLIB_BUILTIN`), each suspended app (Recents) adds more allocated blocks → integrity check time grows linearly → FPS drops linearly.
+When enabled, LVGL calls `lv_mem_test()` after **every** timer callback (`lv_timer.c`), object-tree operation (`lv_obj_tree.c`), and draw operation (`lv_draw_rect.c`, `lv_draw_label.c`). `lv_mem_test()` walks the entire TLSF memory pool checking every block header. With the built-in TLSF allocator (`LV_STDLIB_BUILTIN`), each suspended app (Recents) adds more allocated blocks. The integrity check slows down linearly with the number of blocks, and the frame rate drops accordingly.
 
 This can be confirmed with macOS Instruments (Time Profiler): samples will show `lv_tlsf_check` / `integrity_walker` / `block_is_free` dominating the frame budget.
 
@@ -28,4 +30,3 @@ Set `LV_USE_ASSERT_MEM_INTEGRITY` to `0` in `lv_conf.h`:
 ```
 
 This option is useful for catching heap corruption during development, but **must** be disabled when doing any frame-rate, scrolling, or animation performance testing. The other asserts (`LV_USE_ASSERT_NULL`, `LV_USE_ASSERT_MALLOC`) are O(1) checks and safe to leave on.
-

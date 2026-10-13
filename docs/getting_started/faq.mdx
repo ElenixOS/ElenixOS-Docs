@@ -1,9 +1,11 @@
 ---
-sidebar_position: 5
-title: 常见问题与故障排除
+sidebar_position: 6
+title: Simulator 性能排查：内存完整性断言
 ---
 
-# 常见问题与故障排除
+# Simulator 性能排查：内存完整性断言
+
+本条排查说明针对基于 LVGL 的 Simulator 测试运行，不是 ElenixOS 所有 Board 的通用性能结论。目标平台的默认配置与性能表现由其 BSP 和构建配置决定。
 
 ## 打开应用再返回后帧率明显下降
 
@@ -17,7 +19,7 @@ title: 常见问题与故障排除
 
 该选项启用后，LVGL 会在 **每次 timer 回调执行后**（`lv_timer.c`）、**每次对象树操作时**（`lv_obj_tree.c`）、以及 **每次绘制矩形/标签时**（`lv_draw_rect.c`、`lv_draw_label.c`）调用 `lv_mem_test()` 完整遍历 TLSF 内存池，检查每个 block 的完整性。
 
-当使用内置 TLSF 分配器（`LV_STDLIB_BUILTIN`）时，每个挂起的应用（Recents）会增加已分配的 block 数量 → 完整性检查耗时线性增长 → 帧率线性下降。
+当使用内置 TLSF 分配器（`LV_STDLIB_BUILTIN`）时，每个挂起的应用（Recents）都会增加已分配的 block 数量。完整性检查会随 block 数量线性变慢，帧率也随之下降。
 
 此问题可通过 macOS Instruments（Time Profiler）确认：采样会显示 `lv_tlsf_check` / `integrity_walker` / `block_is_free` 占据了帧预算的主要部分。
 

@@ -12,7 +12,7 @@
 - **函数名**：使用小写字母和下划线，例如 `eos_app_install`
 - **变量名**：使用小写字母和下划线，例如 `app_id`
 - **常量名与宏定义**：使用大写字母和下划线，例如 `EOS_APP_DIR`
-- **类型名**：使用驼峰命名法，例如 `script_pkg_t`
+- **类型名**：使用小写字母和下划线，例如 `script_pkg_t`
 - **静态变量名**：使用前下划线+小写字母与下划线，例如 `static int _app_count = 0;`
 
 #### 代码风格
@@ -38,10 +38,10 @@
 ```c
 /**
  * @brief 安装应用
- * @param eapk_path eapk 安装包路径
+ * @param pkg_path EPK 安装包路径
  * @return eos_result_t 安装结果
  */
-eos_result_t eos_app_install(const char *eapk_path)
+eos_result_t eos_app_install(const char *pkg_path)
 {
     // 函数实现
     return EOS_OK;
@@ -69,10 +69,10 @@ eos_result_t eos_app_install(const char *eapk_path)
 ```javascript
 /**
  * 安装应用
- * @param {string} eapkPath - 应用包路径
+ * @param {string} pkgPath - EPK 包路径
  * @returns {number} 安装结果
  */
-function installApp(eapkPath)
+function installApp(pkgPath)
 {
     // 函数实现
     return 0;
@@ -81,7 +81,7 @@ function installApp(eapkPath)
 
 ## 代码质量检查
 
-ElenixOS 提供了一套统一的代码质量检查框架 `scripts/check.py`，用于确保代码符合项目规范。
+ElenixOS 提供了一套统一的代码质量检查框架 `ElenixOS/scripts/check.py`，用于确保代码符合项目规范。
 
 ### 检查类型
 
@@ -141,30 +141,30 @@ brew install cppcheck              # macOS
 
 ```bash
 # 运行全部检查（项目完整性检查）
-python3 scripts/check.py
+python3 ElenixOS/scripts/check.py
 
 # 运行指定检查（如仅格式检查和架构检查）
-python3 scripts/check.py --check fmt,arch
+python3 ElenixOS/scripts/check.py --check fmt,arch
 
 # 仅运行格式检查
-python3 scripts/check.py --check fmt
+python3 ElenixOS/scripts/check.py --check fmt
 
 # 自动修复代码格式问题
-python3 scripts/check.py --check fmt --fix
+python3 ElenixOS/scripts/check.py --check fmt --fix
 
 # JSON 输出（CI 模式）
-python3 scripts/check.py --json
+python3 ElenixOS/scripts/check.py --json
 
 # 查看可用检查器列表
-python3 scripts/check.py --list-checks
+python3 ElenixOS/scripts/check.py --list-checks
 
 # 指定 clang-format 路径
-python3 scripts/check.py --clang-format /usr/bin/clang-format-20
+python3 ElenixOS/scripts/check.py --clang-format /usr/bin/clang-format-20
 ```
 
 ### 项目完整性检查
 
-`scripts/check.py` 不加参数即运行全部四个检查器，作为项目完整性验证。新提交的代码应在提交前运行一次以确保所有检查通过。
+`ElenixOS/scripts/check.py` 不加参数即运行全部四个检查器，作为项目完整性验证。新提交的代码应在提交前运行一次以确保所有检查通过。
 
 ### CI 自动检查
 
@@ -172,7 +172,7 @@ python3 scripts/check.py --clang-format /usr/bin/clang-format-20
 
 - **触发条件**：当 `push` 或 `PR` 到 `main` 或 `dev` 分支时自动触发
 - **运行环境**：Ubuntu latest
-- **检查命令**：`python3 scripts/check.py --json --clang-format clang-format-20`
+- **检查命令**：`python3 ElenixOS/scripts/check.py --json --clang-format clang-format-20`
 - **检查未通过时**：PR 将无法合并，需根据 CI 日志修复问题
 
 ## 开发流程
@@ -318,8 +318,8 @@ ElenixOS 文档采用 **MDX**（Markdown + JSX，Docusaurus 框架）格式编�
 
 ## 后续步骤
 
-- 查看 [核心模块](./architecture/framework/app) 文档，了解系统的核心功能
-- 查看 [API 文档](./architecture/script_engine/elenix_os)，了解如何使用系统 API
-- 查看 [开发工具](/docs/development/dev_tools) 文档，了解开发工具的使用
+- 查看 [Application 管理](./architecture/framework/app) 文档，了解已安装应用身份、发现与启动协调
+- 查看 [JavaScript API 参考](./architecture/script_engine/elenix_os)，查询脚本可用的系统接口
+- 查看 [ElenixOS-Toolkit](./development/toolkit)，了解项目初始化、安装包构建与分析工作流
 
 欢迎加入 ElenixOS 开发社区，为项目贡献你的力量！

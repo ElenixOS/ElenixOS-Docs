@@ -5,285 +5,37 @@ sidebar_position: 7
 
 # Watchface System
 
-## Overview
+The watchface is the system's root page. Both the built-in watchface and JavaScript watchfaces are displayed through the root Activity and are not pushed onto the Activity stack as ordinary pages; their scripts and Views are still managed by their respective runtime lifecycles.
 
-The watchface is the core UI component of ElenixOS, always displayed as the system's "home page". The watchface system supports two types:
+## Watchface Model
 
-- **Built-in Watchface**: A backup watchface written in C, independent of the script engine
-- **JS Watchface**: A dynamic watchface written in JavaScript, running through the script engine
+Current watchface installation and application installation share EPKG v1. The package header's `package_type` must be Watch Face, and the manifest's `id`, API level, and permission declarations determine runtime identity and compatibility. The watchface manager should not maintain a second set of package parsing or unpacking logic. For the in-package structure, see [EPKG v1 Package Format](../../package_format); the Toolkit can build existing watchface projects, but currently does not provide Watchface project initialization, see [ElenixOS-Toolkit](../../../development/toolkit) for details.
 
-## Architecture Design
+The watchface list includes the built-in fallback watchface. The fallback watchface is a system resource, not an installable item that can be uninstalled like an ordinary package; only installed JS watchfaces come from the watchface installation directory. The default watchface ID is determined by system configuration.
 
-### Watchface Instance Model
+## Switching and Lifecycle
 
-Each watchface is an independent **Instance**, with its own Activity and complete lifecycle management:
+The watchface manager coordinates watchface switching through SPM's start, resume, and stop flows, and replaces the root Activity; its call boundary with `script_engine` is managed by SPM. The old watchface's Activity, View, script Realm, SNI callbacks, and watchface components all become invalid during the replacement flow. After switching completes, the caller re-acquires the current root object from the root Activity interface; the old root pointer becomes invalid with the replacement.
 
-```c
-typedef struct eos_watchface_instance {
-    eos_watchface_type_t type;           /**< Watchface type (BUILTIN/JS) */
-    char id[EOS_WATCHFACE_ID_LEN_MAX];   /**< Unique watchface identifier */
+When opening an application, the current JS watchface can enter a suspended state; when returning to the watchface, the same program instance is resumed. Switching watchfaces, uninstalling watchfaces, Recent Apps eviction, or engine reset all perform a full destruction, and the old watchface no longer exists as a resumable page.
 
-    eos_activity_t *activity;            /**< Owned Activity (created and managed by the instance) */
-    const eos_activity_lifecycle_t *lifecycle;  /**< Activity lifecycle callbacks */
+## Data, Components, and Page Ownership
 
-    union {
-        struct {
-            lv_timer_t *time_update_timer;  /**< Time update timer for built-in watchface */
-        } builtin;
+JS watchfaces use `main.js` as the entry point and create pages through the system interfaces exposed by SNI. The Activity/View determines the lifecycle of the page and the LVGL object tree; the watchface script does not own the root Activity.
 
-        struct {
-            script_pkg_t pkg;               /**< Script package information for JS watchface */
-        } js;
-    } data;
-} eos_watchface_instance_t;
-```
+Data and drawing components are two distinct extension boundaries. `eos.metric` maps existing service state to semantic values; `eos.ww` exposes reusable native LVGL watchface controls to scripts. A component can bind to an existing Metric, or the script can pass read results into the component. In this way, components focus on presentation, while data services focus on units, validity, expiration state, and source.
 
-### Watchface Type Enum
+Metric currently uses static semantic mapping and has no dynamically registerable Provider plugin model. Adding a new watchface component that consumes an existing Metric does not require changing the sensor or Metric service; adding new semantic data requires extending the Metric mapping and SNI exposure. If the data comes from new hardware, it should first pass through the corresponding device/service boundary, and watchface components should not access drivers directly.
 
-```c
-typedef enum {
-    EOS_WATCHFACE_TYPE_BUILTIN,  /**< Built-in backup watchface */
-    EOS_WATCHFACE_TYPE_JS,       /**< JavaScript script watchface */
-} eos_watchface_type_t;
-```
+The LVGL handles returned by watchface components belong to their parent View and the root Activity; when the object tree is destroyed, the component's timers, callbacks, and internal resources must also become invalid in sync. The resources accessible to scripts are still limited to the interfaces registered with SNI, and after the root Activity is replaced, all old handles expire.
 
-### Architecture Layers
+## Architecture Constraints
 
-```mermaid
-flowchart TB
-    subgraph System["ElenixOS System"]
-        direction TB
-        WFMgr["Watchface Manager (eos_watchface)"]
-        ActivityCtrl["Activity Controller"]
-    end
+- The watchface is the root Activity and must not fake a second root page through the ordinary page stack API.
+- Watchface start, resume, and stop are all managed by SPM; the watchface manager does not directly call `script_engine` to create or start a script context.
+- Watchface switching must handle the ownership of the root Activity, View, script program, and watchface-specific components simultaneously.
+- The built-in fallback watchface cannot be deleted as an ordinary installable package, and the configuration must not point to a watchface ID that no longer exists.
+- Watchface packages must first pass complete EPKG v1 validation before unpacking and loading scripts; a successful preview does not mean it is runnable.
+- New code should use root Activity semantics to access the current watchface and should not rely on deprecated dedicated getters.
 
-    subgraph Instance["Current Watchface Instance"]
-        direction TB
-        WFInst["eos_watchface_instance_t"]
-        Activity["Activity (Root)"]
-        View["View (LVGL Object Tree)"]
-    end
-
-    subgraph Implementation["Watchface Implementation"]
-        direction TB
-        Builtin["Built-in Watchface<br/>(eos_watchface_builtin)"]
-        JS["JS Watchface<br/>(eos_watchface_js)"]
-    end
-
-    WFMgr -->|"Create/Switch"| WFInst
-    WFInst -->|"Owns"| Activity
-    Activity -->|"Contains"| View
-
-    WFInst -->|"type == BUILTIN"| Builtin
-    WFInst -->|"type == JS"| JS
-
-    ActivityCtrl -->|"Root Activity"| Activity
-```
-
-## Core Functions
-
-### Initialization Flow
-
-```mermaid
-sequenceDiagram
-    participant App as Application Layer
-    participant WF as eos_watchface
-    participant Activity as Activity System
-    participant Script as Script Engine (Optional)
-
-    App->>WF: eos_watchface_init()
-    WF->>WF: Read configuration file
-    WF->>WF: Determine watchface type (BUILTIN/JS)
-
-    alt Built-in Watchface
-        WF->>WF: eos_watchface_builtin_create()
-        WF->>Activity: eos_activity_create_root(&builtin_lifecycle)
-    else JS Watchface
-        WF->>WF: eos_watchface_js_create()
-        WF->>Script: Prepare script_pkg_t
-        WF->>Activity: eos_activity_create_root(&js_lifecycle)
-    end
-
-    WF->>Activity: eos_activity_controller_init(root_activity)
-    Activity-->>App: Initialization Complete
-```
-
-**Code Example**:
-```c
-// Initialize watchface system (all details handled internally)
-eos_result_t ret = eos_watchface_init();
-if (ret != EOS_OK) {
-    // Handle error
-}
-
-// Get watchface Activity (for controller initialization)
-eos_activity_t *watchface = eos_watchface_get_activity();
-eos_activity_controller_init(watchface);
-```
-
-### Watchface Switching Mechanism
-
-When the user selects a new watchface, the system executes the complete switching process:
-
-```mermaid
-flowchart TD
-    A["User selects new watchface"] --> B["eos_watchface_switch_to(id)"]
-    B --> C{"New watchface same as current?"}
-    C -->|"Yes"| D["No switch needed"]
-    C -->|"No"| E["Create new watchface instance"]
-
-    E --> F{"Watchface type?"}
-    F -->|"BUILTIN"| G["Call eos_watchface_builtin_create()"]
-    F -->|"JS"| H["Call eos_watchface_js_create()"]
-
-    G --> I["Create new Activity"]
-    H --> I
-    I --> J["eos_activity_replace_root(new_root)"]
-
-    J --> K{"Old Root exists?"}
-    K -->|"Yes"| L["Call old Root on_destroy()"]
-    K -->|"No"| M["Skip destruction"]
-
-    L --> N["Set new Root"]
-    M --> N
-    N --> O["Call new Root on_enter()"]
-    O --> P["Display new watchface"]
-```
-
-**Key API**:
-```c
-/**
- * @brief Switch to specified watchface
- * @param watchface_id Target watchface ID
- * @note This function replaces root activity with the new watchface instance
- */
-void eos_watchface_switch_to(const char *watchface_id);
-
-/**
- * @brief Check if watchface configuration has changed and reload
- * @note Should be called when returning to root activity (e.g., in on_resume)
- */
-void eos_watchface_check_and_reload(void);
-```
-
-### Configuration Change Detection
-
-The watchface system supports hot reload and automatically detects and applies changes when the configuration file changes:
-
-```c
-void eos_watchface_check_and_reload(void);
-```
-
-**Typical Use Cases**:
-- When returning to watchface from application (in `on_resume` callback)
-- When system wakes from sleep
-- When user changes default watchface in settings
-
-## Built-in vs JS Watchfaces
-
-### Built-in Watchface Implementation
-
-**File**: `eos_watchface_builtin.c/h`
-
-Features:
-- Uses `lv_timer_t` to periodically update time display
-- Directly operates LVGL API without script engine overhead
-- Serves as system fallback to ensure time display even if script engine fails
-
-**Core Logic**:
-```c
-// Time update callback
-static void builtin_time_update_cb(lv_timer_t *timer)
-{
-    eos_watchface_instance_t *instance = timer->user_data;
-    // Update time display (directly manipulate LVGL objects)
-    lv_label_set_fmt(time_label, "%02d:%02d", hour, minute);
-}
-```
-
-### JS Watchface Implementation
-
-**File**: `eos_watchface_js.c/h`
-
-Features:
-- Uses `script_pkg_t` to define script metadata and source code
-- Uses script engine's layered architecture (Kernel + Manager)
-- Supports context save/restore (when switching applications)
-
-**Core Logic**:
-```c
-// JS watchface initialization
-static eos_activity_t *eos_watchface_js_create(const char *watchface_id)
-{
-    // 1. Load manifest.json to get script information
-    // 2. Read main.js source code
-    // 3. Build script_pkg_t structure
-    // 4. Create Root Activity (View created by script in on_enter)
-
-    return eos_activity_create_root(&js_lifecycle);
-}
-```
-
-## Integration with Activity System
-
-### Root Activity Relationship
-
-The watchface, as the **Root Activity**, has a special status:
-
-```mermaid
-flowchart LR
-    subgraph Stack["Activity Stack"]
-        App1["Application A"]
-        App2["Application B"]
-    end
-
-    subgraph Root["Root (Independent of Stack)"]
-        WF["Watchface Activity"]
-    end
-
-    Stack -->|"back() Pop"| Root
-    WF -->|"replace_root()"| WF2["New Watchface"]
-```
-
-**Lifecycle Comparison**:
-
-| Operation | Normal Activity | Root Activity (Watchface) |
-|-----------|----------------|---------------------------|
-| Create | `eos_activity_create()` | `eos_activity_create_root()` |
-| Destroy | `eos_activity_back()` on pop | `eos_activity_replace_root()` on switch |
-| View Creation | Lazy (in on_enter) | **Immediate** (at create_root) |
-| Persistence | Managed with stack | Always exists until replaced |
-
-### Context Management
-
-For JS watchfaces, the script context is saved when switching to an application:
-
-```mermaid
-stateDiagram-v2
-    [*] --> Showing: Watchface displaying
-    Showing --> Suspended: User opens application
-    Suspended --> Saved: se_kernel_save_context()
-    Saved --> Restoring: User returns to watchface
-    Restoring --> Showing: se_kernel_restore_context()
-
-    state Suspended {
-        [*] --> SUSPEND_STATE: Script idle
-    }
-
-    state Saved {
-        [*] --> STOPPED_STATE: Realm saved externally
-    }
-```
-
-## File Structure
-
-```
-src/framework/watchface/
-├── eos_watchface.h              # Watchface system public interface
-├── eos_watchface.c              # Watchface manager implementation
-├── eos_watchface_list.c         # Watchface list management
-├── eos_watchface_builtin.h      # Built-in watchface interface
-├── eos_watchface_builtin.c      # Built-in watchface implementation
-├── eos_watchface_js.h           # JS watchface interface
-└── eos_watchface_js.c           # JS watchface implementation
-```
+For watchface consumers and the SPM lifecycle, see [Application Contract](../../application_contract); for platform data sources, see [Platform/Vendor Contract](../../platform_contract); for data mapping, SNI lifecycle, and UI hierarchy, see [Metric](../../services/metric), [SNI](../../script_engine/sni), and [UI](../../ui) respectively.

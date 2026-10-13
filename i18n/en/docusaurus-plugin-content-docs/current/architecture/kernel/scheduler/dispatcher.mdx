@@ -3,58 +3,14 @@ sidebar_position: 3
 title: Task Dispatcher
 ---
 
-ElenixOS Task Dispatcher is a lightweight task queue system designed for deferred execution of callback functions in non-real-time contexts. It provides a simple and effective mechanism for executing tasks that need to run in specific threads (such as the GUI thread) at the appropriate time.
+# Task Dispatcher
 
-## Core Features
+The task dispatcher submits short tasks from other threads or interrupt contexts to the system main loop, processing them in sequence in a context suitable for executing UI and system logic. It is a deferred execution queue across contexts, not a general-purpose thread scheduler.
 
-- **Thread Safety**: Uses semaphores internally to protect queue operations, supporting calls from any thread or interrupt
-- **Dynamic Expansion**: Automatically doubles capacity when the queue is full, ensuring tasks are not lost
-- **Lightweight Design**: Minimizes memory usage and execution overhead
-- **Circular Queue**: Implements a circular queue for efficient task management
+## Queue and Execution
 
-## API Reference
+The dispatcher uses a circular queue protected by a critical section to store callbacks and their user data. When queue space is insufficient, it attempts to expand; memory allocation failure may cause new tasks to be lost. Tasks in the queue are processed by the main loop in submission order, and the queue protection is released during callback execution so that other contexts can continue submitting work.
 
-### Initialization
+## Usage Boundaries
 
-- **`eos_dispatcher_init()`**: Initializes the task dispatcher, must be called before the GUI thread starts or during system initialization
-  - Initial queue capacity is 8
-  - Creates semaphores for thread synchronization
-  - Allocates initial queue memory
-
-### Task Management
-
-- **`eos_dispatcher_call(eos_dispatcher_cb_t cb, void *user_data)`**: Adds a callback function to the queue
-  - Parameters:
-    - `cb`: The callback function to execute
-    - `user_data`: User data passed to the callback function
-  - Features:
-    - Can be called from any thread or interrupt, with short execution time
-    - Automatically attempts to expand the queue when full
-    - Silently discards tasks if expansion fails (memory allocation failure)
-
-- **`eos_dispatch_tick()`**: Processes all pending tasks in the queue
-  - Called periodically in the GUI thread loop
-  - Executes all callback functions in the queue sequentially
-  - Releases the semaphore during execution to allow other threads to continue adding tasks
-
-## Working Principle
-
-1. **Queue Structure**: Uses a circular queue to store tasks, containing callback function pointers and user data
-2. **Thread Synchronization**: Ensures thread-safe operations through semaphores
-3. **Memory Management**: Initially allocates a fixed-size queue, automatically expands when capacity is insufficient
-4. **Execution Mechanism**: Executes all tasks in the queue sequentially when `eos_dispatch_tick()` is called
-
-## Use Cases
-
-- **Interrupt Handling**: Collect events in interrupts and defer actual processing to the main loop
-- **Time-Consuming Operations**: Avoid executing time-consuming operations in interrupts or high-priority tasks
-- **Cross-Thread Communication**: Provide a lightweight mechanism for cross-thread task submission
-- **Asynchronous Execution**: Implement simple asynchronous operations without relying on a complete RTOS scheduler
-
-## Notes
-
-- **Initialization Order**: Must call `eos_dispatcher_init()` before use
-- **LVGL Safety**: `eos_dispatcher_call()` supports calls from any thread, but if callback functions need to operate on LVGL, ensure they execute in the GUI thread
-- **Difference from `lv_call_async()`**: `lv_call_async()` only supports calls from the GUI thread, while `eos_dispatcher_call()` supports calls from any thread
-- **Memory Usage**: The queue automatically expands, but frequent expansion may lead to memory fragmentation. It is recommended to estimate an appropriate initial capacity based on actual needs
-- **Error Handling**: Tasks may be silently discarded when memory allocation fails. Error handling should be considered in critical scenarios
+Submitters should keep callbacks short and ensure that user data remains valid until the task executes. In interrupts, only collect the necessary information and submit follow-up work; tasks that need to operate on LVGL must execute in the GUI main loop. The queue does not provide task priorities, cancellation, or reliable persistence guarantees.

@@ -5,129 +5,18 @@ title: CardPager
 
 # CardPager
 
-## Overview
-
-A card-based page switching component that uses a linked list to control the page list and supports circular page flipping. CardPager provides an intuitive page switching mechanism suitable for scenarios that require navigation between multiple content pages, such as welcome screens, image browsers, etc.
-
-## Core Features
-
-- **Linked List Management**: Uses a doubly linked list to store pages, supporting dynamic addition and deletion of pages
-- **Direction Support**: Supports both horizontal and vertical sliding directions
-- **Circular Paging**: Can enable circular mode to achieve seamless page switching
-- **Page Indicators**: Automatically generates page indicators to show the current page position
-- **Callback Mechanism**: Provides page change callbacks to facilitate application response to page changes
-
-## Example
+CardPager manages a set of pages that can be swiped horizontally or vertically, and provides a page indicator. Pages are created by the component and belong to the CardPager.
 
 ```c
-eos_card_pager_t *cp = eos_card_pager_create(eos_screen_active(), EOS_CARD_PAGER_DIR_HOR);
+eos_card_pager_t *cp = eos_card_pager_create(parent, EOS_CARD_PAGER_DIR_HOR);
 lv_obj_t *page = eos_card_pager_create_page(cp);
-lv_obj_set_style_bg_color(page, EOS_COLOR_GREEN, 0);
-page = eos_card_pager_create_page(cp);
-lv_obj_set_style_bg_color(page, EOS_COLOR_YELLOW, 0);
-page = eos_card_pager_create_page(cp);
-lv_obj_set_style_bg_color(page, EOS_COLOR_ORANGE, 0);
-page = eos_card_pager_create_page(cp);
-lv_obj_set_style_bg_color(page, EOS_COLOR_RED, 0);
-eos_card_pager_remove_page(cp,3);
-page = eos_card_pager_create_page(cp);
-lv_obj_set_style_bg_color(page, EOS_COLOR_MINT, 0);
-eos_card_pager_set_loop(cp, false); // Enable loop
-eos_card_pager_move_node(cp,0,3);
-eos_card_pager_move_page(cp,4);
+lv_label_create(page);
+
+eos_card_pager_set_loop(cp, true);
+eos_card_pager_move_page(cp, 0);
+eos_card_pager_set_page_changed_cb(cp, on_page_changed, user_data);
 ```
 
-## API Reference
+`EOS_CARD_PAGER_DIR_VER` and `EOS_CARD_PAGER_DIR_HOR` represent vertical and horizontal sliding, respectively. Page indices start from 0; pages can be managed via `eos_card_pager_get_page`, `eos_card_pager_get_indicator`, `eos_card_pager_remove_page`, and `eos_card_pager_move_node`.
 
-### Direction Definition
-
-```c
-typedef enum
-{
-    EOS_CARD_PAGER_DIR_VER,    // Vertical direction
-    EOS_CARD_PAGER_DIR_HOR     // Horizontal direction
-} eos_card_pager_dir_t;
-```
-
-### Structures
-
-- **`eos_card_pager_t`**: Card-based page manager structure
-- **`eos_card_pager_node_t`**: Page node structure used for linked list storage
-
-### Callback Function
-
-```c
-typedef void (*eos_card_pager_page_changed_cb_t)(eos_card_pager_t *cp,
-                                                  uint8_t current_page_index,
-                                                  void *user_data);
-```
-
-### Functions
-
-- **`eos_card_pager_create(lv_obj_t *parent, eos_card_pager_dir_t dir)`**: Create a card-based page manager
-  - Parameters:
-    - `parent`: Parent LVGL object
-    - `dir`: Page sliding direction
-  - Return value: Returns page manager pointer on success, NULL on failure
-
-- **`eos_card_pager_create_page(eos_card_pager_t *cp)`**: Create a new page
-  - Parameters:
-    - `cp`: Page manager pointer
-  - Return value: Returns newly created page object on success, NULL on failure
-
-- **`eos_card_pager_set_loop(eos_card_pager_t *cp, bool loop)`**: Set page loop mode
-  - Parameters:
-    - `cp`: Page manager pointer
-    - `loop`: true to enable loop mode, false to disable loop mode
-
-- **`eos_card_pager_remove_page(eos_card_pager_t *cp, uint8_t page_index)`**: Remove specified page
-  - Parameters:
-    - `cp`: Page manager pointer
-    - `page_index`: Index of the page to remove (0-based)
-  - Return value: Returns true on success, false on failure
-
-- **`eos_card_pager_get_page(eos_card_pager_t *cp, uint8_t page_index)`**: Get specified page object
-  - Parameters:
-    - `cp`: Page manager pointer
-    - `page_index`: Page index (0-based)
-  - Return value: Returns page object on success, NULL on failure
-
-- **`eos_card_pager_get_indicator(eos_card_pager_t *cp, uint8_t page_index)`**: Get indicator object for specified page
-  - Parameters:
-    - `cp`: Page manager pointer
-    - `page_index`: Page index (0-based)
-  - Return value: Returns indicator object on success, NULL on failure
-
-- **`eos_card_pager_move_page(eos_card_pager_t *cp, uint8_t page_index)`**: Switch to specified page
-  - Parameters:
-    - `cp`: Page manager pointer
-    - `page_index`: Target page index (0-based)
-
-- **`eos_card_pager_move_node(eos_card_pager_t *cp, uint8_t from_index, uint8_t to_index)`**: Move page node position
-  - Parameters:
-    - `cp`: Page manager pointer
-    - `from_index`: Index of the page to move (0-based)
-    - `to_index`: Target position index (0-based)
-  - Return value: Returns true on success, false on failure
-
-- **`eos_card_pager_set_page_changed_cb(eos_card_pager_t *cp, eos_card_pager_page_changed_cb_t cb, void *user_data)`**: Set page change callback function
-  - Parameters:
-    - `cp`: Page manager pointer
-    - `cb`: Callback function
-    - `user_data`: User data
-
-## Usage
-
-1. **Create page manager**: Specify parent object and sliding direction
-2. **Add pages**: Use `eos_card_pager_create_page` to create multiple pages
-3. **Customize pages**: Add controls and set styles on each page
-4. **Configure loop mode**: Enable or disable circular paging as needed
-5. **Page navigation**: Use `eos_card_pager_move_page` to switch to specified pages
-6. **Listen for page changes**: Set page change callback function to respond to page switching events
-
-## Notes
-
-- **Memory Management**: Created pages occupy memory and should be deleted when no longer needed
-- **Performance Considerations**: Too many pages may affect performance, it is recommended to reasonably control the number of pages according to actual needs
-- **User Experience**: Loop mode is suitable for scenarios where content is logically related, while non-loop mode is suitable for scenarios with clear start and end
-- **Callback Processing**: Avoid executing time-consuming operations in page change callbacks to avoid affecting interface response speed
+When loop is enabled, continuing to swipe from the first or last page returns to the other end; when loop is disabled, it stops at the boundary. The page change callback receives the CardPager, the current page index, and the user data registered at the time. Deleting the CardPager's parent object also deletes its pages, and page pointers become invalid as the object tree is destroyed.

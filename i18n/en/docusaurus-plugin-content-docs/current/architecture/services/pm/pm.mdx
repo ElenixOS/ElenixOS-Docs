@@ -1,72 +1,46 @@
----
+{"translation": "---
 sidebar_position: 10
 title: Power Management Service
 ---
 
-The power management service is responsible for managing device power states, including wake, sleep, and AOD (Always-On Display) modes.
+# Power Management Service
 
-## Power States
+The Power Manager maintains the display/sleep policy as seen by the Core and hands the required power actions to the power device. It is the owner of the system state, not a feedback sensor for the physical power controller; the software state observed by callers does not necessarily prove that the hardware has completed the transition.
 
-```c
-typedef enum {
-    EOS_PM_DISPLAY_ON,      // Wake mode (screen on)
-    EOS_PM_DISPLAY_AOD,     // AOD mode (Always-On Display)
-    EOS_PM_SLEEP,           // Sleep mode
-} eos_pm_state_t;
+## Requests, States, and Platform Actions
+
+```mermaid
+sequenceDiagram
+    participant Input as Framework / Input
+    participant PM as Power Manager
+    participant Event as Event Bus
+    participant Sensor as Sensor Service
+    participant Device as Power Device / Vendor
+
+    Input->>PM: request sleep / wake
+    PM->>PM: update Core software state
+    PM->>Event: synchronously publish sleep / AOD / display-on
+    Event->>Sensor: recompute sensor power policy
+    PM->>Device: set_power(state)
 ```
 
-## Service Initialization
+The system states are display-on, AOD, and sleep. A sleep request turns into AOD when AOD mode is enabled, otherwise it enters sleep; a wake turns into display-on. State events are published by the synchronous Event Bus, and then the service performs the platform `set_power` operation.
 
-```c
-void eos_service_pm_init(void);
-```
+Currently the return value of `set_power` is not propagated to the caller, and the state is not rolled back on platform errors; when the power device is missing, the Core logs an error, but there is no generic asynchronous "hardware rejected/completed" result. The event indicates that the Core state has changed, not that the hardware has confirmed it. If a product requires reliable confirmation, an explicit confirmation and failure contract must be added for the Power Device/Service.
 
-## Power Control
+Sleep pauses the Power Manager's timer; the sensor service observes the synchronous state events, applies an interval floor in low-power/AOD mode, turns off sensors during sleep but retains the demand, and restores them according to the remaining demand after wake.
 
-### Wake Device
+## Upper-Layer and Lower-Layer Responsibilities
 
-```c
-void eos_pm_wake_up(void);
-```
+- The Framework, input, and system policy request sleep/wake, always-on mode, or a timeout; applications do not directly rewrite the device power state.
+- The Power Manager is responsible for the software state, timeout policy, configuration, and state events; it does not own board-level power rails, display panel sequences, or chip sleep flows.
+- The Vendor registers the state transition operations of the power device and implements the states that the target platform can support. Successful device registration does not mean that every state such as AOD or sleep has a hardware implementation.
+- When the platform cannot provide a certain state, the integration should explicitly express the capability; the current single `set_power(state)` interface has no generic discovery protocol for independently querying the support status of each state.
 
-### Request Sleep
+Automatic sleep only happens when the service actually creates a timer. The timeout setting only updates the period of an existing timer; if the current build/configuration does not create a timer, an explicit request can still change the software state, but it will not be triggered automatically by the timeout.
 
-If AOD mode is enabled, enters AOD mode; otherwise enters sleep mode:
+The current Core source hardcodes `DEBUG_DISABLE_TIMER` to `1`, so the current build does not create an automatic sleep timer. When the configuration key `sleep_timeout_sec` is missing, the period baseline is 15 seconds, but this value only takes effect in target builds that create a timer; in the current Simulator/this Core version, waiting 15 seconds will not automatically enter AOD or sleep. Explicit sleep/wake requests and input wake state transitions still work along the paths described above.
 
-```c
-void eos_pm_request_sleep(void);
-```
-
-### Reset Timer
-
-Reset the sleep timer:
-
-```c
-void eos_pm_reset_timer(void);
-```
-
-### Set Sleep Timeout
-
-Set how long without operation before entering sleep (unit: seconds):
-
-```c
-void eos_pm_set_sleep_timeout(uint32_t sec);
-```
-
-## AOD Mode
-
-### Set AOD Mode
-
-```c
-void eos_pm_set_aod_mode(bool enable);
-```
-
-Pass true to enable AOD mode, false to disable AOD mode.
-
-## Get Power State
-
-```c
-eos_pm_state_t eos_pm_get_state(void);
-```
-
-Returns the current power state.
+For platform responsibilities, see [Platform/Vendor Contract](../../platform_contract); for the input wake path, see [UI and Input Architecture](../../ui).
+"}
+}

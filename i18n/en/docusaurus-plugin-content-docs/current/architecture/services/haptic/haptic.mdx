@@ -3,54 +3,10 @@ sidebar_position: 8
 title: Haptic Service
 ---
 
-The haptic service is responsible for managing device vibration functions, providing different intensities of haptic feedback.
+# Haptic Service
 
-## Haptic Strength Presets
+The haptic service maps system feedback requests to the platform vibration device. When the device is missing or an operation is unsupported, the service reports according to device capabilities and operation results; a silent no-effect does not constitute a success confirmation.
 
-```c
-typedef enum {
-    EOS_HAPTIC_STRENGTH_OFF = 0,       // Off
-    EOS_HAPTIC_STRENGTH_NORMAL = 128,   // Normal strength
-    EOS_HAPTIC_STRENGTH_INTENSE = 255, // Intense strength
-} eos_haptic_strength_t;
-```
+The service provides three global strength levels — off, normal, and enhanced — as well as feedback semantics such as short, stronger, and long. The specific waveform and duration are determined by the platform implementation; callers express feedback intent and do not directly control the vibration hardware.
 
-## Haptic Feedback Patterns
-
-### Short Light Vibration
-
-Used for light haptic feedback prompts:
-
-```c
-void eos_haptic_tick(void);
-```
-
-### Stronger Longer Vibration
-
-Used for scenarios requiring stronger haptic feedback:
-
-```c
-void eos_haptic_buzz(void);
-```
-
-### Strongest Longest Vibration
-
-Used for important notifications or alerts:
-
-```c
-void eos_haptic_vibrate_long(void);
-```
-
-## Service Management
-
-### Initialize
-
-```c
-void eos_service_haptic_init(void);
-```
-
-### Set Global Vibration Strength
-
-```c
-void eos_haptic_set_strength(eos_haptic_strength_t s);
-```
+Core synchronously invokes the Vibrator's on/off operations according to feedback intent; the Vendor determines the actual waveform and device strength. The operations have no return value, and the current Service does not provide per-vibration completion or hardware success events, so applications cannot rely on a given request necessarily producing a perceptible vibration. See [Platform/Vendor Contract](../../platform_contract) for the platform boundary.

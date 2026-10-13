@@ -3,209 +3,51 @@ sidebar_position: 4
 title: 文件系统模块
 ---
 
-ElenixOS 使用统一的路径格式，即 POSIX-style 路径。所有文件操作都必须通过存储服务进行，系统内无法直接访问底层文件系统。
+# 文件系统模块
 
-## LVGL 文件系统集成
+存储服务在平台文件系统端口之上提供同步的 JSON、文件与目录操作。当前整文件写入直接执行文件操作，没有活动的批量延迟写入队列。平台端口负责当前目标的文件系统实现；服务 API 接收路径和句柄，不隐含应用身份或脚本沙箱。
 
-LVGL 文件系统驱动作为适配层工作：
-
-- 拦截所有 LVGL 文件操作
-- 将其转换为 eos_service_storage API 调用
-- 确保所有文件访问都通过 ElenixOS 存储沙箱
-
-### 架构
-
-LVGL → FS driver → eos_service_storage → eos_fs_port
-
-### 为什么 LV_FS_DEFAULT_DRIVE_LETTER 必须固定？
-
-LVGL 使用"驱动器字母"机制（例如 'S:/path'）来选择文件系统驱动。如果路径不包含驱动器字母，LVGL 会回退到 LV_FS_DEFAULT_DRIVE_LETTER。
-
-在 ElenixOS 中：
-- 向应用程序暴露单一的统一文件系统
-- 所有路径应为 POSIX-style（例如 "/data/config.json"）
-- LVGL 驱动在内部处理驱动器字母转换
-
-因此，LV_FS_DEFAULT_DRIVE_LETTER 必须指向 ElenixOS 驱动，否则 LVGL 可能会将文件操作路由到意外的后端。
-
-```c
-#if LV_FS_DEFAULT_DRIVE_LETTER != EOS_LVGL_FS_LETTER
-#error "LV_FS_DEFAULT_DRRIVE_LETTER must match EOS_LVGL_FS_LETTER"
-#endif
+```mermaid
+flowchart LR
+    Consumer[Framework / App] -->|sync path operation| Storage[Storage Service]
+    Storage -->|FS operation| Port[File-system Port]
+    Port -->|data / error| Storage
+    Storage -->|result / owned value| Consumer
 ```
 
-## 路径处理
+## JSON 与文件数据
 
-### 路径解析
+JSON 数据支持按类型读取和更新。键缺失或类型不匹配时，读取使用调用方给定的回退值。动态字符串和解析后的 JSON 树由调用方按其分配来源释放。
 
-所有路径在 `eos_fs_port` 层解析，不再由存储服务处理前缀。仿真器中调用 `eos_fs_set_root()` 设置沙箱根目录；`eos_fs_open_read()` / `eos_fs_open_write()` 等函数内部通过 `eos_fs_realpath()` 将虚拟路径透明映射到实际文件系统路径。量产硬件上根目录默认为 `"/"`，路径透传。
+JSON 与整文件数据写入在当前调用中完成；递归删除会影响整个目标目录树，调用前必须确认路径边界。
 
-## JSON 存储 API
+## 文件与目录资源
 
-存储服务提供了一套完整的 JSON 文件操作接口，用于读取和修改 JSON 格式的配置文件。
+文件和目录通过显式句柄访问。打开失败会返回无效句柄；句柄关闭后立即失效，后续读写均不再有效。目录读取逐项写入调用方提供的缓冲区。空间查询和其他设备能力可能因平台而不受支持，调用方通过返回结果识别失败。
 
-### 加载 JSON 文件
+文件句柄与整文件便捷 API 均在当前调用路径访问文件系统；大文件 I/O 可能占用调用上下文。整文件 API 的写入返回当前写操作结果，但不表示更高层应用事务已原子提交。
 
-从存储中加载 JSON 文件：
+## LVGL 文件系统适配
 
-```c
-cJSON *eos_storage_json_load(const char *path);
-```
+Storage Service 初始化时注册 LVGL 文件系统驱动适配器。LVGL 的打开、读写、定位和目录操作经该适配器转到同一存储服务句柄接口；读取缓存关闭，文件/目录关闭时适配器关闭对应 Storage 句柄并释放其包装记录。驱动盘符由构建配置确定，且与 LVGL 默认文件系统盘符保持一致。
 
-返回 cJSON 根对象，失败时返回 NULL。
+## 路径与隔离
 
-### 保存 JSON 文件
+脚本接口根据当前程序身份构造包 `assets/` 和应用/表盘配置目录；这些路径规则属于 SNI 层。通用 Storage API 不根据当前脚本身份重写或限制路径，因此不提供自动隔离的应用沙箱。新增的 JS 文件能力在其接口边界定义路径约束，再调用通用存储操作。
 
-将 cJSON 对象保存到文件：
+系统使用以 `/` 开头的逻辑路径。`EOS_SYS_ROOT_DIR` 决定逻辑根到平台文件系统的映射：Simulator Native 将它设为仓库 `fs/` 目录，WASM 使用 `/` 虚拟根，MCU 平台通常使用已挂载文件系统的根目录 `/`。因而应用包和系统目录名在各平台一致，但它们在主机上的实际绝对路径不同。
 
-```c
-eos_result_t eos_storage_json_save(const char *path, cJSON *root);
-```
+| 逻辑路径 | 内容 |
+|---|---|
+| `/.sys/config/cfg.json` | 系统配置文件。 |
+| `/.sys/app/apps/<app-id>/` | 已安装 Application，根目录含 `manifest.json` 与运行入口 `main.js`。 |
+| `/.sys/app/app_data/<app-id>/` | Application 持久数据目录，例如 `eos.config` 使用的应用配置。 |
+| `/.sys/wf/faces/<watchface-id>/` | 已安装 Watch Face，根目录含 `manifest.json` 与运行入口 `main.js`。 |
+| `/.sys/wf/wf_data/<watchface-id>/` | Watch Face 持久数据目录。 |
+| `/.sys/res/font/` | 系统字体资源；默认 TTF 相对文件名为 `font.ttf`。 |
 
-### 布尔值操作
+Simulator Native 下，例如 `/.sys/app/apps/demo/main.js` 对应仓库中的 `fs/.sys/app/apps/demo/main.js`。Core 多处组合路径时使用 `EOS_FS_PATH_MAX` 字节的固定缓冲区；Simulator 项目默认 256 字节，缓冲区还要为结尾 NUL 留空间。它不是跨 API 统一的拒绝规则：超长路径的返回值或截断处理由具体 API 决定。可通过 Kconfig 的 File system 配置组调整缓冲区大小。平台映射和构建默认值见[内核配置系统](../../../development/kconfig)。
 
-```c
-bool eos_storage_json_get_bool(const char *path, const char *key, bool default_value);
-eos_result_t eos_storage_json_set_bool(const char *path, const char *key, bool value);
-```
+平台 port 负责把逻辑路径映射到目标文件系统，并给出 open/read/write/seek 等操作的结果；它不决定某个脚本是否有权访问该路径。脚本资源封装、应用配置命名空间和任何路径规范化/拒绝越界逻辑必须由调用它的上层 API 承担。
 
-### 字符串操作
-
-```c
-char *eos_storage_json_get_string(const char *path, const char *key, const char *default_value);
-eos_result_t eos_storage_json_set_string(const char *path, const char *key, const char *value);
-```
-
-返回的字符串需要使用 `eos_free` 释放内存。
-
-### 数值操作
-
-```c
-double eos_storage_json_get_number(const char *path, const char *key, double default_value);
-eos_result_t eos_storage_json_set_number(const char *path, const char *key, double value);
-```
-
-### JSON 对象操作
-
-```c
-cJSON *eos_storage_json_get_json(const char *path, const char *key);
-eos_result_t eos_storage_json_set_json(const char *path, const char *key, cJSON *json_value);
-```
-
-返回的 cJSON 对象使用完后需要调用 `cJSON_Delete` 释放。
-
-### 创建 JSON 文件
-
-如果文件不存在，则创建包含默认内容的 JSON 文件：
-
-```c
-eos_result_t eos_storage_json_create_if_not_exist(const char *path, const char *default_json);
-```
-
-## 文件系统操作
-
-### 检查文件类型
-
-```c
-bool eos_storage_is_dir(const char *path);
-bool eos_storage_is_file(const char *path);
-bool eos_storage_is_valid_filename(const char *name);
-```
-
-### 写入文件
-
-向文件写入字符串（自动在末尾添加换行符）：
-
-```c
-eos_result_t eos_storage_puts(const char *s, eos_file_t fp);
-```
-
-### 创建目录
-
-如果目录不存在，则创建：
-
-```c
-eos_result_t eos_storage_mkdir_if_not_exist(const char *path);
-```
-
-递归创建目录树：
-
-```c
-eos_result_t eos_storage_mkdir_recursive(const char *path);
-```
-
-### 创建文件
-
-如果文件不存在，则创建并写入默认内容：
-
-```c
-eos_result_t eos_storage_create_file_if_not_exist(const char *path, const char *default_content);
-```
-
-### 读取文件
-
-将整个文件内容读入动态分配的缓冲区（仅适用于文本文件）：
-
-```c
-char *eos_storage_read_file(const char *path);
-```
-
-返回动态分配的缓冲区，使用完后需要使用 `eos_free` 释放。
-
-### 写入文件
-
-```c
-eos_result_t eos_storage_write_file(const char *path, const void *data, size_t data_size);
-```
-
-### 立即写入（绕过延迟写入器）
-
-```c
-eos_result_t eos_storage_write_file_immediate(const char *path, const void *data, size_t data_size);
-char *eos_storage_read_file_immediate(const char *path);
-```
-
-## 延迟文件写入器 (Deferred File Writer)
-
-延迟文件写入器用于批量写入文件，减少频繁的 Flash 写入操作，延长 Flash 寿命。
-
-### 工作原理
-
-- 写入数据时，先写入缓冲区
-- 调用 `eos_dfw_sync()` 时，将缓冲区数据同步到文件系统
-
-### 同步缓冲区到文件系统
-
-```c
-void eos_dfw_sync(void);
-```
-
-### 写入数据
-
-```c
-bool eos_dfw_write(const char *path, const uint8_t *data, size_t data_size);
-```
-
-返回 true 表示任务已添加到队列，将在下一次调用 `eos_dfw_sync()` 时写入文件。
-
-### 读取文件数据
-
-```c
-uint8_t *eos_dfw_read(const char *path);
-```
-
-成功返回文件内容，失败返回 NULL。需要手动释放返回的指针。
-
-### 初始化
-
-```c
-void eos_dfw_init(void);
-```
-
-## LVGL 文件系统注册
-
-注册 LVGL 文件系统驱动，将所有文件操作路由到 ElenixOS 存储服务：
-
-```c
-void eos_lvgl_fs_register(void);
-```
+应用路径与调用方责任见[Application 契约](../../application_contract)；文件系统注册和虚拟根由[Platform/Vendor 契约](../../platform_contract)定义。

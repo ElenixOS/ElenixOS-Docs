@@ -5,21 +5,18 @@ title: Simulator Overview
 
 # Simulator Overview
 
-ElenixOS provides a PC simulator, which is ported based on [lv_port_pc_vscode](https://github.com/lvgl/lv_port_pc_vscode).
-You can compile and run the ElenixOS simulation on any PC for quick iteration and debugging.
+ElenixOS is an embedded operating system for smartwatches and resource-constrained wearable devices. ElenixOS-Simulator is an independent desktop development assistance environment that provides two build methods: Native and WASM. Native uses SDL2 to provide display and input, while WASM runs in the browser via Emscripten.
 
-This page will introduce how to obtain code, set up the environment, compile and run, and basic usage methods.
+The Simulator is suitable for quickly iterating on UI, Applications / Watch Faces, and some platform-independent logic. It does not reproduce the driver, sensor, power consumption, and timing behavior of every Board, nor does it perform board-level firmware flashing. When you need to build firmware, please select or create a project according to [Platform and Board Integration](../integration/overview), and then enter the corresponding build instructions from the [Board-level Firmware Build Path](../getting_started/build); when you need to run the desktop version, use the Simulator guide below. If you use the Toolkit to debug the Native Simulator in VS Code, see [Toolkit Debugging Workflow](../development/toolkit).
 
-## Simulator Running Methods
+The Simulator runtime model still uses ElenixOS's Application, Activity, Runtime, and Service; the window, WASM, headless input/display, and host file root directory are Simulator platform behaviors.
 
-### Native Simulator
+## Build and Run Entry Points
 
-Native running means compiling and running the ElenixOS simulator directly on your computer, supporting Linux, macOS, and Windows operating systems.
+- [Simulator Environment Setup](../getting_started/environment): Install the host dependencies required for the selected target.
+- [Simulator Build and Run](./build): Complete configuration, build, and launch for Native or WASM. This is the shared build tutorial for both desktop targets.
 
-[View Native Simulator Guide](./native)
+## Target Differences
 
-### WASM Simulator
-
-Web running means accessing the ElenixOS simulator through a browser, no dependencies need to be installed, and you can directly experience ElenixOS.
-
-[View WASM Simulator Guide](./wasm)
+- **Native Simulator:** The SDL2 desktop window provides display and hardware input controls. For the runtime model, headless debugging, and input behavior, see [Native Simulator Runtime Model and Debugging](./native).
+- **WASM Simulator:** ElenixOS runs in the browser's virtual file system, and the page shell simulates crown and side button input. For the deployment path and browser boundaries, see [WASM Simulator Runtime Boundaries](./wasm).

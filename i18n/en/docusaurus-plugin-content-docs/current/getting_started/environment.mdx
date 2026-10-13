@@ -1,228 +1,61 @@
 ---
 sidebar_position: 4
-title: Development Environment Setup
+title: Simulator Environment Setup
 ---
 
-# Development Environment Setup
+# Simulator Environment Setup
 
-This document will guide you through setting up the ElenixOS development environment, including necessary tool installations, system requirements, and environment verification methods.
-
-## System Requirements
-
-### Supported Operating Systems
-
-| Operating System | Support Status | Notes |
-|------------------|----------------|-------|
-| macOS (Intel / Apple Silicon) | Fully supported | Recommended to use Homebrew for dependency installation |
-| Ubuntu 20.04+ / Debian 11+ | Fully supported | Recommended to use apt for dependency installation |
-| Windows 10+ (x86_64) | Fully supported | Recommended to use MSYS2 or WSL2 |
-| Other Linux distributions | Basic support | Need to install corresponding dependency packages yourself |
-
-### Hardware Requirements
-
-- **CPU**: Dual-core or higher, supporting `march=native` compilation optimization
-- **Memory**: At least 4GB RAM (8GB or more recommended)
-- **Disk space**: At least 2GB available space (including dependencies and build artifacts)
-- **Display**: Supports OpenGL 2.0 or higher (for simulator GUI display)
+This page only lists the host dependencies for ElenixOS-Simulator; it is not a general toolchain checklist for board-level firmware. Platform / Board projects each require their respective SDK, cross-compiler, and flashing tools. For target selection, see [Board-Level Firmware Build Path](./build).
 
 ## Required Tools
 
-### Compiler Toolchain
+The Native Simulator's CMake configuration requires CMake 3.10 or higher, a C compiler supporting C99, a C++ compiler supporting C++17, and the SDL2 development library. The build scripts also require Python 3; `kconfiglib` is used for `menuconfig` and generating Kconfig configurations, and the build can fall back to the default configuration if it is not installed.
 
-| Tool | Minimum Version | Purpose |
-|------|----------------|--------|
-| CMake | 3.10 | Build system configuration |
-| C compiler (GCC/Clang) | C99 standard support | C code compilation |
-| C++ compiler | C++17 standard support | Some component compilation |
-| Make / Ninja | - | Build execution |
+The WASM Simulator additionally requires the Emscripten SDK and should be configured with `emcmake` after activating the Emscripten environment. FreeRTOS is already provided with the simulator repository and does not need to be downloaded separately.
 
-### SDL2
+The project does not declare fixed minimum CPU, memory, or OpenGL specifications in CMake; actual compilation and runtime capability depends on the host, compiler, and SDL2 environment. The Native configuration adds `-march=native` for the compiler, so the compiler needs to support this option.
 
-The simulator uses SDL2 for window display and input handling, which is a required dependency for the simulator to run.
-
-### Python 3.10
-
-ElenixOS uses Python scripts to assist the development process, including API binding generation and other tasks.
-
-## Environment Setup Steps
+## Installation Examples
 
 ### macOS
 
-Use Homebrew to install required dependencies:
-
 ```bash
-# Install CMake
-brew install cmake
-
-# Install SDL2
-brew install sdl2
-
-# Install Python 3.10 (if not already installed)
-brew install python@3.10
-
-# Verify installation
-cmake --version
-sdl2-config --version
-python3.10 --version
+brew install cmake sdl2 python
 ```
 
 ### Ubuntu / Debian
 
-Use apt to install required dependencies:
-
 ```bash
-# Update package index
 sudo apt update
-
-# Install CMake
-sudo apt install cmake
-
-# Install SDL2 development library
-sudo apt install libsdl2-dev
-
-# Install Python 3.10
-sudo apt install python3.10 python3.10-venv
-
-# Install build tools
-sudo apt install build-essential
-
-# Verify installation
-cmake --version
-sdl2-config --version
-python3.10 --version
+sudo apt install build-essential cmake libsdl2-dev python3 python3-pip
 ```
 
-### Windows (MSYS2)
+On Windows, you can use an MSYS2/MinGW environment that the project can recognize SDL2 in; the documentation does not treat any particular Windows toolchain as a runtime requirement. The key is that CMake, the corresponding compiler, and the SDL2 development files are in searchable paths.
 
-Use MSYS2 to install required dependencies:
-
-```bash
-# Update package database
-pacman -Sy
-
-# Install CMake
-pacman -S mingw-w64-x86_64-cmake
-
-# Install SDL2
-pacman -S mingw-w64-x86_64-SDL2
-
-# Install GCC toolchain
-pacman -S mingw-w64-x86_64-toolchain
-
-# Install Python 3.10
-pacman -S mingw-w64-x86_64-python3.10
-
-# Install Make
-pacman -S make
-```
-
-### Windows (WSL2)
-
-In the WSL2 Ubuntu environment, follow the Ubuntu steps above. If you need to use the native Windows GUI, additional configuration is required:
-
-```bash
-# Install necessary graphics libraries for WSL2
-sudo apt install libx11-dev libxext-dev libxrender-dev libxrandr-dev libxcursor-dev
-
-# Install freetype development library (optional, for font rendering)
-sudo apt install libfreetype6-dev
-```
-
-## Verify Environment
-
-### Check CMake
+## Verification
 
 ```bash
 cmake --version
+python3 --version
 ```
 
-Output should include version information, such as `cmake version 3.10.0` or higher.
-
-### Check SDL2
+If `Could NOT find SDL2` appears during Native configuration, please install the SDL2 development package. When using Kconfig, you can install:
 
 ```bash
-sdl2-config --version
+python3 -m pip install kconfiglib
 ```
-
-Output should be the SDL2 version number, such as `2.0.20`.
-
-### Check Compiler
-
-```bash
-gcc --version
-# or
-clang --version
-```
-
-Ensure the compiler supports C99 standard.
-
-### Check Python
-
-```bash
-python3.10 --version
-```
-
-Output should be `Python 3.10.x`.
 
 ## Get Code
 
 ```bash
-# Clone simulator repository (with submodules)
 git clone --recursive https://github.com/ElenixOS/ElenixOS-Simulator.git
 cd ElenixOS-Simulator
+```
 
-# If already cloned but submodules not pulled
+After a non-recursive clone, you can fetch the submodules:
+
+```bash
 git submodule update --init --recursive
 ```
 
-The repository contains the following main components:
-
-| Directory | Description |
-|-----------|-------------|
-| `ElenixOS/` | ElenixOS core source code |
-| `lvgl/` | LVGL graphics library |
-| `FreeRTOS/` | FreeRTOS real-time kernel (optional) |
-| `lv_drivers/` | LVGL display and input drivers |
-| `main/` | Simulator main program |
-| `config/` | FreeRTOS configuration |
-| `fs/` | File system simulation directory |
-
-## Optional Dependencies
-
-### FreeRTOS
-
-To enable FreeRTOS support in the simulator, no additional dependencies are needed as the project already includes FreeRTOS source code.
-
-### LVGL Extended Features
-
-Some advanced LVGL features require additional library support:
-
-| Feature | Dependency Library | CMake Option |
-|---------|-------------------|-------------|
-| SDL rendering acceleration | SDL2 | `LV_USE_DRAW_SDL=ON` |
-| PNG decoding | libpng | `LV_USE_LIBPNG=ON` |
-| JPEG decoding | libjpeg-turbo | `LV_USE_LIBJPEG_TURBO=ON` |
-| Video playback | FFmpeg | `LV_USE_FFMPEG=ON` |
-| Font rendering | freetype | `LV_USE_FREETYPE=ON` |
-
-## Common Issues
-
-### CMake Cannot Find SDL2
-
-Ensure SDL2 development library is correctly installed and `sdl2-config` is in PATH. If still not found, manually specify SDL2 path:
-
-```bash
-cmake -DSDL2_DIR=/path/to/sdl2 ..
-```
-
-### Compilation Error with `march=native`
-
-If the compiler does not support `march=native` optimization flag, disable it in CMake configuration:
-
-```bash
-cmake -DCMAKE_C_FLAGS="-march=x86-64" ..
-```
-
-### Python Script Execution Failure
-
-ElenixOS-Tools.py requires Python 3.10. If multiple Python versions are installed on the system, ensure 3.10 is the default version or use it in a virtual environment.
+After completing environment setup, follow [Simulator Build and Run](../simulator/build) to choose Native or WASM. This page does not cover firmware building, flashing, or on-device verification for any Board.

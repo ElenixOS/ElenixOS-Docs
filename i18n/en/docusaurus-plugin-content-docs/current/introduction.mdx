@@ -6,46 +6,23 @@ title: Introduction to ElenixOS
 
 # Introduction to ElenixOS
 
-ElenixOS is an open-source operating system designed for smartwatches and other resource-constrained wearable devices. It organizes UI, application logic, and system services on top of a unified scripting runtime, allowing watch faces, system apps, and third-party apps to run in a more consistent way while retaining efficient access to underlying hardware.
+ElenixOS is an open-source embedded operating system for smartwatches and other resource-constrained wearable devices. The system Core provides the application model, runtime, Framework, system services, and device abstraction; Platform / BSP projects connect the Core to specific SoCs, Boards, displays, input, storage, and other peripherals.
 
-## Key Features
+ElenixOS-Simulator and ElenixOS-Toolkit are auxiliary development tools in the ecosystem: the Simulator helps rapidly iterate on UI, Application / Watch Face, and some platform-independent logic; the Toolkit initializes application projects and builds and analyzes EPKG installation packages. The Simulator's desktop runtime behavior does not represent the drivers and hardware capabilities of a specific Board.
 
-### Script-driven Application Model
+The PSoC Edge E84 port is still in development and has not yet reached a stable port. Developers can also create their own Platform / BSP projects and port to their own SoC or Board.
 
-Watch faces and applications in ElenixOS are driven by a scripting engine. Scripts describe the user interface and business logic, while native code handles scheduling, rendering, and resource management. This layered approach makes applications easier to iterate on and simplifies porting to different hardware platforms.
+## System Model
 
-### LVGL + JerryScript Runtime
+- **Application / Package:** Script applications and watch faces are delivered as EPKG installation packages, and after installation are managed by the Framework under a stable identity.
+- **Program / Runtime:** SPM manages script Programs, Realms, and runtime resources; JavaScript enters the Native system through interfaces exposed by SNI.
+- **Activity / View:** The Activity Controller manages page relationships and lifecycle; an Activity holds its own LVGL View. Pages and script Programs are two related but independent lifecycles.
+- **Framework / Service:** The Framework provides application-facing models, and Services manage system-shared capabilities, state, and policies; Storage, Sensor, Audio, and the like are specific system services.
+- **Device / Platform:** The Core defines device and platform contracts; Board / BSP integration implements these boundaries and connects to the target hardware.
 
-The graphics layer is based on LVGL, and scripts are executed by JerryScript. LVGL handles UI rendering and interaction, while JerryScript provides a JavaScript execution environment suitable for resource-limited devices. Together they enable a consistent UI experience and scriptable extensibility on wearables.
+For detailed relationships, see [System Architecture](./architecture/arch). The system entry page does not presume the reader's development role, nor does it require everyone to first create an Application project.
 
-### Layered Architecture
+## Continue Reading
 
-The project separates system capabilities into application, kernel, portability, and hardware layers. This allows upper-layer applications to rely on a stable API while the lower-layer implementations can be adapted for different chips, sensors, and peripherals.
-
-### Developer Tooling
-
-Besides the runtime, ElenixOS provides developer tools such as app packaging and binding generation to help combine scripts, resources, and native interfaces into deployable application bundles.
-
-### Rich Core Modules
-
-ElenixOS offers a set of core modules, including:
-
-- **Application Management**: install, uninstall, manage, and run apps
-- **System Services**: battery management, sensor management, and other system-level services
-- **UI Components**: a rich set of UI widgets built on LVGL
-- **Filesystem**: file and directory operations
-- **Scripting Engine**: a JavaScript runtime based on JerryScript
-
-## Where to Read First
-
-If you want a quick overview, read in this order:
-
-1. [System Architecture](/docs/architecture/arch) to understand ElenixOS's layering.
-2. [Scripting Engine](/docs/architecture/script_engine_overview) to learn how apps and watch faces run.
-3. [Quick Start](/docs/getting_started/quick_start) to get the basic project entry points.
-4. For development and debugging, see [Developer Tools](/docs/development/dev_tools) and [Build & Usage](/docs/getting_started/build).
-5. For implementation details of core modules, consult [Core Modules](./architecture/framework/app).
-
-## Documentation Conventions
-
-This site evolves alongside ElenixOS's implementation. Some sections may be more complete than others, but the overall goal is consistent: to help you build a full understanding of the project from architecture and runtime behavior to development workflows.
+- **Choose a development target:** [Quick Start](./getting_started/quick_start) lists the Application, Watch Face, Platform / BSP, Core, Simulator, and system-understanding paths.
+- **Understand system boundaries:** Read [System Architecture](./architecture/arch), then proceed as needed into Application, Platform, Core, or specific subsystem contracts.

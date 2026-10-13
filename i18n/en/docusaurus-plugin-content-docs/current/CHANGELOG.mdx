@@ -4,6 +4,138 @@ title: Changelog
 
 # Changelog
 
+## [v0.7.0-alpha]
+
+### Breaking Changes
+
+- **Package Format Upgrade**: Unified on EPKG v1, replacing the legacy EAPK/EWPK formats. Old packages must be repackaged; the installer dispatches app or watchface installation based on the package type.
+- **Watchface JavaScript API Reorganization**: The legacy `eos.ww.digitalClock`, `date`, `weekdayRing`, `moonPhase`, `dateWindow`, `battery`, `batteryArc`, `charging`, `heartRate`, `heartRateArc`, `steps`, `spo2`, `temperature`, `activityRings`, `barometer`, `compass`, `tickRing`, `numeralRing`, `centerCap`, `background`, `progressRing`, `progressRingSetValue`, and `progressRingSetRange` interfaces have been removed. New component entry points include `analogDial`, `arcTrack`, `compassDial`, `radialGauge`, `metricRings`, `trendChart`, and `calendarGrid`; semantic data is read or subscribed to via `eos.metric`.
+- **LVGL SNI Export Boundary Adjustment**: LVGL screen creation, reading, and switching interfaces are no longer exposed to JavaScript; the display root node and transitions are managed by the Activity/view framework. Macros, enums, and widget exports are also now selected via a configuration-based whitelist.
+- **Sensor Data Contract Update**: Three-axis acceleration, angular velocity, and magnetic field values are now `int32` fixed-point data with explicit scaling; humidity data has been added and a temperature field has been added to barometric samples. Platform drivers must publish samples in unified units, with timestamps using monotonic milliseconds since boot; absence of a sample is represented by a validity state, and a zero value is still a valid reading.
+
+### Added
+
+- **ESH System Service**: Added a command interpreter with a bindable terminal frontend, log bridging, and a command registration mechanism, allowing system logs to be observed from the command line.
+- **System and File Commands**: Added system status, configuration, app, hardware, sensor, input, package management, and debugging diagnostic commands; file tools cover `stat`, `cp`, `mv`, `touch`, `df`, `find`, `grep`, `head`, `tail`, `wc`, `crc32`, and `sha256`, and memory, uptime, and hex viewing commands are also provided.
+- **YMODEM File Transfer**: Supports sending and receiving files via ESH, with transfer progress, timeout/retry handling, and abort status diagnostics.
+- **ESH Line Editing**: Added command history, up/down arrow browsing, left/right cursor movement, and inline editing; `Ctrl+C` can clear the current input line or abort a YMODEM transfer.
+- **JavaScript Debug Commands**: Debug builds add `js eval` and `js file`, allowing code or files to be executed in a persistent ESH Console program context.
+- **Touch Automation and Tracing**: ESH adds touch control acquire/release, tap, press, move, release, and swipe commands; touch trajectory visualization has been added, and the ESH release command has been completed for the Windows frontend.
+- **EPKG v1 Package Tool**: Added CRC32 and LZ4 block decoding, package content and metadata preview, and connected app and watchface installation to the same package context.
+- **Semantic Metric Interface**: Added `eos.metric.get()`, `subscribe()`, and `unsubscribe()`, unifying reading of metrics such as time, battery, heart rate, blood oxygen, steps, temperature, barometric pressure, heading, and moon phase.
+- **Watchface Components and Bindings**: Added `ArcLabel` binding, as well as `analogDial`, `ArcTrack`, `compassDial`, `radialGauge`, `metricRings`, `trendChart`, and `calendarGrid` components; supports range knobs, chart data updates, and calendar month/date selection; analog dials can set time override, hide tick ranges, and set the ring start angle.
+- **Heart Rate and Compass Services**: Added corresponding sensor processing modules, and extended sensor reading, sampling period, asynchronous request cancellation, and test diagnostic capabilities.
+- **Activity Mini Title Bar**: Supports selecting standard or compact title bar styles per Activity, and controlling the title bar back button and display height.
+- **Memory Region Statistics**: Added EOS allocation statistics, memory region registration and snapshots, allocation failure and erroneous free counts, and an interface for platforms to report external memory.
+- **Fatal Error Dump**: Added a cross-platform dump interface that can output the fault reason as well as platform-provided register, stack, and fault status information.
+
+### Changed
+
+- **Recent Apps Interaction**: The recent apps page has changed from a list to an interactive card stack, and supports native apps entering the recent list; a single crown click immediately performs the original action, while a long press opens the recent apps page.
+- **Activity Lifecycle**: Explicitly represents the created, active, suspended, and destroyed states of an Activity, and provides retain, destroy, or suspend policies for exit behavior. Only one unterminated script program instance is kept per app ID at a time.
+- **App Loading Feedback**: The loading mask immediately participates in the transition; the spinner is only shown when loading exceeds about 160 ms, and fast launches no longer wait for a decorative minimum display time.
+- **Touch Gesture Thresholds**: System touch devices use a 5-pixel scroll determination threshold and a 400 ms long-press duration, improving the consistency of tap detection on small screens.
+- **Top-Level UI Management**: Manages the layering of Activity snapshots, title bars, system overlays, modal windows, secure screens, and debug screens via fixed semantic slots; a separate interaction slot is responsible for exclusive focus of screens such as the control center and message list.
+- **Sensor Sampling Scheduling**: The sampling period is jointly arbitrated by the independent demands of multiple subscribers, and sampling demands can be acquired or released on demand; identical sampling rates are no longer repeatedly sent to the device.
+- **Platform Device Interfaces**: Extended sensor, audio, and touch porting interfaces; speakers can report queue drain, number of samples played, and input end status, and touch input can be connected to a unified broker.
+- **Font System**: TinyTTF manages reusable font instances by exact pixel font size, and `setFontSize(px)` is no longer rounded to fixed 30/26/22 pixel tiers; added a `clearFontSize()` interface to restore inherited font size, and removed multiple font C arrays compiled into the firmware.
+- **SNI Generator**: Unifies LVGL type resolution, validation, and code rendering workflows via versioned binding configurations; the CLI provides `analyze`, `validate`, `update-config`, `generate`, and `dump-ir`, supporting structured text/JSON diagnostics, IR snapshot export, and independent project path resolution.
+- **SNI Export Filtering**: Selects LVGL widgets, macros, and enum families from explicit configuration; updates bindings to match LVGL master; the generator reads the version from LVGL headers, and wrappers required by grids/lists etc. are provided by dedicated bindings.
+- **Storage and Log Settings**: Removed the deferred file writer; added a persistable runtime log level in settings.
+
+### Fixed
+
+- **App List Transition**: Fixed the snapshot animation order, hide/show timing, and return transition of list page buttons and pages; provided a direct draw path for high-memory-usage scenarios, and prevented the app debugger and app list from sharing transition state.
+- **App Icons and Bubbles**: Fixed icons dimming when pressing list buttons, recent app icons being obscured by card borders, and residual bubbles still being visible after an app is removed; fixed the Chinese and English prompts when recent apps are empty, and retained the built-in app list even when the app file system is not yet mounted.
+- **App State Restoration**: Fixed Activity state retention and restoration during recent app transitions, and made apps that launch too quickly immediately remove the loading mask.
+- **Script and Activity Cleanup**: Fixed the issue where JavaScript event callbacks were not restored after an LVGL reset, and hardened the exit cleanup order of Activities, SNI, JerryScript Realms, and script programs.
+- **Parse Memory Error Reporting**: When the script parser heap is exhausted, the specific error is sent to the fault panel, improving diagnosis of app launch failures.
+- **Callbacks and Memory Ownership**: Added generation validation for asynchronous sensor requests to prevent old request callbacks from affecting a new lifecycle; clarified ownership of LVGL strings and output buffers.
+- **LVGL SNI Parameter Validation**: Corrected the mapping between JavaScript and LVGL values, validated instance method receivers, avoided computed macro replacement text, and restored required UI constants and grid/list bindings.
+- **Draw Buffer Release**: Fixed the release and alignment issues of icon glyph, snapshot, and slide/panel draw buffers.
+- **Simulated Pointer Safety**: Rejects touch injection when no physical touch input is bound, avoiding access to an uninitialized input device.
+- **Watchface Image Loading**: Analog dial hand images are read from storage and held by the component, and the percentage calculation of the LVGL image pivot has been corrected.
+- **Font Fallback Configuration**: Fixed the issue where font fallback options with a value of `0` in the generated configuration were still treated as enabled.
+- **EPKG Metadata Validation**: Validates that the package type is consistent with the manifest metadata, preventing app packages and watchface packages from being incorrectly dispatched.
+- **Build Compatibility**: Fixed compatibility of the EOS allocator with C99/LVGL custom memory backends, and switched to private header paths relative to the LVGL root directory.
+- **Input and Logging**: Restored crown feedback during non-touch scrolling, fixed overlay focus restoration, and corrected log levels in several places; normal app transition logs have been lowered to Debug level.
+- **File Reading**: Allows reading empty files and returns a valid empty string.
+
+## [v0.6.0-alpha]
+
+### Added
+
+- **Recent Apps System**: A complete app suspend/resume mechanism that preserves state instead of destroying apps when switching. Includes an LRU registry, Activity sub-stack detach/attach, a Parking Lot view parking area, pre-captured snapshots, thumbnail display, and resume transition animations.
+- **App Suspend/Resume**: SPM has been extended from supporting only watchface suspension to applications, adding `spm_app_suspend()`, `spm_app_resume(app_id)`, and `spm_app_stop_by_id(app_id)` APIs.
+- **SNI Resource Suspend/Resume Policies**: Timers support three resume policies `RUN_ONCE`/`RUN_ALL`/`SKIP`, and animations support two resume policies `CONTINUE`/`JUMP_TO_END`, configurable via Kconfig.
+- **Digital Crown Double-Click Detection**: Changed from immediate triggering to a wait-then-decide mode, with a default double-click window of 250 ms; a double click opens the Recent Apps page, and a single click suspends the current app.
+- **App Loading Screen**: Displays a progress bar and status updates when an app starts, including a radial loading animation (supporting determinate and indeterminate modes).
+- **Watchface Component Library**: Added 20+ reusable C watchface UI components, covering time/date (digital clock, date, weekday ring, moon phase, date window), battery (battery status, arc indicator, charging), health (heart rate, heart rate arc, steps, blood oxygen, temperature, activity rings, barometer, compass), and decoration (tick ring, numeral ring, center cap, progress ring, background).
+- **eos.ww Namespace**: The watchface component library is exposed as the `eos.ww.*` namespace via SNI, and can be used directly in JavaScript.
+- **Developer Options**: Added FPS display, visible object count (OBJS) display, and touch tracing functionality in the settings app.
+- **Circular Image Component**: Added the `eos_circle_image_create` circular cropped image component.
+- **Widget Data Registry (eos_wdata)**: A type-safe per-widget data registry that replaces direct use of `lv_obj_set_user_data()` by various subsystems; SNI control blocks are now stored as `EOS_WDATA_SNI_CB` type entries.
+- **Explicit Activity Destruction**: Added the `eos_activity_destroy()` function, supporting explicit destruction of a specified Activity.
+- **Standalone Snapshot**: Added the `eos_activity_take_snapshot_standalone()` snapshot interface that is not restricted by transition state, for Recent Apps scenarios.
+- **Activity Sub-Stack Mechanism**: Added `eos_activity_detach_app_substack()` and `eos_activity_reattach_app_substack()` for sub-stack management during app suspend/resume.
+- **Parking Lot Mechanism**: When an Activity is suspended, its View is moved to an invisible parking area instead of being destroyed, supporting fast resume.
+- **Animation Group (eos_anim_group)**: Supports coordinating synchronized transitions of multiple animations.
+- **Custom Cubic Bezier Easing**: Supports custom cubic-bezier easing paths and debug interception callbacks.
+- **SNI teardown State Machine**: Implements a resource management state machine, formalizing resource ownership (Pure Managed / Tree-Dependent / Hybrid) and destruction order.
+- **JerryScript Port Enhancements**: Added complete date/time and file system functionality support.
+- **Font Fallback Configuration**: Supports fallback font configuration when TTF font loading fails.
+- **Sensor Sampling Period API**: Added `eos_sensor_set_sample_period()` and `eos_sensor_get_sample_period()` APIs.
+- **Memory Query API**: Added `eos_mem_get_used_bytes()` and `eos_mem_get_free_bytes()` for querying C heap usage.
+- **Third-Party Library Git Information**: Generates and records Git version information of third-party dependency libraries at startup.
+- **Style Checker Enhancements**: Added separator and comment format check rules.
+- **ES Module Resolution Cache**: Introduced a module cache to ensure ES module singleton semantics, so multiple imports of the same module share the same instance.
+- **SNI Special Method Wrappers**: `lv_obj_delete`, `lv_obj_remove_event`, and the `lv_obj` parent setter have been moved to special wrapper handling.
+- **Crash Recovery Restart Dialog**: Displays a restart/exit dialog for the user to choose from after an engine crash.
+
+### Changed
+
+- **App Lifecycle**: Apps now support suspend/resume, and switching apps suspends rather than destroys by default.
+- **Animation System Refactoring**: Refactored animation handling to use `eos_anim_group` to coordinate transitions, improving animation handling in UI components.
+- **Unified SNI Control Block Retrieval**: `sni_control_block_t` retrieval now uniformly uses the `eos_wdata` registry.
+- **AppHeader Synchronization**: App UI and AppHeader are displayed in the same frame, eliminating the delayed appearance of the title bar.
+- **Configuration Macro Renaming**: `DEBUG`/`RELEASE` have been renamed to `EOS_DEBUG`/`EOS_RELEASE` to avoid naming conflicts.
+- **Theme Default Behavior**: Scrolling and scrollbars are disabled by default for all objects.
+- **Circular Icon Rendering**: Circular icons are rendered as centered images rather than baseline-offset labels, using a dark background to eliminate white halos.
+- **Main Loop Optimization**: Removed the forced minimum sleep duration.
+- **Numeral Ring Labels**: Adjusted label sizes to achieve vertical centering.
+- **Code Comment Standardization**: Unified separator and comment formats.
+- **LVGL 9.4 Adaptation**: Simulator builds are adapted to LVGL 9.4 headers.
+
+### Fixed
+
+- **Input Protection During Transitions**: Blocks input events during Activity transition animations to prevent inconsistent state.
+- **Animation Completion Before Snapshot**: Ensures all animations complete before capturing a snapshot.
+- **Crown Scrollbar Animation Blocking**: Fixed scrollbar animation blocking during fade in/out.
+- **List Transition Pop Effect**: Fixed the button "pop" effect, ensuring transitions start from off-screen.
+- **SNI Resource Ownership**: Formalized resource ownership rules, fixing dangling references, use-after-free, and resource leaks caused by teardown order.
+- **SNI Activity/View Lifecycle**: Hardened the Activity/View lifecycle, locking View/Screen access permissions.
+- **Memory Tracking Table**: Added a full-table warning and resets the warning state on removal.
+- **Memory Tracking Table Size Configuration**: Added a new configuration item and updated the cache size.
+- **Clock Hidden Flag**: Added a hidden flag check in the timer callback.
+- **Stress Test CPU Saturation**: Added a delay to prevent busy-loop CPU saturation.
+- **EOS_WEAK Macro**: Updated the GCC definition and removed the MinGW32 check.
+- **Sensor Notification Performance**: Removed logging in `eos_sensor_notify` to improve performance.
+- **Empty Data Placeholder**: Displays 0 instead of the LVGL default text when there is no data.
+- **FIFO Logging**: Re-enabled FIFO operation logging.
+- **Fatal Error Logging**: Replaced `printf` with `EOS_LOG_E` for fatal error logging.
+- **Script Engine Error Recovery**: Implemented error handling and recovery mechanisms in `script_engine_call_raw`.
+- **JerryScript Value Management**: Enhanced JerryScript value management during the teardown phase.
+- **SPM teardown Phase**: Refined the teardown phase of SNI context management.
+- **Descriptor Table Generation**: Generates right-aligned pointers and dynamic continuation indentation.
+- **Audio Decoder**: Removed unused fields in the `wav_fmt_chunk_t` structure.
+- **SNI Type Bridging**: Updated the `lv_event_t` type definition and color property offset to use the `lv_color_t` structure.
+- **File System Error Messages**: Corrected the error message for drive letter mismatch.
+- **Rounded Canvas Buffer**: Initialized the canvas buffer and adjusted background image handling.
+- **Radio Button Focus Scrolling**: Removed the scroll focus flag for radio option buttons.
+- **Bitmap Font Conditional Inclusion**: Conditionally includes bitmap fonts in CMakeLists.txt based on `EOS_FONT_TYPE`.
+- **Switch Indicator Style**: Synchronized the indicator style of unrendered components and removed debug output.
+- **Switch Creation Layout Update**: Removed unnecessary layout updates when creating switches.
+
 ## [v0.5.1-alpha]
 
 ### Fixed
@@ -242,6 +374,8 @@ title: Changelog
 - Provides isolation mechanism between scripts and system core, improving system stability and security.
 - Provides basic debugging and development support capabilities, improving desktop-side development and debugging efficiency.
 
+[v0.7.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.7.0-alpha
+[v0.6.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.6.0-alpha
 [v0.5.1-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.1-alpha
 [v0.5.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.5.0-alpha
 [v0.4.0-alpha]:https://github.com/ElenixOS/ElenixOS/releases/tag/v0.4.0-alpha

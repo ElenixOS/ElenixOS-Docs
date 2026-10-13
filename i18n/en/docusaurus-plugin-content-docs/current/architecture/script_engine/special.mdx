@@ -1,30 +1,17 @@
 ---
-title: Special API Usage and Notes
+title: Special LVGL API
 sidebar_position: 3
 ---
 
-# Special API Usage and Notes
+# LVGL Special Interfaces
 
-ElenixOS provides some special LVGL API components that have specific functions and usage methods. This document describes the usage methods and notes for these special APIs.
+The following pages only cover the classes that particularly need explanation in the current binding: `anim`, `timer`, `buttonmatrix`, `calendar`, `canvas`, `dropdown`, `image`, and the generic `obj`. They still follow the regular SNI handle and Activity/View lifecycle rules.
 
-## Special API Component List
-
-The following are the special LVGL API components supported by ElenixOS:
-
-- [Animation](sni/sni_api/lv/special/anim) - Used to create and manage animation effects
-- [Button Matrix](sni/sni_api/lv/special/btnm) - Used to create button matrices
-- [Calendar](sni/sni_api/lv/special/calendar) - Used to display and select dates
-- [Canvas](sni/sni_api/lv/special/canvas) - Used to draw graphics and images
-- [Dropdown](sni/sni_api/lv/special/dropdown) - Used to display and select dropdown options
-- [Image](sni/sni_api/lv/special/image) - Used to display images
-- [Object](sni/sni_api/lv/special/obj) - Base class for all LVGL components
-- [Timer](sni/sni_api/lv/special/timer) - Used to create and manage timers
-
-## Characteristics of Special APIs
-
-Compared with regular APIs, special APIs have the following characteristics:
-
-1. **Specific Functionality**: Each special API component has a specific function, such as animation, calendar, etc.
-2. **Complex Usage**: Special API components are usually more complex to use than regular components.
-3. **Performance Requirements**: Some special API components have higher performance requirements, such as animations and canvases.
-4. **Resource Consumption**: Some special API components may consume more system resources, such as canvases and images.
+- [Animation](sni/sni_api/lv/special/anim)
+- [Timer](sni/sni_api/lv/special/timer)
+- [Button Matrix](sni/sni_api/lv/special/btnm)
+- [Calendar](sni/sni_api/lv/special/calendar)
+- [Canvas](sni/sni_api/lv/special/canvas)
+- [Dropdown](sni/sni_api/lv/special/dropdown)
+- [Image](sni/sni_api/lv/special/image)
+- [Object](sni/sni_api/lv/special/obj)

@@ -5,69 +5,13 @@ sidebar_position: 5
 
 # Dropdown
 
-Dropdown is a special API component in ElenixOS used to display and select dropdown options. This document describes the functionality, usage methods, and notes for the dropdown component.
-
-## Feature Introduction
-
-The dropdown component allows developers to create a dropdown menu that displays a list of options. Users can click on the dropdown to expand the menu and select an option. Dropdowns are typically used for selecting from a list of choices.
-
-## Usage Methods
-
-### Creating Dropdown
-
-Use the `new lv.dropdown()` constructor to create a dropdown object:
-
-```javascript
-// Create dropdown object
+```js
 const dropdown = new lv.dropdown(eos.view.active());
-```
-
-### Configuring Dropdown
-
-Use the following methods to configure the dropdown:
-
-```javascript
-// Set dropdown size
-dropdown.setSize(150, 40);
-
-// Set dropdown position
-dropdown.setPos(10, 10);
-
-// Set dropdown options
-const options = "Option 1\nOption 2\nOption 3\nOption 4";
-dropdown.setOptions(options);
-
-// Set selected option by index
+dropdown.setOptions("Item 1\nItem 2");
 dropdown.setSelected(0);
-```
-
-### Binding Events
-
-Use the `addEventCb` method to bind events:
-
-```javascript
-// Bind selection change event
-dropdown.addEventCb((e) => {
-    const selected = dropdown.getSelected();
-    eos.console.log("Selected index:", selected);
+dropdown.addEventCb(() => {
+    eos.console.log(dropdown.getSelected());
 }, lv.EVENT_VALUE_CHANGED, null);
 ```
 
-### Example: Creating a Simple Dropdown
-
-```javascript
-// Create dropdown
-const dropdown = new lv.dropdown(eos.view.active());
-dropdown.setSize(150, 40);
-dropdown.align(lv.ALIGN_CENTER, 0, 0);
-
-// Set dropdown options
-const options = "Option 1\nOption 2\nOption 3\nOption 4";
-dropdown.setOptions(options);
-
-// Bind event
-dropdown.addEventCb((e) => {
-    const selected = dropdown.getSelected();
-    eos.console.log("Selected index:", selected);
-}, lv.EVENT_VALUE_CHANGED, null);
-```
+The current binding provides methods/properties such as options, selected item, direction, symbol, list, text, and open state, including `setOptions`, `setSelected`, `setDir`, `getSelected`, `getSelectedStr`, `getOptionCount`, `close`, and `isOpen`. The dropdown list is still part of the LVGL object tree, and its handle becomes invalid when the parent object is destroyed.

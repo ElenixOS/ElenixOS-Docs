@@ -1,25 +1,30 @@
 ---
 sidebar_position: 1
-title: Project Integration
+title: Platform and Board Integration
 ---
 
-## Project Acquisition
+# Platform and Board Integration
 
-### Clone the Repository
+ElenixOS Core provides portable Framework, Runtime, Service, Device, and port contracts; board-level projects implement these contracts and combine the SoC / BSP, peripheral drivers, boot flow, configuration, and toolchain to produce board-level firmware. Different integration projects have independent build, configuration, and flashing flows, and do not share a single set of common commands.
 
-Use Git to clone the ElenixOS repository:
+## Choosing an Existing Board-Level Project
 
-```bash
-git clone --recursive https://github.com/ElenixOS/ElenixOS.git
-```
+| Integration Project | Target Hardware | Development and Build Entry Point |
+|---|---|---|
+| [ElenixOS-PSoC-E84](https://github.com/ElenixOS/ElenixOS-PSoC-E84) (in development) | PSoC Edge E84 Evaluation / AI / HMI kits; the project includes CM33 Secure, CM33 Non-secure, and CM55 multi-core projects. | Use ModusToolbox with the corresponding BSP / Toolchain; the repository README and `ElenixOS-PSoC-E84.code-workspace` describe the current project's Build, Program, and board settings. This port is not yet stable. |
 
-:::note
-Note: Use the `--recursive` parameter to ensure submodules are also cloned.
-If you didn't use `--recursive` when cloning, you can get the submodules with the following command:
+The E84 integration is still in the development stage and has not yet achieved a stable port. The target board, SDK / Toolchain versions, display configuration, Linker Script, build variants, Flash layout, and flashing tools are governed by the corresponding board-level project; see [E84 Development Project Build and Flash](./psoc_edge_e84_build) for the current commands. Projects for other targets are defined by their respective Platform / Board projects. For build target selection, see [Board-Level Firmware Build Path](../getting_started/build); for porting responsibilities and registration order, see [Platform / Vendor Contract](../architecture/platform_contract); for the device interface model, see [Device Architecture](../architecture/device_architecture_design).
 
-```bash
-git submodule update --init --recursive
-```
-:::
+## Building Your Own Platform / Board Port
 
-<todo />
+Existing integration projects are not the only target option. Developers can create new Platform / BSP projects for their own SoC or custom board to connect ElenixOS Core to the target hardware; there is no requirement to copy the build system or board structure of existing projects.
+
+A porting project is responsible for implementing the applicable port and Device contracts, combining the BSP and peripherals, preparing system boot and service registration, and defining its own configuration, Toolchain, firmware artifacts, and flashing flow. For implementation boundaries, see [Platform / Vendor Contract](../architecture/platform_contract); for the overall system relationships, see [System Architecture](../architecture/arch).
+
+## Boundary Between Firmware and Application Packages
+
+Firmware images are built by the board-level project and flashed to the chip; an Application / Watch Face `.epk` is a Package installed on an already-running system and is not a board-level firmware artifact. For application-side project and deployment tasks, see [Application Development](../getting_started/application_development) and [Watch Face Development](../getting_started/watchface_development). The Platform integration boundary is still defined by Core's Device and port contracts and does not change based on package type.
+
+## Optional Desktop Auxiliary Environment
+
+[ElenixOS-Simulator](../simulator/overview) can be used to quickly validate the UI, Applications / Watch Faces, and some platform-independent logic. Native / WASM targets are built by a separate Simulator project; simulated display, input, device, and filesystem behavior cannot replace driver, power, timing, and flashing validation on the target Board.

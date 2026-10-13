@@ -5,123 +5,38 @@ title: Application Management Module
 
 # Application Management Module
 
-The application management module is one of the core components of ElenixOS, responsible for application installation, uninstallation, management, and running. This module provides a complete application lifecycle management mechanism, supporting functions such as application installation, uninstallation, and list management.
+The application management module is responsible for the identity, discovery, installation, uninstallation, ordering, and launch coordination of installed applications. It does not own script Realms, nor does it directly drive Activity pages; these responsibilities belong to SPM and the Activity controller respectively.
 
-## Core Features
+## Application Model
 
-### Application Installation and Uninstallation
+Applications and watch faces use the same EPKG v1 container. The `package_type` in the package header determines installation dispatch, and the `id` in `manifest.json` is the stable key for runtime identity, installation directory, and Recent Apps. Application management completes preview, manifest reading, full validation, and unpacking through a unified package context. For the internal layout and field semantics of the installation package, see [EPKG v1 Installation Package Format](../../package_format); for the official project and packaging workflow, see [ElenixOS-Toolkit](../../../development/toolkit).
 
-The application management module supports installing applications through the `eos_app_install` function and uninstalling applications through the `eos_app_uninstall` function. The installation process parses the application package (.eapk file), verifies application information, and deploys application files to the specified directory.
+The installation process sequentially reads metadata, checks the API level and package type, fully validates the EPKG, unpacks to an installation directory named by ID, and updates the discovery results and ordering state. Preview only provides metadata and does not constitute full validation. Installation success or failure is expressed through result codes and system events; whether a directory appears is not used as the criterion for installation result.
 
-### Application List Management
+## Installation and Uninstallation
 
-The application list management function allows operations such as getting the number of installed applications, getting application IDs by index, and checking if an application exists. The application list is persistently stored to ensure consistency after system restart.
+When installing an application with the same ID, the existing installation content is handled according to replacement semantics; the application ID must not change due to a change in the package file name. Uninstallation must simultaneously handle the installation content, application data, and permission records, and publish an uninstallation event; after a successful installation, publish an installation event.
 
-### Application Sorting
+Package parsing, decompression buffers, manifest temporary information, and installation target paths each have independent release responsibilities. After closing the EPKG context, its header, file table, or file handles must not continue to be read.
 
-Through the `eos_app_order_move` function, the position of applications in the list can be adjusted to implement application sorting functionality. Sorting results are saved to the configuration file to ensure sorting status is maintained during the next startup.
+## List, Ordering, and Launch
 
-## Key Interfaces
+The application list is rediscovered by installation directory, and the ordering sequence is saved by the `app_order` configuration; uninstalled IDs are no longer valid ordering entries. Application management is responsible for stable identity and ordering, not for creating Activities or deciding page exit policies.
 
-### Application Installation Interface
+When opening a new script application, the application manager first establishes and enters the App Activity that hosts the loading UI, then requests SPM to synchronously run the script; `main.js` establishes the page content in the startup call stack. After a successful return, the Activity binds the program instance ID and engine generation. Recent Apps restoration reattaches the same instance without creating a parallel Realm. **Directly calling `script_engine` to launch an application is prohibited**.
 
-```c
-eos_result_t eos_app_install(const char *eapk_path);
-```
+## Programs and Recent Apps
 
-- **Parameters**: `eapk_path` - Application package path
-- **Return value**: Installation result, returns `EOS_OK` on success, error code on failure
+When an application leaves the foreground, the Activity controller first detaches the application Activity sub-stack; Recent Apps then parks the program and page as `SUSPENDED`, or performs a full destruction. Recent Apps entries bind to the program instance ID and may save snapshots for return animations. After reaching the count or memory watermark, the system evicts entries through the per-instance stop path, while cleaning up the corresponding program and associated state.
 
-### Application Uninstallation Interface
+Suspension retains the program instance and is not equivalent to exit. Sensor requirements, audio, timers, animations, and script callbacks are handled according to the program suspend/resume policy; resources that continue to be retained have explicit owners and recovery paths.
 
-```c
-eos_result_t eos_app_uninstall(const char *app_id);
-```
+## Architectural Constraints
 
-- **Parameters**: `app_id` - Application ID
-- **Return value**: Uninstallation result, returns `EOS_OK` on success, error code on failure
+- The application ID is a stable key; package paths, display names, or package file names must not be used in its place.
+- SPM is the sole owner of the script program lifecycle; the application manager must not directly operate the Script Engine Core, nor directly call `script_engine` to launch an application.
+- Two unterminated script programs with the same application ID must not exist simultaneously.
+- The cleanup of Activities, Recent Apps, and SPM must be completed as a set, and must not produce "Recent Apps entries without a program" or "script programs still referencing an old View".
+- The current format only accepts EPKG v1; the legacy EAPK/EWPK compatibility paths and the installation flow distinguished by magic are deprecated.
 
-### Application List Operation Interfaces
-
-```c
-uint32_t eos_app_get_installed(void);
-const char* eos_app_list_get_id(size_t index);
-bool eos_app_list_contains(const char* app_id);
-const char *eos_app_list_get_existing_id(const char *id);
-```
-
-- `eos_app_get_installed`: Get the number of installed applications
-- `eos_app_list_get_id`: Get application ID by index
-- `eos_app_list_contains`: Check if application exists
-- `eos_app_list_get_existing_id`: Get existing application ID in the list
-
-### Application Sorting Interface
-
-```c
-eos_result_t eos_app_order_move(const char *app_id, size_t new_index);
-```
-
-- **Parameters**:
-  - `app_id` - Target application ID
-  - `new_index` - New index position
-- **Return value**: Operation result, returns `EOS_OK` on success, error code on failure
-
-## Application Package Structure
-
-ElenixOS application packages (.eapk files) contain the following key files:
-
-- **manifest.json**: Application configuration file, containing application ID, name, version, type, etc.
-- **main.js**: Application main script file, containing application interface and logic
-- **icon.bin**: Application icon file
-
-## Application Lifecycle
-
-1. **Installation**: Install application package through `eos_app_install`
-2. **Initialization**: Initialize application system through `eos_app_init` when system starts
-3. **Running**: Run application through script engine
-4. **Uninstallation**: Uninstall application through `eos_app_uninstall`
-
-## Usage Examples
-
-### Install Application
-
-```c
-eos_result_t result = eos_app_install("/path/to/app.eapk");
-if (result == EOS_OK) {
-    // Installation successful
-} else {
-    // Installation failed
-}
-```
-
-### Uninstall Application
-
-```c
-eos_result_t result = eos_app_uninstall("com.example.app");
-if (result == EOS_OK) {
-    // Uninstallation successful
-} else {
-    // Uninstallation failed
-}
-```
-
-### Get Application List
-
-```c
-uint32_t app_count = eos_app_get_installed();
-for (size_t i = 0; i < app_count; i++) {
-    const char* app_id = eos_app_list_get_id(i);
-    // Process application ID
-}
-```
-
-## Implementation Details
-
-The core implementation of the application management module includes:
-
-1. **Application package parsing**: Parse .eapk files, extract application information and files
-2. **Application list management**: Maintain application list, support CRUD operations
-3. **Application directory management**: Manage application installation directories and data directories
-4. **Application sorting**: Support application list sorting and persistence
-
-This module works closely with the file system module and script engine module to provide complete application management functionality for ElenixOS.
+For the application-perspective Pull/Push, synchronous/asynchronous, and lifecycle contracts, see [Application and Framework Contract](../../application_contract); for platform-side registration and reporting methods, see [Platform/Vendor Contract](../../platform_contract).

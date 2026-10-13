@@ -1,149 +1,21 @@
 ---
-sidebar_position: 6
 title: Swipe Panel
+sidebar_position: 6
 ---
 
 # Swipe Panel
 
-## Overview
-
-Swipe Panel is a single-direction sliding panel used to slide `swipe_obj` from outside the screen into the screen. It supports touch swipe-in and function-controlled slide-in, and comes with sliding animation. Swipe Panel is a functional wrapper based on the Slide Widget component, providing a higher-level interface and more complete panel management functions.
-
-Swipe Panel is suitable for panel scenarios that need to slide in/out from the screen edge, such as control center, notification panel, settings panel, etc.
-
-## Core Features
-
-- **Four-Direction Support**: Supports sliding in four directions: up, down, left, and right
-- **Touch Control**: Supports gesture touch sliding for intuitive interaction experience
-- **Function Control**: Provides API functions to control panel display and hiding
-- **Animation Effects**: Built-in smooth sliding animation to enhance user experience
-- **Gesture Area**: Provides dedicated gesture trigger area to optimize touch experience
-- **Handle Bar**: Built-in small white bar indicator for visual guidance
-
-## Usage
-
-Use `eos_swipe_panel_create()` to create a new swipe panel. After creation, you can set the sliding direction, control panel display and hiding, etc.
-
-## Notes
-
-This code is a functional wrapper of `slide_widget`, providing a higher-level interface and more complete panel management functions.
-
-## Example
+Swipe Panel is an edge-sliding panel based on Slide Widget, supporting four directions: up, down, left, and right. After creation, the panel can be shown, hidden, and moved by gestures or API.
 
 ```c
-// Create swipe panel
 eos_swipe_panel_t *sp = eos_swipe_panel_create(parent);
-
-// Set sliding direction to slide in from bottom
 eos_swipe_panel_set_dir(sp, EOS_SWIPE_DIR_DOWN);
-
-// Slide into screen
-eos_swipe_panel_slide_down(sp);
-
-// Slide out of screen
-eos_swipe_panel_slide_up(sp);
-
-// Hide Handle Bar
+eos_swipe_panel_show(sp);
+eos_swipe_panel_pull_back(sp);
 eos_swipe_panel_hide_handle_bar(sp);
-
-// Show Handle Bar
-eos_swipe_panel_show_handle_bar(sp);
-
-// Delete swipe panel
 eos_swipe_panel_delete(sp);
 ```
 
-## API Reference
+The direction constants are `EOS_SWIPE_DIR_UP`, `EOS_SWIPE_DIR_DOWN`, `EOS_SWIPE_DIR_LEFT`, and `EOS_SWIPE_DIR_RIGHT`. `eos_swipe_panel_move(sp, target, anim)` uses absolute coordinates on the display axis; when `anim` is true, animation is performed.
 
-### Direction Definition
-
-```c
-typedef enum{
-    EOS_SWIPE_DIR_UP=0,      // Swipe up from bottom to pull out swipe_obj
-    EOS_SWIPE_DIR_DOWN=1,    // Swipe down from top to pull out swipe_obj
-    EOS_SWIPE_DIR_LEFT=2,    // Swipe left from right to pull out swipe_obj
-    EOS_SWIPE_DIR_RIGHT=3    // Swipe right from left to pull out swipe_obj
-} eos_swipe_dir_t;
-```
-
-### Structures
-
-- **`eos_swipe_panel_t`**: Swipe panel structure containing all state and configuration information of the component
-
-### Functions
-
-- **`eos_swipe_panel_create(lv_obj_t *parent)`**: Create swipe panel
-  - Parameters:
-    - `parent`: Parent object of the swipe panel
-  - Return value: Pointer to the successfully created Swipe Panel
-  - Note: When not in use, you need to use `eos_swipe_panel_delete` to delete this control, otherwise memory leak may occur
-
-- **`eos_swipe_panel_set_dir(eos_swipe_panel_t *swipe_panel, const eos_swipe_dir_t dir)`**: Set drag direction
-  - Parameters:
-    - `swipe_panel`: Swipe panel
-    - `dir`: Drag direction, for example `EOS_SWIPE_DIR_DOWN` means drag down to pull out `swipe_obj`
-
-- **`eos_swipe_panel_slide_down(eos_swipe_panel_t *sp)`**: Slide panel into screen
-  - Parameters:
-    - `sp`: Target swipe panel
-
-- **`eos_swipe_panel_slide_up(eos_swipe_panel_t *sp)`**: Slide panel out of screen
-  - Parameters:
-    - `sp`: Target swipe panel
-
-- **`eos_swipe_panel_hide_handle_bar(eos_swipe_panel_t *swipe_panel)`**: Hide Handle Bar (small white bar)
-  - Parameters:
-    - `swipe_panel`: Swipe panel
-
-- **`eos_swipe_panel_show_handle_bar(eos_swipe_panel_t *swipe_panel)`**: Show Handle Bar (small white bar)
-  - Parameters:
-    - `swipe_panel`: Swipe panel
-
-- **`eos_swipe_panel_pull_back(eos_swipe_panel_t *swipe_panel)`**: Externally trigger pull-back animation, automatically pull back outside the screen
-  - Parameters:
-    - `swipe_panel`: Swipe panel
-
-- **`eos_swipe_panel_move(eos_swipe_panel_t *swipe_panel, int32_t target, bool anim)`**: Trigger pull animation, move swipe panel to specified pixel position (absolute coordinates)
-  - Parameters:
-    - `swipe_panel`: Swipe panel
-    - `target`: Target position, unit pixels
-    - `anim`: Whether to enable animation
-  - Note: When swipe panel is horizontal, target controls x-axis coordinate; when swipe panel is vertical, target controls y-axis coordinate
-
-- **`eos_swipe_panel_show(eos_swipe_panel_t *sp)`**: Show swipe panel
-  - Parameters:
-    - `sp`: Swipe panel
-
-- **`eos_swipe_panel_hide(eos_swipe_panel_t *sp)`**: Hide swipe panel
-  - Parameters:
-    - `sp`: Swipe panel
-
-- **`eos_swipe_panel_delete(eos_swipe_panel_t *swipe_panel)`**: Delete Swipe Panel
-  - Parameters:
-    - `swipe_panel`: Swipe panel
-
-## Working Principle
-
-1. **Initialization**: Create swipe panel object, including swipe_obj, touch_obj and handle_bar
-2. **Direction Setting**: Adjust panel and touch area position and size according to set direction
-3. **Gesture Detection**: Listen for gesture operations on touch area, calculate sliding distance
-4. **Animation Execution**: Execute corresponding sliding animation based on gesture or function call
-5. **State Management**: Manage panel display/hide state, update touch area position
-
-## Use Cases
-
-- **Control Center**: Control panel sliding in from screen edge
-- **Notification Panel**: Swipe panel displaying notifications and reminders
-- **Settings Panel**: Swipe panel for quick access to settings
-- **Menu Panel**: Menu system sliding in from edge
-- **Info Panel**: Swipe panel displaying additional information
-
-## Notes
-
-- **Memory Management**: Created swipe panels occupy memory and should be deleted in time when no longer needed
-- **Parent Object**: Ensure parent object exists and is valid, otherwise may cause memory leak or crash
-- **Direction Setting**: After setting direction, panel automatically adjusts position and size
-- **Gesture Area**: Default gesture area is 50 pixels, can be adjusted as needed
-- **Animation Duration**: Default animation duration is 200ms, can be adjusted as needed
-- **Handle Bar**: Handle Bar provides visual guidance, can be shown or hidden as needed
-- **Event Handling**: Panel sliding events are handled by the underlying Slide Widget component
+The component contains the panel object, gesture area, and handle bar. The default gesture area is 50 pixels, and the default animation is chosen internally by the component; callers should not rely on the internal object layout. To listen for sliding state, use the public callback registration interface of its internal Slide Widget.
